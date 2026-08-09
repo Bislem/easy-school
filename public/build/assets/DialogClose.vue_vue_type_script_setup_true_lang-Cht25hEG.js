@@ -1,0 +1,1 @@
+import{t as s}from"./Breadcrumbs.vue_vue_type_script_setup_true_lang-zUN6wXa_.js";import{d as t,c as r,o as l,u as n,I as p,w as c,G as d}from"./app-DyB9s2r5.js";const u=t({__name:"DialogClose",props:{asChild:{type:Boolean},as:{}},setup(o){const e=o;return(a,i)=>(l(),r(n(s),p({"data-slot":"dialog-close"},e),{default:c(()=>[d(a.$slots,"default")]),_:3},16))}});export{u as _};
