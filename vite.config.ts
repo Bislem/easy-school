@@ -14,6 +14,7 @@ export default defineConfig({
         tailwindcss(),
         wayfinder({
             formVariants: true,
+            command: 'php8.4 artisan wayfinder:generate',
         }),
         vue({
             template: {

@@ -6,13 +6,12 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useTwoFactorAuth } from '@/composables/useTwoFactorAuth';
 import AppLayout from '@/layouts/AppLayout.vue';
-import ClientLayout from '@/layouts/ClientLayout.vue';
 import SettingsLayout from '@/layouts/settings/Layout.vue';
 import { disable, enable, show } from '@/routes/two-factor';
 import { BreadcrumbItem } from '@/types';
-import { Form, Head, usePage } from '@inertiajs/vue3';
+import { Form, Head } from '@inertiajs/vue3';
 import { ShieldBan, ShieldCheck } from 'lucide-vue-next';
-import { computed, onUnmounted, ref } from 'vue';
+import { onUnmounted, ref } from 'vue';
 
 interface Props {
     requiresConfirmation?: boolean;
@@ -37,18 +36,10 @@ const showSetupModal = ref<boolean>(false);
 onUnmounted(() => {
     clearTwoFactorAuthData();
 });
-
-const page = usePage();
-
-const layout = computed(() => {
-    return page.props.auth.user.role === 'admin'
-        ? AppLayout
-        : ClientLayout
-})
 </script>
 
 <template>
-    <component :is="layout" :breadcrumbs="breadcrumbs">
+    <AppLayout :breadcrumbs="breadcrumbs">
         <Head title="Authentification à deux facteurs" />
         <SettingsLayout>
             <div class="space-y-6">
@@ -66,7 +57,8 @@ const layout = computed(() => {
                     <p class="text-muted-foreground">
                         Lorsque vous activez l’authentification à deux facteurs,
                         un code sécurisé vous sera demandé à la connexion. Ce
-                        code est fourni par une application TOTP sur votre téléphone.
+                        code est fourni par une application TOTP sur votre
+                        téléphone.
                     </p>
 
                     <div>
@@ -124,5 +116,5 @@ const layout = computed(() => {
                 />
             </div>
         </SettingsLayout>
-    </component>
+    </AppLayout>
 </template>
