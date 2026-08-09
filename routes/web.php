@@ -7,8 +7,15 @@ use App\Http\Controllers\Admin\UsersController;
 use App\Http\Controllers\Admin\ClassroomsController;
 use App\Http\Controllers\Admin\CoursesController;
 use App\Http\Controllers\Admin\StudentsController;
+use App\Http\Controllers\Admin\EnrollmentFormsController;
+use App\Http\Controllers\Admin\ExpensesController;
+use App\Http\Controllers\PublicEnrollmentController;
 
 Route::redirect('/', '/login')->name('home');
+
+Route::get('inscription/confirmer/{enrollment}/{token}', [PublicEnrollmentController::class, 'confirm'])->middleware('signed')->name('public.enrollment.confirm');
+Route::get('inscription/{enrollmentForm:public_token}', [PublicEnrollmentController::class, 'show'])->name('public.enrollment.show');
+Route::post('inscription/{enrollmentForm:public_token}', [PublicEnrollmentController::class, 'store'])->middleware('throttle:10,1')->name('public.enrollment.store');
 
 Route::middleware(['auth', 'verified', 'active'])->get('/dashboard', function () {
     return Inertia::render('Dashboard');
@@ -36,6 +43,18 @@ Route::middleware(['auth', 'verified', 'active', 'admin'])
         Route::post('students', [StudentsController::class, 'store'])->name('students.store');
         Route::put('students/{student}', [StudentsController::class, 'update'])->name('students.update');
         Route::patch('students/{student}/toggle-active', [StudentsController::class, 'toggleActive'])->name('students.toggle-active');
+        Route::get('enrollment-forms', [EnrollmentFormsController::class, 'index'])->name('enrollment-forms.index');
+        Route::get('enrollment-forms/{enrollmentForm}', [EnrollmentFormsController::class, 'show'])->name('enrollment-forms.show');
+        Route::post('enrollment-forms', [EnrollmentFormsController::class, 'store'])->name('enrollment-forms.store');
+        Route::put('enrollment-forms/{enrollmentForm}', [EnrollmentFormsController::class, 'update'])->name('enrollment-forms.update');
+        Route::patch('enrollment-forms/{enrollmentForm}/toggle-active', [EnrollmentFormsController::class, 'toggleActive'])->name('enrollment-forms.toggle-active');
+        Route::patch('enrollment-forms/{enrollmentForm}/enrollments/{enrollment}/group', [EnrollmentFormsController::class, 'updateGroup'])->name('enrollment-forms.enrollments.group');
+        Route::post('enrollment-forms/{enrollmentForm}/enrollments', [EnrollmentFormsController::class, 'addEnrollment'])->name('enrollment-forms.enrollments.store');
+        Route::delete('enrollment-forms/{enrollmentForm}/enrollments/{enrollment}', [EnrollmentFormsController::class, 'removeEnrollment'])->name('enrollment-forms.enrollments.destroy');
+        Route::get('expenses', [ExpensesController::class, 'index'])->name('expenses.index');
+        Route::post('expenses', [ExpensesController::class, 'store'])->name('expenses.store');
+        Route::put('expenses/{expense}', [ExpensesController::class, 'update'])->name('expenses.update');
+        Route::delete('expenses/{expense}', [ExpensesController::class, 'destroy'])->name('expenses.destroy');
     });
 require __DIR__ . '/settings.php';
 require __DIR__ . '/auth.php';

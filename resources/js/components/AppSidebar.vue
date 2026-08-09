@@ -16,8 +16,10 @@ import { Link, usePage } from '@inertiajs/vue3';
 import {
     BookOpen,
     ClipboardCheck,
+    ClipboardList,
     GraduationCap,
     LayoutDashboard,
+    ReceiptText,
     Settings,
     Users,
 } from 'lucide-vue-next';
@@ -43,6 +45,12 @@ const mainNavItems: NavItem[] = [
               },
               { title: 'Salles', href: '/admin/classrooms', icon: BookOpen },
               { title: 'Formations', href: '/admin/courses', icon: BookOpen },
+              {
+                  title: 'Inscriptions',
+                  href: '/admin/enrollment-forms',
+                  icon: ClipboardList,
+              },
+              { title: 'Dépenses', href: '/admin/expenses', icon: ReceiptText },
               { title: 'Présences', href: '#', icon: ClipboardCheck },
           ]
         : []),

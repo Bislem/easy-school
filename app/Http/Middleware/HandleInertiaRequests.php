@@ -66,6 +66,7 @@ class HandleInertiaRequests extends Middleware
             'flash' => [
                 'restricted_action' => $request->session()->get('restricted_action'),
                 'success' => $request->session()->get('success'),
+                'enrollment_pending' => $request->session()->get('enrollment_pending'),
             ],
         ];
     }
