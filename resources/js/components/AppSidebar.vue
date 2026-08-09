@@ -11,72 +11,68 @@ import {
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
 import { home } from '@/routes';
-import { index as carsIndex } from '@/routes/admin/cars/index';
-import { index as clientsIndex } from '@/routes/admin/clients/index';
-import { index as paymentsIndex } from '@/routes/admin/payments/index';
-import { index as reportsIndex } from '@/routes/admin/reports/index';
-import { index as reservationsIndex } from '@/routes/admin/reservations/index';
-import { index as supportIndex } from '@/routes/admin/support/index';
 import { type NavItem } from '@/types';
-import { Link } from '@inertiajs/vue3';
+import { Link, usePage } from '@inertiajs/vue3';
 import {
-    BarChart,
-    Calendar,
-    Car,
-    CreditCard,
-    ReceiptText,
-    LifeBuoy,
+    BookOpen,
+    ClipboardCheck,
+    GraduationCap,
+    LayoutDashboard,
     Settings,
-    User,
+    Users,
 } from 'lucide-vue-next';
 import AppLogo from './AppLogo.vue';
 
+const page = usePage();
+const role = page.props.auth.user.role;
+const school = page.props.school as { primary_color?: string } | undefined;
+
 const mainNavItems: NavItem[] = [
     {
-        title: 'Véhicules',
-        href: carsIndex(),
-        icon: Car,
+        title: 'Tableau de bord',
+        href: '/dashboard',
+        icon: LayoutDashboard,
     },
+    ...(role === 'admin'
+        ? [
+              { title: 'Utilisateurs', href: '/admin/users', icon: Users },
+              {
+                  title: 'Étudiants',
+                  href: '/admin/students',
+                  icon: GraduationCap,
+              },
+              { title: 'Salles', href: '/admin/classrooms', icon: BookOpen },
+              { title: 'Formations', href: '/admin/courses', icon: BookOpen },
+              { title: 'Présences', href: '#', icon: ClipboardCheck },
+          ]
+        : []),
     {
-        title: 'Réservations',
-        href: reservationsIndex(),
-        icon: Calendar,
-    },
-    {
-        title: 'Clients',
-        href: clientsIndex(),
-        icon: User,
-    },
-    {
-        title: 'Paiements',
-        href: paymentsIndex(),
-        icon: CreditCard,
-    },
-    {
-        title: 'Dépenses',
-        href: '/admin/expenses',
-        icon: ReceiptText,
-    },
-    {
-        title: 'Rapports',
-        href: reportsIndex(),
-        icon: BarChart,
-    },
-    {
-        title: 'Support',
-        href: supportIndex(),
-        icon: LifeBuoy,
-    },
-    {
-        title: "Paramètres de l'agence",
-        href: '/admin/settings',
+        title: 'Paramètres du compte',
+        href: '/settings/profile',
         icon: Settings,
     },
+    ...(role === 'admin'
+        ? [
+              {
+                  title: "Paramètres de l'école",
+                  href: '/admin/settings',
+                  icon: Settings,
+              },
+          ]
+        : []),
 ];
 </script>
 
 <template>
-    <Sidebar collapsible="icon" variant="inset">
+    <Sidebar
+        collapsible="icon"
+        variant="inset"
+        :style="
+            school?.primary_color
+                ? { '--primary': school.primary_color }
+                : undefined
+        "
+    >
         <SidebarHeader>
             <SidebarMenu>
                 <SidebarMenuItem>

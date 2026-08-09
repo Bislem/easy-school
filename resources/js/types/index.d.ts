@@ -34,11 +34,6 @@ export interface User {
     avatar?: string;
     role: string;
     birth_date?: string | null;
-    driving_license_number?: string | null;
-    driving_license_delivered_at?: string | null;
-    driving_license_authority?: string | null;
-    driving_license_url?: string | null;
-    approval_status?: string;
     email_verified_at: string | null;
     created_at: string;
     updated_at: string;

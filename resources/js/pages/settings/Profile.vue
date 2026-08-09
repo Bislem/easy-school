@@ -13,8 +13,6 @@ import { Label } from '@/components/ui/label';
 import AppLayout from '@/layouts/AppLayout.vue';
 import SettingsLayout from '@/layouts/settings/Layout.vue';
 import { type BreadcrumbItem } from '@/types';
-import ClientLayout from '@/layouts/ClientLayout.vue';
-import { computed } from 'vue';
 
 interface Props {
     mustVerifyEmail: boolean;
@@ -32,16 +30,10 @@ const breadcrumbItems: BreadcrumbItem[] = [
 
 const page = usePage();
 const user = page.props.auth.user;
-
-const layout = computed(() => {
-    return page.props.auth.user.role === 'admin'
-        ? AppLayout
-        : ClientLayout
-})
 </script>
 
 <template>
-    <component :is="layout" :breadcrumbs="breadcrumbItems">
+    <AppLayout :breadcrumbs="breadcrumbItems">
         <Head title="Paramètres du profil" />
 
         <SettingsLayout>
@@ -85,9 +77,17 @@ const layout = computed(() => {
                         <InputError class="mt-2" :message="errors.email" />
                     </div>
 
-                    <div v-if="user.role === 'client'" class="grid gap-2">
+                    <div class="grid gap-2">
                         <Label for="phone">Numéro de téléphone</Label>
-                        <Input id="phone" type="tel" name="phone" :default-value="user.phone ?? ''" maxlength="50" autocomplete="tel" required />
+                        <Input
+                            id="phone"
+                            type="tel"
+                            name="phone"
+                            :default-value="user.phone ?? ''"
+                            maxlength="50"
+                            autocomplete="tel"
+                            required
+                        />
                         <InputError class="mt-2" :message="errors.phone" />
                     </div>
 
@@ -99,7 +99,8 @@ const layout = computed(() => {
                                 as="button"
                                 class="text-foreground underline decoration-neutral-300 underline-offset-4 transition-colors duration-300 ease-out hover:decoration-current! dark:decoration-neutral-500"
                             >
-                                Cliquez ici pour renvoyer l'e-mail de vérification.
+                                Cliquez ici pour renvoyer l'e-mail de
+                                vérification.
                             </Link>
                         </p>
 
@@ -107,7 +108,8 @@ const layout = computed(() => {
                             v-if="status === 'verification-link-sent'"
                             class="mt-2 text-sm font-medium text-green-600"
                         >
-                            Un nouveau lien de vérification a été envoyé à votre adresse e-mail.
+                            Un nouveau lien de vérification a été envoyé à votre
+                            adresse e-mail.
                         </div>
                     </div>
 
@@ -137,5 +139,5 @@ const layout = computed(() => {
 
             <DeleteUser />
         </SettingsLayout>
-    </component>
+    </AppLayout>
 </template>

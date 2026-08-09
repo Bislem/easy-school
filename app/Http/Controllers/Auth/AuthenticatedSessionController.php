@@ -12,6 +12,7 @@ use Inertia\Inertia;
 use Inertia\Response;
 use Laravel\Fortify\Features;
 use App\Enums\UserRole;
+use App\Models\CompanySetting;
 
 class AuthenticatedSessionController extends Controller
 {
@@ -27,45 +28,32 @@ class AuthenticatedSessionController extends Controller
     }
 
     /**
-     * Show the admin login page.
-     */
-    public function adminLogin(Request $request): Response
-    {
-        return Inertia::render('auth/AdminLogin', [
-            'canResetPassword' => Route::has('password.request'),
-            'status' => $request->session()->get('status'),
-        ]);
-    }
-
-    /**
      * Handle an incoming authentication request.
      */
     public function store(LoginRequest $request): RedirectResponse
     {
         $user = $request->validateCredentials();
+        $role = $user->getRawOriginal('role');
 
-        // Only allow clients to login through this method
-        if ($user->role !== UserRole::CLIENT) {
+        if (! in_array($role, [UserRole::ADMIN->value, UserRole::TEACHER->value], true)) {
             Auth::logout();
+
             return back()->withErrors([
-                'email' => 'You are not authorized to access this area.',
+                'email' => 'Seuls les administrateurs et les enseignants peuvent accéder à ce portail.',
             ])->onlyInput('email');
         }
 
-        if (($user->approval_status ?? 'approved') !== 'approved') {
+        if ($role === UserRole::TEACHER->value && CompanySetting::current()->teacher_login_disabled) {
             Auth::logout();
-            $message = match ($user->approval_status) {
-                'pending' => "Votre compte attend encore l'approbation de l'agence.",
-                'rejected' => 'Votre demande de compte a été refusée. '.($user->rejection_reason ?: 'Veuillez contacter l’agence.'),
-                default => 'Votre compte client n’est pas autorisé à se connecter.',
-            };
 
-            return back()->withErrors(['email' => $message])->onlyInput('email');
+            return back()->withErrors([
+                'email' => "L'accès des enseignants est actuellement désactivé par l'administrateur.",
+            ])->onlyInput('email');
         }
 
         if (! $user->is_active) {
             Auth::logout();
-            return back()->withErrors(['email' => 'Votre compte est suspendu. Veuillez contacter l’agence.'])->onlyInput('email');
+            return back()->withErrors(['email' => "Votre compte est inactif. Veuillez contacter l'administrateur."])->onlyInput('email');
         }
 
         if (Features::enabled(Features::twoFactorAuthentication()) && $user->hasEnabledTwoFactorAuthentication()) {
@@ -80,34 +68,7 @@ class AuthenticatedSessionController extends Controller
         Auth::login($user, $request->boolean('remember'));
         $request->session()->regenerate();
 
-        return redirect()->intended(route('client.home', absolute: false));
-    }
-
-    public function storeAdminLogin(LoginRequest $request): RedirectResponse
-    {
-        $user = $request->validateCredentials();
-
-        // Only allow admins to login through this method
-        if ($user->role !== UserRole::ADMIN) {
-            Auth::logout();
-            return back()->withErrors([
-                'email' => 'You are not authorized to access the admin area.',
-            ])->onlyInput('email');
-        }
-
-        if (Features::enabled(Features::twoFactorAuthentication()) && $user->hasEnabledTwoFactorAuthentication()) {
-            $request->session()->put([
-                'login.id' => $user->getKey(),
-                'login.remember' => $request->boolean('remember'),
-            ]);
-
-            return to_route('two-factor.login');
-        }
-
-        Auth::login($user, $request->boolean('remember'));
-        $request->session()->regenerate();
-
-        return redirect()->intended(route('admin.home', absolute: false));
+        return redirect()->intended(route('dashboard', absolute: false));
     }
 
     /**

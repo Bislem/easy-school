@@ -13,13 +13,7 @@ class HomePagesController extends Controller
 {
     public function index()
     {
-        $homeCars = Car::whereIn('id', [6, 8, 13, 17, 23, 29])
-        ->select('id', 'make', 'model', 'year', 'price_per_day', 'description', 'fuel_type')
-        ->orderBy('year', 'asc')
-            ->limit(30)
-            ->get();
-
-        return inertia('Welcome', compact('homeCars'));
+        return inertia('Welcome');
     }
 
     public function fleet(Request $request)

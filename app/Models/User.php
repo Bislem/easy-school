@@ -29,14 +29,6 @@ class User extends Authenticatable
         'role',
         'is_active',
         'birth_date',
-        'driving_license_number',
-        'driving_license_delivered_at',
-        'driving_license_authority',
-        'driving_license_path',
-        'approval_status',
-        'rejection_reason',
-        'approved_at',
-        'approved_by',
     ];
 
     /**
@@ -62,24 +54,7 @@ class User extends Authenticatable
             'role' => UserRole::class,
             'is_active' => 'boolean',
             'birth_date' => 'date:Y-m-d',
-            'driving_license_delivered_at' => 'date:Y-m-d',
-            'approved_at' => 'datetime',
         ];
-    }
-
-    protected $appends = ['driving_license_url'];
-
-    public function getDrivingLicenseUrlAttribute(): ?string
-    {
-        if (!$this->driving_license_path) {
-            return null;
-        }
-
-        $host = app()->runningInConsole()
-            ? config('app.url')
-            : request()->getSchemeAndHttpHost();
-
-        return rtrim($host, '/') . '/storage/' . ltrim($this->driving_license_path, '/');
     }
 
     /**

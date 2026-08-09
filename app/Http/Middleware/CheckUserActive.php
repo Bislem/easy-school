@@ -23,7 +23,7 @@ class CheckUserActive
             $request->session()->regenerateToken();
             
             return redirect()->route('login')
-                ->with('error', 'Your account has been deactivated. Please contact the administrator.');
+                ->with('error', "Votre compte a été désactivé. Veuillez contacter l'administrateur.");
         }
 
         return $next($request);

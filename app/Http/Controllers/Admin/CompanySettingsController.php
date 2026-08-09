@@ -35,7 +35,6 @@ class CompanySettingsController extends Controller
             'trading_name' => ['required', 'string', 'max:255'],
             'legal_name' => ['nullable', 'string', 'max:255'],
             'registration_number' => ['nullable', 'string', 'max:100'],
-            'tax_number' => ['nullable', 'string', 'max:100'],
             'address_line_1' => ['nullable', 'string', 'max:255'],
             'address_line_2' => ['nullable', 'string', 'max:255'],
             'city' => ['nullable', 'string', 'max:100'],
@@ -46,12 +45,7 @@ class CompanySettingsController extends Controller
             'email' => ['nullable', 'email', 'max:255'],
             'website' => ['nullable', 'url', 'max:255'],
             'primary_color' => ['required', 'regex:/^#[0-9A-Fa-f]{6}$/'],
-            'website_disabled' => ['required', 'boolean'],
-            'booking_disabled' => ['required', 'boolean'],
-            'client_login_disabled' => ['required', 'boolean'],
-            'tax_enabled' => ['required', 'boolean'],
-            'tax_rate' => ['required', 'numeric', 'between:0,100'],
-            'online_advance_percentage' => ['required', 'numeric', 'between:0,100'],
+            'teacher_login_disabled' => ['required', 'boolean'],
             'logo_temp_folders' => ['array'],
             'logo_temp_folders.*' => ['string'],
             'logo_removed_files' => ['array'],
@@ -71,6 +65,6 @@ class CompanySettingsController extends Controller
 
         $this->filePondService->handleFileUpdates($settings, $tempFolders, $removedIds, 'logo');
 
-        return back()->with('success', "Les paramètres de l'agence ont été mis à jour avec succès.");
+        return back()->with('success', "Les paramètres de l'école ont été mis à jour avec succès.");
     }
 }

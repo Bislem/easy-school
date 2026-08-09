@@ -1,283 +1,474 @@
 <script setup lang="ts">
-import CarCard from '@/components/CarCard.vue';
 import HomeLayout from '@/layouts/HomeLayout.vue';
-import { Head, usePage } from '@inertiajs/vue3';
-import { fleet } from '@/routes';
-import { about } from '@/routes';
+import { Head, Link } from '@inertiajs/vue3';
+import {
+    Award,
+    BookOpen,
+    BriefcaseBusiness,
+    Calculator,
+    Check,
+    ChevronDown,
+    Clock,
+    Code2,
+    Globe2,
+    GraduationCap,
+    Megaphone,
+    Monitor,
+    Palette,
+    Rocket,
+    Star,
+    Users,
+} from 'lucide-vue-next';
+import { ref } from 'vue';
 
-interface Car {
-    id: number;
-    make: string;
-    model: string;
-    year: number;
-    price_per_day: string;
-    description: string;
-    fuel_type: string;
-    image_url: string;
-    color?: string;
-    status?: string;
-    license_plate?: string;
-    image?: string;
-}
-
-const $page = usePage();
-const homeCars = $page.props.homeCars as Car[];
+const courses = [
+    {
+        title: 'Développement Web',
+        duration: '12 semaines',
+        level: 'Intermédiaire',
+        icon: Code2,
+        color: 'bg-orange-50 text-orange-500',
+    },
+    {
+        title: 'Design Graphique',
+        duration: '9 semaines',
+        level: 'Débutant',
+        icon: Palette,
+        color: 'bg-blue-50 text-blue-500',
+    },
+    {
+        title: 'Marketing Digital',
+        duration: '10 semaines',
+        level: 'Intermédiaire',
+        icon: Megaphone,
+        color: 'bg-emerald-50 text-emerald-500',
+    },
+    {
+        title: 'Comptabilité & Gestion',
+        duration: '12 semaines',
+        level: 'Intermédiaire',
+        icon: Calculator,
+        color: 'bg-violet-50 text-violet-500',
+    },
+    {
+        title: 'Langues',
+        duration: '8 semaines',
+        level: 'Tous niveaux',
+        icon: Globe2,
+        color: 'bg-amber-50 text-amber-500',
+    },
+    {
+        title: 'Bureautique',
+        duration: '6 semaines',
+        level: 'Débutant',
+        icon: Monitor,
+        color: 'bg-sky-50 text-sky-500',
+    },
+];
+const instructors = [
+    {
+        name: 'Yacine B.',
+        role: 'Développeur Full Stack',
+        image: '/images/team/michael.webp',
+    },
+    {
+        name: 'Sonia K.',
+        role: 'Designer graphique',
+        image: '/images/team/sara.webp',
+    },
+    {
+        name: 'Mehdi H.',
+        role: 'Expert marketing digital',
+        image: '/images/team/emily.webp',
+    },
+];
+const faqs = [
+    [
+        'Faut-il avoir des prérequis pour suivre une formation ?',
+        'Chaque formation indique clairement son niveau. Plusieurs parcours sont accessibles aux débutants sans prérequis.',
+    ],
+    [
+        'Quels sont les horaires des formations ?',
+        'Nous proposons des sessions en journée, en soirée et le week-end selon le programme choisi.',
+    ],
+    [
+        'Puis-je payer en plusieurs fois ?',
+        'Oui, des facilités de paiement peuvent être proposées selon la durée de la formation.',
+    ],
+    [
+        'Les formations sont-elles certifiées ?',
+        'Une attestation ou un certificat de fin de formation est délivré après validation du parcours.',
+    ],
+];
+const openFaq = ref<number | null>(0);
 </script>
 
 <template>
-
-    <Head>
-        <title>Ease Rent Car - Service premium de location de voitures</title>
-        <meta name="description"
-            content="Ease Rent Car est une plateforme premium proposant des solutions fiables de location de voitures, de l’économique au luxe, pour de courtes ou longues durées." />
-    </Head>
-
     <HomeLayout>
+        <Head title="Formations professionnelles" />
         <main>
-            <!--  Hero Section with Light Background -->
-            <section class="relative overflow-hidden bg-gradient-to-br from-gray-50 via-white to-gray-100 py-12">
-                <!-- Background Pattern -->
-                <div class="absolute inset-0 opacity-5">
-                    <div class="absolute inset-0" style="
-                            background-image: radial-gradient(
-                                circle at 1px 1px,
-                                rgba(0, 0, 0, 0.15) 1px,
-                                transparent 0
-                            );
-                            background-size: 20px 20px;
-                        "></div>
+            <section
+                class="relative overflow-hidden bg-gradient-to-br from-white via-white to-orange-50/70"
+            >
+                <div
+                    class="mx-auto grid max-w-7xl items-center gap-10 px-6 py-16 lg:grid-cols-[.8fr_1.2fr] lg:py-20"
+                >
+                    <div class="relative z-10">
+                        <div
+                            class="inline-flex items-center gap-2 rounded-full border border-orange-200 bg-white px-4 py-2 text-xs font-bold text-[#f4511e] shadow-sm"
+                        >
+                            <Award class="size-4" /> Formations professionnelles
+                            certifiantes
+                        </div>
+                        <h1
+                            class="mt-7 text-5xl leading-[1.08] font-black tracking-tight md:text-6xl"
+                        >
+                            Construisez<br />votre
+                            <span class="text-[#f4511e]">avenir</span>
+                        </h1>
+                        <p
+                            class="mt-6 max-w-lg text-lg leading-8 text-slate-600"
+                        >
+                            Des formations pratiques, actuelles et certifiantes
+                            pour développer vos compétences et accélérer votre
+                            carrière.
+                        </p>
+                        <div class="mt-8 flex flex-wrap gap-3">
+                            <a
+                                href="#formations"
+                                class="rounded-xl bg-[#f4511e] px-6 py-3.5 font-bold text-white shadow-xl shadow-orange-200 transition hover:-translate-y-0.5"
+                                >Découvrir nos formations →</a
+                            ><a
+                                href="#contact"
+                                class="rounded-xl border border-slate-200 bg-white px-6 py-3.5 font-bold transition hover:border-orange-300"
+                                >Nous contacter</a
+                            >
+                        </div>
+                    </div>
+                    <img
+                        src="/images/school/learning-center-hero.png"
+                        alt="Centre de formation moderne avec salles de classe"
+                        class="w-full mix-blend-multiply drop-shadow-2xl"
+                    />
                 </div>
+            </section>
 
-                <div class="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-                    <div class="grid items-center gap-16 lg:grid-cols-2">
-                        <!--  Left Content -->
-                        <div class="space-y-10">
-                            <div class="space-y-6">
-                                <div
-                                    class="inline-flex items-center rounded-full bg-orange-50 px-4 py-2 text-sm font-semibold text-orange-700 ring-1 ring-orange-200">
-                                    <svg class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                            d="M13 10V3L4 14h7v7l9-11h-7z"></path>
-                                    </svg>
-                                    Expérience de location de voiture haut de gamme
+            <section class="relative z-10 mx-auto -mt-2 max-w-7xl px-6">
+                <div
+                    class="grid rounded-2xl border bg-white p-6 shadow-xl shadow-slate-200/60 sm:grid-cols-2 lg:grid-cols-4"
+                >
+                    <div
+                        v-for="stat in [
+                            ['500+', 'apprenants formés'],
+                            ['25', 'formations certifiantes'],
+                            ['15', 'formateurs experts'],
+                            ['92%', 'de satisfaction'],
+                        ]"
+                        :key="stat[0]"
+                        class="border-slate-100 px-5 py-3 text-center last:border-0 lg:border-r"
+                    >
+                        <strong class="text-2xl">{{ stat[0] }}</strong>
+                        <p class="text-xs text-slate-500">{{ stat[1] }}</p>
+                    </div>
+                </div>
+            </section>
+
+            <section id="formations" class="mx-auto max-w-7xl px-6 py-20">
+                <h2 class="text-center text-3xl font-extrabold">
+                    Des formations pour
+                    <span class="text-[#f4511e]">chaque ambition</span>
+                </h2>
+                <div
+                    class="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6"
+                >
+                    <article
+                        v-for="course in courses"
+                        :key="course.title"
+                        class="group rounded-2xl border border-slate-100 bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:shadow-xl"
+                    >
+                        <div
+                            :class="course.color"
+                            class="grid size-12 place-items-center rounded-xl"
+                        >
+                            <component :is="course.icon" class="size-6" />
+                        </div>
+                        <h3 class="mt-5 min-h-12 font-bold">
+                            {{ course.title }}
+                        </h3>
+                        <p
+                            class="mt-3 flex items-center gap-1 text-xs text-slate-500"
+                        >
+                            <Clock class="size-3.5" /> {{ course.duration }}
+                        </p>
+                        <p class="mt-2 text-xs text-slate-500">
+                            ● {{ course.level }}
+                        </p>
+                        <div class="mt-5 text-xl text-[#f4511e]">→</div>
+                    </article>
+                </div>
+            </section>
+
+            <section id="about" class="bg-slate-50 py-20">
+                <div
+                    class="mx-auto grid max-w-7xl items-center gap-12 px-6 lg:grid-cols-2"
+                >
+                    <div>
+                        <p
+                            class="text-sm font-extrabold text-[#f4511e] uppercase"
+                        >
+                            Pourquoi nous choisir ?
+                        </p>
+                        <h2 class="mt-3 text-4xl font-black">
+                            Une expérience d'apprentissage orientée
+                            <span class="text-[#f4511e]">résultats</span>
+                        </h2>
+                        <p class="mt-5 leading-7 text-slate-600">
+                            Nous combinons expertise, pratique et accompagnement
+                            pour vous aider à atteindre vos objectifs
+                            professionnels.
+                        </p>
+                        <div class="mt-8 grid gap-5 sm:grid-cols-2">
+                            <div
+                                v-for="item in [
+                                    { t: 'Formateurs expérimentés', i: Users },
+                                    {
+                                        t: 'Apprentissage pratique',
+                                        i: BriefcaseBusiness,
+                                    },
+                                    { t: 'Horaires flexibles', i: Clock },
+                                    { t: 'Certification reconnue', i: Award },
+                                ]"
+                                :key="item.t"
+                                class="flex gap-3"
+                            >
+                                <span
+                                    class="grid size-10 shrink-0 place-items-center rounded-xl bg-orange-100 text-[#f4511e]"
+                                    ><component :is="item.i" class="size-5"
+                                /></span>
+                                <div>
+                                    <h3 class="font-bold">{{ item.t }}</h3>
+                                    <p class="mt-1 text-sm text-slate-500">
+                                        Un parcours pensé pour votre réussite.
+                                    </p>
                                 </div>
-
-                                <h1 class="text-3xl leading-tight font-bold text-gray-900 lg:text-6xl">
-                                    Conduisez votre
-                                    <span
-                                        class="bg-gradient-to-r from-orange-500 to-orange-600 bg-clip-text text-transparent">
-                                        Rêves
-                                    </span>
-                                </h1>
-
-                                <p class="max-w-lg text-lg leading-relaxed text-gray-600">
-                                    Découvrez le luxe et la fiabilité avec notre
-                                    flotte haut de gamme. Des réunions d'affaires aux
-                                    escapades du week-end, trouvez le véhicule idéal
-                                    pour chaque trajet.
+                            </div>
+                        </div>
+                    </div>
+                    <div class="rounded-[2rem] bg-white p-8 shadow-xl">
+                        <div
+                            class="rounded-2xl bg-gradient-to-br from-[#101b36] to-[#24375f] p-10 text-white"
+                        >
+                            <GraduationCap class="size-16 text-orange-400" />
+                            <h3 class="mt-8 text-3xl font-black">
+                                Apprenez aujourd'hui.<br />Réussissez demain.
+                            </h3>
+                            <div class="mt-8 space-y-3 text-sm text-slate-200">
+                                <p class="flex gap-2">
+                                    <Check class="size-5 text-orange-400" />
+                                    Projets concrets et cas pratiques
+                                </p>
+                                <p class="flex gap-2">
+                                    <Check class="size-5 text-orange-400" />
+                                    Suivi personnalisé
+                                </p>
+                                <p class="flex gap-2">
+                                    <Check class="size-5 text-orange-400" />
+                                    Compétences recherchées
                                 </p>
                             </div>
-
-                            <div class="flex flex-col gap-4 sm:flex-row">
-                                <a :href="fleet.url()"
-                                    class="group cursor-pointer inline-flex items-center justify-center rounded-xl bg-gradient-to-r from-orange-500 to-orange-600  text-md px-5 py-2 font-semibold text-white shadow-xl transition-all duration-200 hover:scale-105 hover:from-orange-600 hover:to-orange-700 hover:shadow-2xl">
-                                    <svg class="mr-2 h-5 w-5 transition-transform group-hover:translate-x-1" fill="none"
-                                        stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                            d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
-                                    </svg>
-                                    Nos véhicules
-                                </a>
-                                <a :href="about.url()"
-                                    class="inline-flex cursor-pointer items-center justify-center rounded-xl border-2 border-gray-300 bg-white text-md px-5 py-2 font-semibold text-gray-700 transition-all duration-200 hover:border-orange-500 hover:text-orange-600 hover:shadow-lg">
-                                    En savoir plus
-                                </a>
-                            </div>
-
-                            <!--  Stats -->
-                            <div class="grid grid-cols-3 gap-8 border-t border-gray-200 pt-10">
-                                <div class="text-center">
-                                    <div
-                                        class="bg-gradient-to-r from-orange-500 to-orange-600 bg-clip-text text-4xl font-bold text-transparent">
-                                        1000+
-                                    </div>
-                                    <div class="mt-1 text-sm font-medium text-gray-600">
-                                        Clients satisfaits
-                                    </div>
-                                </div>
-                                <div class="text-center">
-                                    <div
-                                        class="bg-gradient-to-r from-orange-500 to-orange-600 bg-clip-text text-4xl font-bold text-transparent">
-                                        150+
-                                    </div>
-                                    <div class="mt-1 text-sm font-medium text-gray-600">
-                                        Voitures haut de gamme
-                                    </div>
-                                </div>
-                                <div class="text-center">
-                                    <div
-                                        class="bg-gradient-to-r from-orange-500 to-orange-600 bg-clip-text text-4xl font-bold text-transparent">
-                                        24/7
-                                    </div>
-                                    <div class="mt-1 text-sm font-medium text-gray-600">
-                                        Assistance
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Right Image - Optimized for Dark Isometric Image -->
-                        <div class="flex justify-center lg:justify-end">
-                            <div class="relative">
-                                <div
-                                    class="absolute -inset-4 rounded-3xl bg-gradient-to-r from-orange-500/20 to-orange-600/20 blur-2xl">
-                                </div>
-                                <img src="/images/hero_image.png" alt="Garage de voitures premium en vue isométrique"
-                                    class="relative h-auto max-w-full rounded-2xl drop-shadow-2xl" />
-                            </div>
                         </div>
                     </div>
                 </div>
             </section>
 
-            <!--  Featured Cars Section -->
-            <section id="fleet" class="bg-white py-24">
-                <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-                    <div class="mb-20 text-center">
+            <section class="mx-auto max-w-7xl px-6 py-20">
+                <div
+                    class="grid items-center gap-6 rounded-3xl border border-orange-100 bg-orange-50/60 p-7 md:grid-cols-[auto_1fr_auto]"
+                >
+                    <div
+                        class="grid size-24 place-items-center rounded-2xl bg-[#101b36] text-orange-400"
+                    >
+                        <Code2 class="size-12" />
+                    </div>
+                    <div>
+                        <p class="text-sm font-bold text-[#f4511e]">
+                            Formation phare
+                        </p>
+                        <h2 class="mt-1 text-2xl font-black">
+                            Développement Web Full Stack
+                        </h2>
+                        <p class="mt-3 text-sm text-slate-600">
+                            12 semaines · Présentiel · Niveau intermédiaire
+                        </p>
+                    </div>
+                    <div class="md:border-l md:pl-8">
+                        <p class="text-xs text-slate-500">Tarif</p>
+                        <strong class="text-2xl text-[#f4511e]"
+                            >45 000 DZD</strong
+                        ><a
+                            href="#contact"
+                            class="mt-3 block rounded-xl bg-[#f4511e] px-5 py-3 text-center text-sm font-bold text-white"
+                            >Voir le programme →</a
+                        >
+                    </div>
+                </div>
+            </section>
+
+            <section class="bg-slate-50 py-20">
+                <div class="mx-auto max-w-7xl px-6">
+                    <h2 class="text-center text-3xl font-extrabold">
+                        Comment <span class="text-[#f4511e]">s'inscrire ?</span>
+                    </h2>
+                    <div class="mt-12 grid gap-8 md:grid-cols-3">
                         <div
-                            class="mb-6 inline-flex items-center rounded-full bg-orange-50 px-4 py-2 text-sm font-semibold text-orange-700 ring-1 ring-orange-200">
-                            Notre collection Premium
+                            v-for="(step, index) in [
+                                {
+                                    t: 'Choisissez une formation',
+                                    d: 'Explorez nos parcours et trouvez celui qui vous correspond.',
+                                    i: BookOpen,
+                                },
+                                {
+                                    t: 'Inscrivez-vous en ligne',
+                                    d: 'Créez votre compte étudiant en quelques minutes.',
+                                    i: GraduationCap,
+                                },
+                                {
+                                    t: 'Commencez votre parcours',
+                                    d: 'Accédez à votre espace et démarrez votre apprentissage.',
+                                    i: Rocket,
+                                },
+                            ]"
+                            :key="step.t"
+                            class="relative text-center"
+                        >
+                            <span
+                                class="absolute top-0 left-1/2 -translate-x-10 -translate-y-3 rounded-full bg-[#f4511e] px-2 py-1 text-xs font-bold text-white"
+                                >{{ index + 1 }}</span
+                            >
+                            <div
+                                class="mx-auto grid size-20 place-items-center rounded-2xl bg-orange-100 text-[#f4511e]"
+                            >
+                                <component :is="step.i" class="size-9" />
+                            </div>
+                            <h3 class="mt-5 font-bold">{{ step.t }}</h3>
+                            <p
+                                class="mx-auto mt-2 max-w-xs text-sm leading-6 text-slate-500"
+                            >
+                                {{ step.d }}
+                            </p>
                         </div>
-                        <h2 class="mb-6 text-4xl font-bold text-gray-900 lg:text-5xl">
-                            Découvrez notre
-                            <span class="bg-gradient-to-r from-orange-500 to-orange-600 bg-clip-text text-transparent">
-                                Flotte d'élite
-                            </span>
-                        </h2>
-                        <p class="mx-auto max-w-3xl text-xl leading-relaxed text-gray-600">
-                            Chaque véhicule de notre collection est méticuleusement
-
-                            entretenu et équipé de fonctionnalités haut de gamme pour
-
-                            garantir un voyage tout simplement exceptionnel.
-                        </p>
-                    </div>
-
-                    <div class="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
-                        <CarCard v-for="car in homeCars" :key="car.id" :car="car" />
-                    </div>
-
-                    <div class="mt-16 text-center">
-                        <a :href="fleet.url()"
-                            class="inline-flex cursor-pointer items-center rounded-xl bg-gradient-to-r from-orange-500 to-orange-600 px-8 py-4 font-semibold text-white shadow-xl transition-all duration-200 hover:scale-105 hover:from-orange-600 hover:to-orange-700 hover:shadow-2xl">
-                            <svg class="mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10">
-                                </path>
-                            </svg>
-                            Voir la flotte complète
-                        </a>
                     </div>
                 </div>
             </section>
 
-            <!--  Features Section -->
-            <section id="services" class="bg-gray-50 py-24">
-                <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-                    <div class="mb-20 text-center">
-                        <h2 class="mb-6 text-4xl font-bold text-gray-900 lg:text-5xl">
-                            Pourquoi choisir
-                            <span class="bg-gradient-to-r from-orange-500 to-orange-600 bg-clip-text text-transparent">
-                                Ease Rent </span>?
-                        </h2>
-                        <p class="mx-auto max-w-2xl text-xl text-gray-600">
-                            Nous nous engageons à vous offrir une expérience de location de voiture inégalée
+            <section id="formateurs" class="mx-auto max-w-7xl px-6 py-20">
+                <h2 class="text-center text-3xl font-extrabold">
+                    Nos <span class="text-[#f4511e]">formateurs</span>
+                </h2>
+                <div class="mx-auto mt-10 grid max-w-5xl gap-5 md:grid-cols-3">
+                    <article
+                        v-for="person in instructors"
+                        :key="person.name"
+                        class="overflow-hidden rounded-2xl border bg-white shadow-sm"
+                    >
+                        <img
+                            :src="person.image"
+                            :alt="person.name"
+                            class="h-64 w-full object-cover object-top"
+                        />
+                        <div class="p-5">
+                            <h3 class="font-bold">{{ person.name }}</h3>
+                            <p class="mt-1 text-sm text-slate-500">
+                                {{ person.role }}
+                            </p>
+                        </div>
+                    </article>
+                </div>
+            </section>
 
-                            avec un service haut de gamme à chaque
-                            point de contact.
+            <section class="bg-orange-50/50 py-20">
+                <div class="mx-auto max-w-7xl px-6">
+                    <h2 class="text-center text-3xl font-extrabold">
+                        Ce que disent nos
+                        <span class="text-[#f4511e]">apprenants</span>
+                    </h2>
+                    <div class="mt-10 grid gap-5 md:grid-cols-3">
+                        <blockquote
+                            v-for="(quote, i) in [
+                                'Une formation très pratique qui m’a permis de changer de carrière.',
+                                'Un accompagnement de qualité et des projets proches du monde professionnel.',
+                                'Des formateurs disponibles, pédagogues et vraiment passionnés.',
+                            ]"
+                            :key="quote"
+                            class="rounded-2xl bg-white p-6 shadow-sm"
+                        >
+                            <p class="leading-7 text-slate-600">
+                                “{{ quote }}”
+                            </p>
+                            <div class="mt-5 flex items-center justify-between">
+                                <strong>{{
+                                    ['Amel R.', 'Karim M.', 'Lina T.'][i]
+                                }}</strong
+                                ><span class="flex text-[#f4511e]"
+                                    ><Star
+                                        v-for="n in 5"
+                                        :key="n"
+                                        class="size-4 fill-current"
+                                /></span>
+                            </div>
+                        </blockquote>
+                    </div>
+                </div>
+            </section>
+
+            <section class="mx-auto max-w-5xl px-6 py-20">
+                <h2 class="text-center text-3xl font-extrabold">
+                    Questions <span class="text-[#f4511e]">fréquentes</span>
+                </h2>
+                <div
+                    class="mt-10 divide-y overflow-hidden rounded-2xl border bg-white"
+                >
+                    <div v-for="(faq, index) in faqs" :key="faq[0]">
+                        <button
+                            class="flex w-full items-center justify-between p-5 text-left font-semibold"
+                            @click="openFaq = openFaq === index ? null : index"
+                        >
+                            {{ faq[0]
+                            }}<ChevronDown
+                                class="size-5 transition"
+                                :class="{ 'rotate-180': openFaq === index }"
+                            />
+                        </button>
+                        <p
+                            v-if="openFaq === index"
+                            class="px-5 pb-5 text-sm leading-6 text-slate-600"
+                        >
+                            {{ faq[1] }}
                         </p>
                     </div>
+                </div>
+            </section>
 
-                    <div class="grid gap-12 md:grid-cols-3">
-                        <div class="group text-center">
-                            <div
-                                class="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-2xl bg-gradient-to-br from-orange-500 to-orange-600 shadow-xl transition-transform duration-200 group-hover:scale-110">
-                                <svg class="h-10 w-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                                </svg>
-                            </div>
-                            <h3 class="mb-4 text-2xl font-bold text-gray-900">
-                                Qualité supérieure
-                            </h3>
-                            <p class="leading-relaxed text-gray-600">
-                                Chaque véhicule fait l'objet d'une inspection complète
-
-                                et d'un entretien afin de garantir votre sécurité,
-
-                                votre confort et votre tranquillité d'esprit.
-                            </p>
-                        </div>
-
-                        <div class="group text-center">
-                            <div
-                                class="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-2xl bg-gradient-to-br from-orange-500 to-orange-600 shadow-xl transition-transform duration-200 group-hover:scale-110">
-                                <svg class="h-10 w-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                        d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                                </svg>
-                            </div>
-                            <h3 class="mb-4 text-2xl font-bold text-gray-900">
-                                Assistance 24/7
-                            </h3>
-                            <p class="leading-relaxed text-gray-600">
-                                Notre équipe d'assistance dédiée est disponible 24h/24 et 7j/7 pour répondre à toutes
-                                vos questions et préoccupations pendant votre location.
-                            </p>
-                        </div>
-
-                        <div class="group text-center">
-                            <div
-                                class="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-2xl bg-gradient-to-br from-orange-500 to-orange-600 shadow-xl transition-transform duration-200 group-hover:scale-110">
-                                <svg class="h-10 w-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                        d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1">
-                                    </path>
-                                </svg>
-                            </div>
-                            <h3 class="mb-4 text-2xl font-bold text-gray-900">
-                                Meilleure valeur
-                            </h3>
-                            <p class="leading-relaxed text-gray-600">
-                                Tarification transparente, sans frais cachés.
-
-                                Bénéficiez de services de location de voitures haut de gamme à des tarifs compétitifs
-
-                                et d'un excellent rapport qualité-prix.
-                            </p>
-                        </div>
+            <section class="mx-auto max-w-7xl px-6 pb-20">
+                <div
+                    class="flex flex-col items-center justify-between gap-6 rounded-3xl bg-gradient-to-r from-[#101b36] to-[#24375f] p-9 text-white md:flex-row"
+                >
+                    <div>
+                        <p class="text-3xl font-black">
+                            Prêt à développer vos compétences ?
+                        </p>
+                        <p class="mt-2 text-slate-300">
+                            Rejoignez des centaines d'apprenants et construisez
+                            votre avenir.
+                        </p>
                     </div>
+                    <Link
+                        href="/login"
+                        class="shrink-0 rounded-xl bg-[#f4511e] px-7 py-4 font-bold shadow-lg"
+                        >Se connecter →</Link
+                    >
                 </div>
             </section>
         </main>
     </HomeLayout>
 </template>
-
-<style scoped>
-.font-sans {
-    font-family:
-        'Inter',
-        -apple-system,
-        BlinkMacSystemFont,
-        'Segoe UI',
-        Roboto,
-        sans-serif;
-}
-
-.line-clamp-2 {
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-}
-</style>

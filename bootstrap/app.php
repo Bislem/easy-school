@@ -2,7 +2,6 @@
 
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
-use App\Http\Middleware\WebsiteAvailability;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -20,7 +19,6 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->web(append: [
             HandleAppearance::class,
             HandleInertiaRequests::class,
-            WebsiteAvailability::class,
             AddLinkHeadersForPreloadedAssets::class,
         ]);
 
@@ -29,7 +27,6 @@ return Application::configure(basePath: dirname(__DIR__))
             'client' => \App\Http\Middleware\ClientMiddleware::class,
             'active' => \App\Http\Middleware\CheckUserActive::class,
             'restricted' => \App\Http\Middleware\restricted::class,
-            'client-access' => \App\Http\Middleware\ClientAccessEnabled::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
