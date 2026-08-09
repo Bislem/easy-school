@@ -35,6 +35,7 @@ interface EnrollmentForm {
     min_students: number;
     max_students: number;
     groups_count: number;
+    students_per_group?: number | null;
     is_active: boolean;
     course_id: number;
     teacher_id: number;
@@ -77,6 +78,7 @@ const form = useForm({
     min_students: 1,
     max_students: 20,
     groups_count: 1,
+    students_per_group: 20,
     is_active: true,
     cover_temp_folders: [] as string[],
     cover_removed_files: [] as number[],
@@ -102,6 +104,7 @@ function openCreate() {
     form.min_students = 1;
     form.max_students = 20;
     form.groups_count = 1;
+    form.students_per_group = 20;
     form.is_active = true;
     modalOpen.value = true;
 }
@@ -117,6 +120,7 @@ function openEdit(item: EnrollmentForm) {
     form.min_students = item.min_students;
     form.max_students = item.max_students;
     form.groups_count = item.groups_count;
+    form.students_per_group = item.students_per_group ?? 20;
     form.is_active = item.is_active;
     coverFiles.value = item.files
         .filter((file) => file.collection === 'cover')
@@ -257,7 +261,12 @@ const paginationLabel = (label: string) =>
                             <div class="rounded-lg bg-muted/50 p-3">
                                 <p class="text-muted-foreground">Groupes</p>
                                 <p class="mt-1 font-semibold">
-                                    {{ item.groups_count }} groupe(s)
+                                    {{ item.groups_count }} groupe(s) ·
+                                    {{
+                                        item.classroom?.capacity ??
+                                        item.students_per_group
+                                    }}
+                                    / groupe
                                 </p>
                             </div>
                         </div>
@@ -275,6 +284,8 @@ const paginationLabel = (label: string) =>
                                         item.classroom.capacity
                                     }}
                                     places)</template
+                                ><template v-else>
+                                    · Sans salle attribuée</template
                                 >
                             </p>
                         </div>
@@ -396,6 +407,25 @@ const paginationLabel = (label: string) =>
                             :message="form.errors.title"
                             class="mt-1"
                         />
+                    </div>
+                    <div v-if="!form.classroom_id">
+                        <Label for="students_per_group"
+                            >Étudiants par groupe</Label
+                        ><Input
+                            id="students_per_group"
+                            v-model="form.students_per_group"
+                            type="number"
+                            min="1"
+                            class="mt-1"
+                            required
+                        /><InputError
+                            :message="form.errors.students_per_group"
+                            class="mt-1"
+                        />
+                        <p class="mt-1 text-xs text-muted-foreground">
+                            Utilisé comme capacité de chaque groupe
+                            lorsqu’aucune salle n’est sélectionnée.
+                        </p>
                     </div>
                     <div class="grid gap-4 sm:grid-cols-2">
                         <div>

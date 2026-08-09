@@ -72,6 +72,12 @@ const pending = computed(() =>
                         enrollmentForm.classroom.name
                     }}
                 </p>
+                <p v-else class="flex items-center gap-2 text-sm">
+                    <Users class="size-4 text-orange-500" />{{
+                        enrollmentForm.students_per_group
+                    }}
+                    étudiants maximum par groupe
+                </p>
             </div>
 
             <div

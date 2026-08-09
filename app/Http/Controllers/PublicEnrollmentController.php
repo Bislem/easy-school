@@ -88,10 +88,13 @@ class PublicEnrollmentController extends Controller
                     ]);
                 }
 
+                $group = $form->nextAvailableGroup();
+                abort_if(! $group, 422, 'Tous les groupes ont atteint leur capacité maximale.');
+
                 $enrollment->update([
                     'student_id' => $student->id,
                     'confirmed_at' => now(),
-                    'group_number' => ($confirmedCount % $form->groups_count) + 1,
+                    'group_number' => $group,
                 ]);
             });
         }

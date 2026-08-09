@@ -9,7 +9,10 @@ use App\Http\Controllers\Admin\CoursesController;
 use App\Http\Controllers\Admin\StudentsController;
 use App\Http\Controllers\Admin\EnrollmentFormsController;
 use App\Http\Controllers\Admin\ExpensesController;
+use App\Http\Controllers\Admin\SalariesController;
 use App\Http\Controllers\PublicEnrollmentController;
+use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\Admin\TrainingPlansController;
 
 Route::redirect('/', '/login')->name('home');
 
@@ -17,9 +20,7 @@ Route::get('inscription/confirmer/{enrollment}/{token}', [PublicEnrollmentContro
 Route::get('inscription/{enrollmentForm:public_token}', [PublicEnrollmentController::class, 'show'])->name('public.enrollment.show');
 Route::post('inscription/{enrollmentForm:public_token}', [PublicEnrollmentController::class, 'store'])->middleware('throttle:10,1')->name('public.enrollment.store');
 
-Route::middleware(['auth', 'verified', 'active'])->get('/dashboard', function () {
-    return Inertia::render('Dashboard');
-})->name('dashboard');
+Route::middleware(['auth', 'verified', 'active'])->get('/dashboard', DashboardController::class)->name('dashboard');
 
 Route::middleware(['auth', 'verified', 'active', 'admin'])
     ->prefix('admin')
@@ -55,6 +56,20 @@ Route::middleware(['auth', 'verified', 'active', 'admin'])
         Route::post('expenses', [ExpensesController::class, 'store'])->name('expenses.store');
         Route::put('expenses/{expense}', [ExpensesController::class, 'update'])->name('expenses.update');
         Route::delete('expenses/{expense}', [ExpensesController::class, 'destroy'])->name('expenses.destroy');
+        Route::get('salaries', [SalariesController::class, 'index'])->name('salaries.index');
+        Route::post('salaries', [SalariesController::class, 'store'])->name('salaries.store');
+        Route::put('salaries/{salary}', [SalariesController::class, 'update'])->name('salaries.update');
+        Route::delete('salaries/{salary}', [SalariesController::class, 'destroy'])->name('salaries.destroy');
+        Route::get('planifications', [TrainingPlansController::class, 'index'])->name('training-plans.index');
+        Route::post('planifications', [TrainingPlansController::class, 'store'])->name('training-plans.store');
+        Route::get('planifications/{trainingPlan}', [TrainingPlansController::class, 'show'])->name('training-plans.show');
+        Route::put('planifications/{trainingPlan}', [TrainingPlansController::class, 'update'])->name('training-plans.update');
+        Route::post('planifications/{trainingPlan}/groupes', [TrainingPlansController::class, 'storeGroup'])->name('training-plans.groups.store');
+        Route::put('planifications/{trainingPlan}/groupes/{group}', [TrainingPlansController::class, 'updateGroup'])->name('training-plans.groups.update');
+        Route::delete('planifications/{trainingPlan}/groupes/{group}', [TrainingPlansController::class, 'destroyGroup'])->name('training-plans.groups.destroy');
+        Route::post('planifications/{trainingPlan}/groupes/{group}/seances', [TrainingPlansController::class, 'storeSession'])->name('training-plans.sessions.store');
+        Route::put('planifications/{trainingPlan}/groupes/{group}/seances/{session}', [TrainingPlansController::class, 'updateSession'])->name('training-plans.sessions.update');
+        Route::delete('planifications/{trainingPlan}/groupes/{group}/seances/{session}', [TrainingPlansController::class, 'destroySession'])->name('training-plans.sessions.destroy');
     });
 require __DIR__ . '/settings.php';
 require __DIR__ . '/auth.php';

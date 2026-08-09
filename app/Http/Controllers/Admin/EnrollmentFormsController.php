@@ -118,10 +118,10 @@ class EnrollmentFormsController extends Controller
         $validated = $request->validate([
             'group_number' => ['required', 'integer', 'min:1', 'max:'.$enrollmentForm->groups_count],
         ]);
-        if ($enrollmentForm->classroom_id && $enrollment->group_number !== $validated['group_number']) {
+        if ($enrollment->group_number !== $validated['group_number']) {
             $inGroup = $enrollmentForm->enrollments()->whereNotNull('confirmed_at')
                 ->where('group_number', $validated['group_number'])->count();
-            abort_if($inGroup >= $enrollmentForm->classroom->capacity, 422, 'Ce groupe a atteint la capacité de la salle.');
+            abort_if($inGroup >= $enrollmentForm->groupCapacity(), 422, 'Ce groupe a atteint sa capacité maximale.');
         }
         $enrollment->update($validated);
 
@@ -151,12 +151,13 @@ class EnrollmentFormsController extends Controller
                 throw ValidationException::withMessages(['email' => 'Le nombre maximum d’étudiants est atteint.']);
             }
 
-            $group = $validated['group_number'] ?: (($confirmedCount % $form->groups_count) + 1);
-            if ($form->classroom_id) {
-                $inGroup = $form->enrollments()->whereNotNull('confirmed_at')->where('group_number', $group)->count();
-                if ($inGroup >= $form->classroom->capacity) {
-                    throw ValidationException::withMessages(['group_number' => 'Ce groupe a atteint la capacité de la salle.']);
-                }
+            $group = $validated['group_number'] ?: $form->nextAvailableGroup();
+            if (! $group) {
+                throw ValidationException::withMessages(['group_number' => 'Tous les groupes ont atteint leur capacité maximale.']);
+            }
+            $inGroup = $form->enrollments()->whereNotNull('confirmed_at')->where('group_number', $group)->count();
+            if ($inGroup >= $form->groupCapacity()) {
+                throw ValidationException::withMessages(['group_number' => 'Ce groupe a atteint sa capacité maximale.']);
             }
 
             $student = Student::query()->whereRaw('LOWER(email) = ?', [$validated['email']])->first();
@@ -199,6 +200,7 @@ class EnrollmentFormsController extends Controller
             'min_students' => ['required', 'integer', 'min:1'],
             'max_students' => ['required', 'integer', 'gte:min_students', 'max:100000'],
             'groups_count' => ['required', 'integer', 'min:1', 'lte:max_students'],
+            'students_per_group' => ['nullable', 'required_without:classroom_id', 'integer', 'min:1', 'max:100000'],
             'is_active' => ['required', 'boolean'],
             'cover_temp_folders' => ['array'],
             'cover_temp_folders.*' => ['string'],
@@ -207,11 +209,19 @@ class EnrollmentFormsController extends Controller
         ]);
 
         if ($validated['classroom_id']) {
+            $validated['students_per_group'] = null;
             $classroom = Classroom::findOrFail($validated['classroom_id']);
             $availablePlaces = $classroom->capacity * $validated['groups_count'];
             if ($validated['max_students'] > $availablePlaces) {
                 throw ValidationException::withMessages([
                     'max_students' => "Cette salle permet au maximum {$availablePlaces} étudiants pour {$validated['groups_count']} groupe(s).",
+                ]);
+            }
+        } else {
+            $availablePlaces = $validated['students_per_group'] * $validated['groups_count'];
+            if ($validated['max_students'] > $availablePlaces) {
+                throw ValidationException::withMessages([
+                    'max_students' => "La capacité définie permet au maximum {$availablePlaces} étudiants pour {$validated['groups_count']} groupe(s).",
                 ]);
             }
         }

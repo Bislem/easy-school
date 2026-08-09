@@ -29,6 +29,8 @@ class User extends Authenticatable
         'role',
         'is_active',
         'birth_date',
+        'job_title',
+        'can_login',
     ];
 
     /**
@@ -54,7 +56,13 @@ class User extends Authenticatable
             'role' => UserRole::class,
             'is_active' => 'boolean',
             'birth_date' => 'date:Y-m-d',
+            'can_login' => 'boolean',
         ];
+    }
+
+    public function salaries(): HasMany
+    {
+        return $this->hasMany(Expense::class, 'employee_id')->where('category', 'Salaire');
     }
 
     /**

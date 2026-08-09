@@ -210,7 +210,12 @@ function changeGroup(enrollment: Enrollment, event: Event) {
                             Groupe {{ group }}
                         </p>
                         <p class="mt-1 text-2xl font-bold">
-                            {{ groupCount(group) }} étudiant(s)
+                            {{ groupCount(group) }} /
+                            {{
+                                enrollmentForm.classroom?.capacity ??
+                                enrollmentForm.students_per_group
+                            }}
+                            étudiant(s)
                         </p>
                     </div>
                 </div>

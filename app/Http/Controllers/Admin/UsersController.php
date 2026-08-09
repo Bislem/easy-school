@@ -17,12 +17,13 @@ class UsersController extends Controller
     public function index(Request $request): Response
     {
         $users = User::query()
-            ->whereIn('role', [UserRole::ADMIN->value, UserRole::TEACHER->value])
+            ->whereIn('role', [UserRole::ADMIN->value, UserRole::TEACHER->value, UserRole::EMPLOYEE->value])
             ->when($request->string('search')->trim()->toString(), function ($query, string $search) {
                 $query->where(function ($query) use ($search) {
                     $query->where('name', 'like', "%{$search}%")
                         ->orWhere('email', 'like', "%{$search}%")
-                        ->orWhere('phone', 'like', "%{$search}%");
+                        ->orWhere('phone', 'like', "%{$search}%")
+                        ->orWhere('job_title', 'like', "%{$search}%");
                 });
             })
             ->when($request->string('role')->toString(), fn ($query, string $role) => $query->where('role', $role))
@@ -40,6 +41,10 @@ class UsersController extends Controller
     {
         $validated = $this->validateUser($request);
 
+        if (blank($validated['password'] ?? null)) {
+            $validated['password'] = str()->password(32);
+        }
+
         User::create($validated + [
             'email_verified_at' => now(),
         ]);
@@ -52,7 +57,7 @@ class UsersController extends Controller
         $validated = $this->validateUser($request, $user);
 
         if ($request->user()->is($user)
-            && (! $validated['is_active'] || $validated['role'] !== UserRole::ADMIN->value)) {
+            && (! $validated['is_active'] || ! $validated['can_login'] || $validated['role'] !== UserRole::ADMIN->value)) {
             return back()->withErrors([
                 'user' => 'Vous ne pouvez pas désactiver ou retirer votre propre rôle administrateur.',
             ]);
@@ -84,14 +89,22 @@ class UsersController extends Controller
 
     private function validateUser(Request $request, ?User $user = null): array
     {
-        return $request->validate([
+        $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', Rule::unique('users')->ignore($user)],
             'phone' => ['nullable', 'string', 'max:50'],
             'birth_date' => ['nullable', 'date', 'before:today'],
             'role' => ['required', Rule::enum(UserRole::class)],
             'is_active' => ['required', 'boolean'],
-            'password' => [Rule::requiredIf($user === null), 'nullable', 'confirmed', Password::defaults()],
+            'job_title' => ['nullable', 'required_if:role,employee', 'string', 'max:150'],
+            'can_login' => ['sometimes', 'boolean'],
+            'password' => [Rule::requiredIf($user === null && $request->boolean('can_login')), 'nullable', 'confirmed', Password::defaults()],
         ]);
+
+        $validated['can_login'] = array_key_exists('can_login', $validated)
+            ? (bool) $validated['can_login']
+            : $validated['role'] !== UserRole::EMPLOYEE->value;
+
+        return $validated;
     }
 }

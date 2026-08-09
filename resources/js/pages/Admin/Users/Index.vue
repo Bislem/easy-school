@@ -14,7 +14,9 @@ interface ManagedUser {
     email: string;
     phone?: string | null;
     birth_date?: string | null;
-    role: 'admin' | 'teacher';
+    role: 'admin' | 'teacher' | 'employee';
+    job_title?: string | null;
+    can_login: boolean;
     is_active: boolean;
     created_at: string;
 }
@@ -42,7 +44,9 @@ const form = useForm({
     email: '',
     phone: '',
     birth_date: '',
-    role: 'teacher' as 'admin' | 'teacher',
+    role: 'teacher' as 'admin' | 'teacher' | 'employee',
+    job_title: '',
+    can_login: true,
     is_active: true,
     password: '',
     password_confirmation: '',
@@ -62,6 +66,7 @@ function openCreate() {
     form.clearErrors();
     form.role = 'teacher';
     form.is_active = true;
+    form.can_login = true;
     modalOpen.value = true;
 }
 
@@ -73,6 +78,8 @@ function openEdit(user: ManagedUser) {
     form.phone = user.phone ?? '';
     form.birth_date = user.birth_date ?? '';
     form.role = user.role;
+    form.job_title = user.job_title ?? '';
+    form.can_login = user.can_login;
     form.is_active = user.is_active;
     form.password = '';
     form.password_confirmation = '';
@@ -101,8 +108,17 @@ function toggleActive(user: ManagedUser) {
     );
 }
 
+function onRoleChange() {
+    form.can_login = form.role !== 'employee';
+    if (form.role !== 'employee') form.job_title = '';
+}
+
 const roleLabel = (role: ManagedUser['role']) =>
-    role === 'admin' ? 'Administrateur' : 'Enseignant';
+    role === 'admin'
+        ? 'Administrateur'
+        : role === 'teacher'
+          ? 'Enseignant'
+          : 'Employé';
 const paginationLabel = (label: string) =>
     label
         .replace('&laquo;', '‹')
@@ -125,8 +141,8 @@ const paginationLabel = (label: string) =>
                             Gestion des utilisateurs
                         </h1>
                         <p class="mt-1 text-sm text-muted-foreground">
-                            Créez et gérez les comptes administrateurs et
-                            enseignants.
+                            Gérez les administrateurs, enseignants et employés
+                            de l’établissement.
                         </p>
                     </div>
                     <Button
@@ -165,6 +181,7 @@ const paginationLabel = (label: string) =>
                         <option value="">Tous les rôles</option>
                         <option value="admin">Administrateurs</option>
                         <option value="teacher">Enseignants</option>
+                        <option value="employee">Employés</option>
                     </select>
                     <Button type="submit" variant="outline">Rechercher</Button>
                 </form>
@@ -179,6 +196,7 @@ const paginationLabel = (label: string) =>
                                     Utilisateur
                                 </th>
                                 <th class="px-5 py-3 font-medium">Rôle</th>
+                                <th class="px-5 py-3 font-medium">Fonction</th>
                                 <th class="px-5 py-3 font-medium">Téléphone</th>
                                 <th class="px-5 py-3 font-medium">Statut</th>
                                 <th class="px-5 py-3 text-right font-medium">
@@ -198,6 +216,9 @@ const paginationLabel = (label: string) =>
                                     {{ roleLabel(user.role) }}
                                 </td>
                                 <td class="px-5 py-4 text-muted-foreground">
+                                    {{ user.job_title || '—' }}
+                                </td>
+                                <td class="px-5 py-4 text-muted-foreground">
                                     {{ user.phone || '—' }}
                                 </td>
                                 <td class="px-5 py-4">
@@ -209,7 +230,11 @@ const paginationLabel = (label: string) =>
                                                 : 'bg-red-100 text-red-700'
                                         "
                                         >{{
-                                            user.is_active ? 'Actif' : 'Inactif'
+                                            !user.is_active
+                                                ? 'Inactif'
+                                                : user.can_login
+                                                  ? 'Connexion autorisée'
+                                                  : 'Sans accès'
                                         }}</span
                                     >
                                 </td>
@@ -284,7 +309,15 @@ const paginationLabel = (label: string) =>
                         </div>
                         <div class="mt-3 text-sm text-muted-foreground">
                             <p>{{ roleLabel(user.role) }}</p>
+                            <p v-if="user.job_title">{{ user.job_title }}</p>
                             <p>{{ user.phone || 'Aucun téléphone' }}</p>
+                            <p>
+                                {{
+                                    user.can_login
+                                        ? 'Connexion autorisée'
+                                        : 'Sans accès au portail'
+                                }}
+                            </p>
                         </div>
                         <div class="mt-4 grid grid-cols-2 gap-2">
                             <Button variant="outline" @click="openEdit(user)"
@@ -419,13 +452,28 @@ const paginationLabel = (label: string) =>
                         ><select
                             id="role"
                             v-model="form.role"
+                            @change="onRoleChange"
                             class="mt-1 h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm"
                         >
                             <option value="teacher">Enseignant</option>
+                            <option value="employee">Employé</option>
                             <option value="admin">
                                 Administrateur
                             </option></select
                         ><InputError :message="form.errors.role" class="mt-1" />
+                    </div>
+                    <div v-if="form.role === 'employee'">
+                        <Label for="job_title">Fonction de l’employé</Label
+                        ><Input
+                            id="job_title"
+                            v-model="form.job_title"
+                            class="mt-1"
+                            required
+                            placeholder="Secrétaire, comptable, agent d’entretien…"
+                        /><InputError
+                            :message="form.errors.job_title"
+                            class="mt-1"
+                        />
                     </div>
                     <label class="flex items-center gap-3 rounded-lg border p-3"
                         ><input
@@ -434,6 +482,20 @@ const paginationLabel = (label: string) =>
                             class="size-4 rounded border-gray-300 text-primary"
                         /><span class="text-sm font-medium"
                             >Compte actif</span
+                        ></label
+                    >
+                    <label class="flex items-center gap-3 rounded-lg border p-3"
+                        ><input
+                            v-model="form.can_login"
+                            type="checkbox"
+                            class="size-4 rounded border-gray-300 text-primary"
+                        /><span
+                            ><span class="block text-sm font-medium"
+                                >Autoriser la connexion</span
+                            ><span class="block text-xs text-muted-foreground"
+                                >Les employés sont généralement créés sans accès
+                                au portail.</span
+                            ></span
                         ></label
                     >
                     <div class="grid gap-4 sm:grid-cols-2">
@@ -448,7 +510,7 @@ const paginationLabel = (label: string) =>
                                 v-model="form.password"
                                 type="password"
                                 class="mt-1"
-                                :required="!editingUser"
+                                :required="!editingUser && form.can_login"
                                 autocomplete="new-password"
                             /><InputError
                                 :message="form.errors.password"
@@ -463,7 +525,7 @@ const paginationLabel = (label: string) =>
                                 v-model="form.password_confirmation"
                                 type="password"
                                 class="mt-1"
-                                :required="!editingUser"
+                                :required="!editingUser && form.can_login"
                                 autocomplete="new-password"
                             />
                         </div>

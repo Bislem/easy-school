@@ -18,7 +18,7 @@ class ExpensesController extends Controller
     public function index(Request $request): Response
     {
         $query = Expense::query()
-            ->with(['creator:id,name', 'files'])
+            ->with(['creator:id,name', 'employee:id,name,job_title', 'files'])
             ->when($request->string('search')->toString(), function ($query, $search) {
                 $query->where(function ($query) use ($search) {
                     $query->where('title', 'like', "%{$search}%")

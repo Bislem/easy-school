@@ -14,18 +14,24 @@ class Expense extends Model
     protected $appends = ['receipt_url'];
 
     protected $fillable = [
-        'created_by', 'type', 'category', 'title', 'amount',
-        'expense_date', 'vendor', 'payment_method', 'reference', 'notes',
+        'created_by', 'employee_id', 'type', 'category', 'title', 'amount',
+        'expense_date', 'salary_period', 'vendor', 'payment_method', 'reference', 'notes',
     ];
 
     protected $casts = [
         'amount' => 'decimal:2',
         'expense_date' => 'date:Y-m-d',
+        'salary_period' => 'date:Y-m-d',
     ];
 
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function employee(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'employee_id');
     }
 
     public function getReceiptUrlAttribute(): ?string

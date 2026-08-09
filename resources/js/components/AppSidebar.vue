@@ -15,6 +15,7 @@ import { type NavItem } from '@/types';
 import { Link, usePage } from '@inertiajs/vue3';
 import {
     BookOpen,
+    CalendarRange,
     ClipboardCheck,
     ClipboardList,
     GraduationCap,
@@ -22,6 +23,7 @@ import {
     ReceiptText,
     Settings,
     Users,
+    WalletCards,
 } from 'lucide-vue-next';
 import AppLogo from './AppLogo.vue';
 
@@ -51,6 +53,12 @@ const mainNavItems: NavItem[] = [
                   icon: ClipboardList,
               },
               { title: 'Dépenses', href: '/admin/expenses', icon: ReceiptText },
+              { title: 'Salaires', href: '/admin/salaries', icon: WalletCards },
+              {
+                  title: 'Planifications',
+                  href: '/admin/planifications',
+                  icon: CalendarRange,
+              },
               { title: 'Présences', href: '#', icon: ClipboardCheck },
           ]
         : []),

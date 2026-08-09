@@ -35,11 +35,11 @@ class AuthenticatedSessionController extends Controller
         $user = $request->validateCredentials();
         $role = $user->getRawOriginal('role');
 
-        if (! in_array($role, [UserRole::ADMIN->value, UserRole::TEACHER->value], true)) {
+        if (! in_array($role, [UserRole::ADMIN->value, UserRole::TEACHER->value, UserRole::EMPLOYEE->value], true) || ! $user->can_login) {
             Auth::logout();
 
             return back()->withErrors([
-                'email' => 'Seuls les administrateurs et les enseignants peuvent accéder à ce portail.',
+                'email' => "Ce compte n'est pas autorisé à accéder au portail.",
             ])->onlyInput('email');
         }
 
