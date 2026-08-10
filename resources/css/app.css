@@ -130,6 +130,45 @@
     --sidebar: hsl(0 0% 98%);
 }
 
+/* School navigation uses the configured primary color as a subtle tint. */
+[data-sidebar='sidebar'] {
+    background-color: var(--sidebar-background);
+    background-image:
+        radial-gradient(
+            circle at 10% 0%,
+            color-mix(in srgb, var(--primary), transparent 88%),
+            transparent 32%
+        ),
+        linear-gradient(
+            180deg,
+            color-mix(in srgb, var(--sidebar-background), white 35%),
+            var(--sidebar-background)
+        );
+}
+
+[data-sidebar='content'] {
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in srgb, var(--primary), transparent 45%)
+        transparent;
+}
+
+[data-sidebar='content']::-webkit-scrollbar {
+    width: 5px;
+}
+
+[data-sidebar='content']::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+[data-sidebar='content']::-webkit-scrollbar-thumb {
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--primary), transparent 45%);
+}
+
+[data-sidebar='content']::-webkit-scrollbar-thumb:hover {
+    background: var(--primary);
+}
+
 /* Public-site branding. The color is set from the agency settings in HomeLayout. */
 .public-site {
     /* Override Tailwind's orange palette itself so every existing orange

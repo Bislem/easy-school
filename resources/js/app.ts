@@ -55,6 +55,18 @@ function applySchoolBrand(school: SchoolBrand) {
     root.style.setProperty('--sidebar-primary', color);
     root.style.setProperty('--sidebar-primary-foreground', foreground);
     root.style.setProperty('--sidebar-ring', color);
+    root.style.setProperty(
+        '--sidebar-background',
+        `color-mix(in srgb, ${color}, white 96%)`,
+    );
+    root.style.setProperty(
+        '--sidebar-accent',
+        `color-mix(in srgb, ${color}, white 87%)`,
+    );
+    root.style.setProperty(
+        '--sidebar-border',
+        `color-mix(in srgb, ${color}, white 78%)`,
+    );
     root.style.setProperty('--website-primary', color);
     root.style.setProperty('--chart-1', color);
 }
