@@ -30,11 +30,11 @@ const pending = computed(() =>
             />
             <div class="mb-7 text-center">
                 <div
-                    class="mx-auto grid size-12 place-items-center rounded-xl bg-slate-900 text-sm font-black text-white"
+                    class="mx-auto grid size-12 place-items-center rounded-xl bg-primary text-sm font-black text-primary-foreground"
                 >
                     ES
                 </div>
-                <p class="mt-3 text-sm font-semibold text-orange-600">
+                <p class="mt-3 text-sm font-semibold text-primary">
                     INSCRIPTION À UNE FORMATION
                 </p>
                 <h1 class="mt-2 text-3xl font-black text-slate-900">
@@ -49,17 +49,17 @@ const pending = computed(() =>
                 class="mb-6 grid gap-3 rounded-2xl border bg-white p-5 shadow-sm sm:grid-cols-2"
             >
                 <p class="flex items-center gap-2 text-sm">
-                    <CalendarDays class="size-4 text-orange-500" />Du
+                    <CalendarDays class="size-4 text-primary" />Du
                     {{ enrollmentForm.start_date }} au
                     {{ enrollmentForm.end_date }}
                 </p>
                 <p class="flex items-center gap-2 text-sm">
-                    <Users class="size-4 text-orange-500" />{{
+                    <Users class="size-4 text-primary" />{{
                         enrollmentForm.teacher.name
                     }}
                 </p>
                 <p class="flex items-center gap-2 text-sm">
-                    <Clock class="size-4 text-orange-500" />{{
+                    <Clock class="size-4 text-primary" />{{
                         enrollmentForm.course.duration_hours
                     }}
                     heures
@@ -68,12 +68,12 @@ const pending = computed(() =>
                     v-if="enrollmentForm.classroom"
                     class="flex items-center gap-2 text-sm"
                 >
-                    <MapPin class="size-4 text-orange-500" />{{
+                    <MapPin class="size-4 text-primary" />{{
                         enrollmentForm.classroom.name
                     }}
                 </p>
                 <p v-else class="flex items-center gap-2 text-sm">
-                    <Users class="size-4 text-orange-500" />{{
+                    <Users class="size-4 text-primary" />{{
                         enrollmentForm.students_per_group
                     }}
                     étudiants maximum par groupe
@@ -126,7 +126,7 @@ const pending = computed(() =>
             >
                 <div class="mb-6 flex items-center gap-3">
                     <span
-                        class="grid size-9 place-items-center rounded-full bg-orange-100 font-bold text-orange-600"
+                        class="grid size-9 place-items-center rounded-full bg-primary/10 font-bold text-primary"
                         >1</span
                     >
                     <div>
@@ -213,15 +213,11 @@ const pending = computed(() =>
                             />
                         </div>
                     </div>
-                    <Button
-                        class="mt-2 w-full bg-orange-600 hover:bg-orange-700"
-                        :disabled="processing"
-                        >{{
-                            processing
-                                ? 'Envoi…'
-                                : "Continuer et confirmer l'e-mail"
-                        }}</Button
-                    >
+                    <Button class="mt-2 w-full" :disabled="processing">{{
+                        processing
+                            ? 'Envoi…'
+                            : "Continuer et confirmer l'e-mail"
+                    }}</Button>
                 </Form>
                 <p class="mt-5 text-center text-xs text-slate-500">
                     {{ confirmedCount }} inscription(s) confirmée(s) sur

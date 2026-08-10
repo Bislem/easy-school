@@ -35,7 +35,7 @@ const isDemoOpen = ref(false);
             <!-- Header -->
             <div class="text-center">
                 <div
-                    class="mx-auto mb-5 grid size-12 place-items-center rounded-xl bg-slate-900 text-sm font-black text-white shadow-lg"
+                    class="mx-auto mb-5 grid size-12 place-items-center rounded-xl bg-primary text-sm font-black text-primary-foreground shadow-lg"
                 >
                     ES
                 </div>
@@ -128,9 +128,9 @@ const isDemoOpen = ref(false);
                     <!-- Admin Demo -->
                     <div class="rounded-lg bg-white p-3 shadow-sm">
                         <div class="mb-2 flex items-center space-x-2">
-                            <Shield class="h-4 w-4 text-orange-600" />
+                            <Shield class="h-4 w-4 text-primary" />
                             <span
-                                class="text-xs font-semibold tracking-wide text-orange-700 uppercase"
+                                class="text-xs font-semibold tracking-wide text-primary uppercase"
                             >
                                 Accès administrateur
                             </span>
@@ -200,7 +200,7 @@ const isDemoOpen = ref(false);
                             :tabindex="1"
                             autocomplete="email"
                             placeholder="Saisissez votre adresse e-mail"
-                            class="w-full rounded-lg border border-gray-300 px-4 py-3 transition-colors focus:border-orange-500 focus:ring-2 focus:ring-orange-500"
+                            class="w-full rounded-lg border border-gray-300 px-4 py-3 transition-colors focus:border-primary focus:ring-2 focus:ring-primary"
                         />
                         <InputError :message="errors.email" class="mt-1" />
                     </div>
@@ -217,7 +217,7 @@ const isDemoOpen = ref(false);
                             <TextLink
                                 v-if="canResetPassword"
                                 :href="request()"
-                                class="text-sm font-medium text-orange-600 hover:text-orange-700"
+                                class="text-sm font-medium text-primary hover:opacity-80"
                                 :tabindex="5"
                             >
                                 Mot de passe oublié ?
@@ -231,7 +231,7 @@ const isDemoOpen = ref(false);
                             :tabindex="2"
                             autocomplete="current-password"
                             placeholder="Saisissez votre mot de passe"
-                            class="w-full rounded-lg border border-gray-300 px-4 py-3 transition-colors focus:border-orange-500 focus:ring-2 focus:ring-orange-500"
+                            class="w-full rounded-lg border border-gray-300 px-4 py-3 transition-colors focus:border-primary focus:ring-2 focus:ring-primary"
                         />
                         <InputError :message="errors.password" class="mt-1" />
                     </div>
@@ -246,7 +246,7 @@ const isDemoOpen = ref(false);
                                 id="remember"
                                 name="remember"
                                 :tabindex="3"
-                                class="rounded border-gray-300 text-orange-600 focus:ring-orange-500"
+                                class="rounded border-gray-300 text-primary focus:ring-primary"
                             />
                             <span class="text-sm text-gray-700"
                                 >Se souvenir de moi pendant 30 jours</span
@@ -257,7 +257,7 @@ const isDemoOpen = ref(false);
                     <!-- Submit Button -->
                     <Button
                         type="submit"
-                        class="flex w-full items-center justify-center rounded-lg bg-orange-600 px-4 py-3 font-semibold text-white transition-colors duration-200 hover:bg-orange-700"
+                        class="flex w-full items-center justify-center rounded-lg bg-primary px-4 py-3 font-semibold text-primary-foreground transition-opacity duration-200 hover:opacity-90"
                         :tabindex="4"
                         :disabled="processing"
                         data-test="login-button"

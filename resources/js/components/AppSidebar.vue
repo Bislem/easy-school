@@ -29,7 +29,6 @@ import AppLogo from './AppLogo.vue';
 
 const page = usePage();
 const role = page.props.auth.user.role;
-const school = page.props.school as { primary_color?: string } | undefined;
 
 const mainNavItems: NavItem[] = [
     {
@@ -39,34 +38,29 @@ const mainNavItems: NavItem[] = [
     },
     ...(role === 'admin'
         ? [
-              { title: 'Utilisateurs', href: '/admin/users', icon: Users },
-              {
-                  title: 'Étudiants',
-                  href: '/admin/students',
-                  icon: GraduationCap,
-              },
-              { title: 'Salles', href: '/admin/classrooms', icon: BookOpen },
-              { title: 'Formations', href: '/admin/courses', icon: BookOpen },
               {
                   title: 'Inscriptions',
                   href: '/admin/enrollment-forms',
                   icon: ClipboardList,
               },
-              { title: 'Dépenses', href: '/admin/expenses', icon: ReceiptText },
-              { title: 'Salaires', href: '/admin/salaries', icon: WalletCards },
               {
                   title: 'Planifications',
                   href: '/admin/planifications',
                   icon: CalendarRange,
               },
+              {
+                  title: 'Étudiants',
+                  href: '/admin/students',
+                  icon: GraduationCap,
+              },
+              { title: 'Formations', href: '/admin/courses', icon: BookOpen },
               { title: 'Présences', href: '#', icon: ClipboardCheck },
+              { title: 'Salles', href: '/admin/classrooms', icon: BookOpen },
+              { title: 'Utilisateurs', href: '/admin/users', icon: Users },
+              { title: 'Salaires', href: '/admin/salaries', icon: WalletCards },
+              { title: 'Dépenses', href: '/admin/expenses', icon: ReceiptText },
           ]
         : []),
-    {
-        title: 'Paramètres du compte',
-        href: '/settings/profile',
-        icon: Settings,
-    },
     ...(role === 'admin'
         ? [
               {
@@ -80,15 +74,7 @@ const mainNavItems: NavItem[] = [
 </script>
 
 <template>
-    <Sidebar
-        collapsible="icon"
-        variant="inset"
-        :style="
-            school?.primary_color
-                ? { '--primary': school.primary_color }
-                : undefined
-        "
-    >
+    <Sidebar collapsible="icon" variant="inset">
         <SidebarHeader>
             <SidebarMenu>
                 <SidebarMenuItem>

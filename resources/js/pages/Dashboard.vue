@@ -97,7 +97,7 @@ const roleLabel = computed(() =>
         <main class="min-w-0 flex-1 bg-muted/20 p-4 sm:p-6 lg:p-8">
             <div class="mx-auto max-w-[1600px] space-y-6">
                 <header
-                    class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-primary/80 p-6 text-primary-foreground shadow-lg sm:p-8"
+                    class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-primary/80 p-5 text-primary-foreground shadow-lg sm:p-6 lg:p-8"
                 >
                     <div
                         class="pointer-events-none absolute -top-24 -right-20 size-72 rounded-full bg-white/10"
@@ -106,9 +106,9 @@ const roleLabel = computed(() =>
                         class="pointer-events-none absolute right-40 -bottom-28 size-56 rounded-full bg-white/5"
                     />
                     <div
-                        class="relative flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between"
+                        class="relative flex min-w-0 flex-col gap-6 xl:flex-row xl:items-end xl:justify-between xl:gap-8"
                     >
-                        <div>
+                        <div class="min-w-0 xl:max-w-xl">
                             <p
                                 class="text-sm font-medium text-primary-foreground/75"
                             >
@@ -135,29 +135,37 @@ const roleLabel = computed(() =>
                         </div>
                         <div
                             v-if="isAdmin"
-                            class="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap"
+                            class="grid w-full min-w-0 grid-cols-1 gap-2 sm:grid-cols-2 xl:w-auto xl:min-w-[34rem]"
                         >
-                            <Button as-child variant="secondary"
+                            <Button
+                                as-child
+                                variant="secondary"
+                                class="h-auto min-h-10 w-full justify-start px-4 py-2.5 text-left leading-tight whitespace-normal"
                                 ><Link href="/admin/enrollment-forms"
-                                    ><Plus class="mr-2 size-4" />Nouvelle
-                                    inscription</Link
+                                    ><Plus
+                                        class="mr-2 size-4 shrink-0"
+                                    />Nouvelle inscription</Link
                                 ></Button
                             ><Button
                                 as-child
-                                class="bg-white/15 text-white hover:bg-white/25"
+                                class="h-auto min-h-10 w-full justify-start bg-white/15 px-4 py-2.5 text-left leading-tight whitespace-normal text-white hover:bg-white/25"
                                 ><Link href="/admin/students"
-                                    ><UserPlus class="mr-2 size-4" />Ajouter un
-                                    apprenant</Link
+                                    ><UserPlus
+                                        class="mr-2 size-4 shrink-0"
+                                    />Ajouter un apprenant</Link
                                 ></Button
-                            ><Button disabled class="bg-white/10 text-white/70"
-                                ><Banknote class="mr-2 size-4" />Ajouter un
-                                paiement</Button
+                            ><Button
+                                disabled
+                                class="h-auto min-h-10 w-full justify-start bg-white/10 px-4 py-2.5 text-left leading-tight whitespace-normal text-white/70"
+                                ><Banknote
+                                    class="mr-2 size-4 shrink-0"
+                                />Ajouter un paiement</Button
                             ><Button
                                 as-child
-                                class="bg-white/15 text-white hover:bg-white/25"
+                                class="h-auto min-h-10 w-full justify-start bg-white/15 px-4 py-2.5 text-left leading-tight whitespace-normal text-white hover:bg-white/25"
                                 ><Link href="/admin/planifications"
                                     ><CalendarClock
-                                        class="mr-2 size-4"
+                                        class="mr-2 size-4 shrink-0"
                                     />Planifier une séance</Link
                                 ></Button
                             >
