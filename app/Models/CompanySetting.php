@@ -43,7 +43,7 @@ class CompanySetting extends Model
         'online_advance_percentage' => 'decimal:2',
     ];
 
-    protected $appends = ['logo_url'];
+    protected $appends = ['logo_url', 'favicon_url'];
 
     public static function defaults(): array
     {
@@ -75,6 +75,19 @@ class CompanySetting extends Model
         $file = $this->relationLoaded('files')
             ? $this->files->firstWhere('collection', 'logo')
             : $this->files()->where('collection', 'logo')->first();
+
+        return $file?->path ? Storage::url(str_replace('storage/', '', $file->path)) : null;
+    }
+
+    public function getFaviconUrlAttribute(): ?string
+    {
+        if (! $this->exists || ! Schema::hasTable('files')) {
+            return null;
+        }
+
+        $file = $this->relationLoaded('files')
+            ? $this->files->firstWhere('collection', 'favicon')
+            : $this->files()->where('collection', 'favicon')->first();
 
         return $file?->path ? Storage::url(str_replace('storage/', '', $file->path)) : null;
     }

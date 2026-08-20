@@ -24,6 +24,10 @@ class CompanySettingsController extends Controller
                 ->where('collection', 'logo')
                 ->map(fn ($file) => ['id' => $file->id, 'url' => $settings->logo_url])
                 ->values(),
+            'faviconFiles' => $settings->files
+                ->where('collection', 'favicon')
+                ->map(fn ($file) => ['id' => $file->id, 'url' => $settings->favicon_url])
+                ->values(),
         ]);
     }
 
@@ -50,21 +54,34 @@ class CompanySettingsController extends Controller
             'logo_temp_folders.*' => ['string'],
             'logo_removed_files' => ['array'],
             'logo_removed_files.*' => ['integer'],
+            'favicon_temp_folders' => ['array'],
+            'favicon_temp_folders.*' => ['string'],
+            'favicon_removed_files' => ['array'],
+            'favicon_removed_files.*' => ['integer'],
         ]);
 
-        $settings->update(collect($validated)->except(['logo_temp_folders', 'logo_removed_files'])->toArray());
+        $settings->update(collect($validated)->except([
+            'logo_temp_folders', 'logo_removed_files',
+            'favicon_temp_folders', 'favicon_removed_files',
+        ])->toArray());
 
-        $tempFolders = $request->input('logo_temp_folders', []);
-        $removedIds = $request->input('logo_removed_files', []);
+        $this->syncCollection($request, $settings, 'logo');
+        $this->syncCollection($request, $settings, 'favicon');
+
+        return back()->with('success', "Les paramètres de l'école ont été mis à jour avec succès.");
+    }
+
+    private function syncCollection(Request $request, CompanySetting $settings, string $collection): void
+    {
+        $tempFolders = $request->input("{$collection}_temp_folders", []);
+        $removedIds = $request->input("{$collection}_removed_files", []);
         if ($tempFolders !== []) {
             $removedIds = array_values(array_unique(array_merge(
                 $removedIds,
-                $settings->files()->where('collection', 'logo')->pluck('id')->all(),
+                $settings->files()->where('collection', $collection)->pluck('id')->all(),
             )));
         }
 
-        $this->filePondService->handleFileUpdates($settings, $tempFolders, $removedIds, 'logo');
-
-        return back()->with('success', "Les paramètres de l'école ont été mis à jour avec succès.");
+        $this->filePondService->handleFileUpdates($settings, $tempFolders, $removedIds, $collection);
     }
 }

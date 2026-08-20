@@ -27,7 +27,13 @@ const pages = import.meta.glob<DefineComponent>([
     './pages/Public/**/*.vue',
 ]);
 
-type SchoolBrand = { primary_color?: string | null } | null | undefined;
+type SchoolBrand =
+    | {
+          primary_color?: string | null;
+          favicon_url?: string | null;
+      }
+    | null
+    | undefined;
 
 function applySchoolBrand(school: SchoolBrand) {
     const color = school?.primary_color || '#f97316';
@@ -69,6 +75,9 @@ function applySchoolBrand(school: SchoolBrand) {
     );
     root.style.setProperty('--website-primary', color);
     root.style.setProperty('--chart-1', color);
+
+    const favicon = document.querySelector<HTMLLinkElement>('#school-favicon');
+    if (favicon) favicon.href = school?.favicon_url || '/favicon.ico';
 }
 
 router.on('navigate', (event) => {

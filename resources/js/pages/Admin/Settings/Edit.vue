@@ -28,6 +28,7 @@ interface SchoolSettings {
 const props = defineProps<{
     settings: SchoolSettings;
     logoFiles: Array<{ id: number; url: string }>;
+    faviconFiles: Array<{ id: number; url: string }>;
 }>();
 
 const form = useForm({
@@ -47,12 +48,19 @@ const form = useForm({
     teacher_login_disabled: Boolean(props.settings.teacher_login_disabled),
     logo_temp_folders: [] as string[],
     logo_removed_files: [] as number[],
+    favicon_temp_folders: [] as string[],
+    favicon_removed_files: [] as number[],
 });
 
 const tempFolders = ref<string[]>([]);
 const removedFileIds = ref<number[]>([]);
+const faviconTempFolders = ref<string[]>([]);
+const faviconRemovedFileIds = ref<number[]>([]);
 
 watch(tempFolders, (value) => (form.logo_temp_folders = [...value]), {
+    deep: true,
+});
+watch(faviconTempFolders, (value) => (form.favicon_temp_folders = [...value]), {
     deep: true,
 });
 
@@ -60,6 +68,13 @@ function onFileRemoved(data: { type: string; fileId?: number }) {
     if (data.type === 'existing' && data.fileId) {
         removedFileIds.value.push(data.fileId);
         form.logo_removed_files = [...removedFileIds.value];
+    }
+}
+
+function onFaviconRemoved(data: { type: string; fileId?: number }) {
+    if (data.type === 'existing' && data.fileId) {
+        faviconRemovedFileIds.value.push(data.fileId);
+        form.favicon_removed_files = [...faviconRemovedFileIds.value];
     }
 }
 
@@ -90,24 +105,63 @@ function submit() {
                             Identité et image de marque
                         </h2>
                         <div class="mt-5 grid gap-6 md:grid-cols-2">
-                            <div>
-                                <Label>Logo de l'école</Label>
-                                <div class="mt-2 max-w-sm">
-                                    <FileUpload
-                                        v-model="tempFolders"
-                                        :initial-files="logoFiles"
-                                        :allow-multiple="false"
-                                        :max-files="1"
-                                        collection="logo"
-                                        theme="light"
-                                        width="100%"
-                                        @file-removed="onFileRemoved"
-                                    />
+                            <div class="space-y-6">
+                                <div>
+                                    <Label>Logo de l'école</Label>
+                                    <div class="mt-2 max-w-sm">
+                                        <FileUpload
+                                            v-model="tempFolders"
+                                            :initial-files="logoFiles"
+                                            :allow-multiple="false"
+                                            :max-files="1"
+                                            collection="logo"
+                                            theme="light"
+                                            width="100%"
+                                            @file-removed="onFileRemoved"
+                                        />
+                                    </div>
+                                    <p
+                                        class="mt-2 text-xs text-muted-foreground"
+                                    >
+                                        PNG, JPG, SVG ou WebP. Taille maximale :
+                                        5 Mo.
+                                    </p>
                                 </div>
-                                <p class="mt-2 text-xs text-muted-foreground">
-                                    PNG, JPG, SVG ou WebP. Taille maximale : 5
-                                    Mo.
-                                </p>
+                                <div class="border-t pt-5">
+                                    <Label>Favicon</Label>
+                                    <div class="mt-2 max-w-sm">
+                                        <FileUpload
+                                            v-model="faviconTempFolders"
+                                            :initial-files="faviconFiles"
+                                            :allow-multiple="false"
+                                            :max-files="1"
+                                            :max-file-size="1024 * 1024"
+                                            :allowed-file-types="[
+                                                'image/png',
+                                                'image/svg+xml',
+                                                'image/x-icon',
+                                                'image/vnd.microsoft.icon',
+                                            ]"
+                                            collection="favicon"
+                                            theme="light"
+                                            width="100%"
+                                            @file-removed="onFaviconRemoved"
+                                        />
+                                    </div>
+                                    <InputError
+                                        :message="
+                                            form.errors.favicon_temp_folders
+                                        "
+                                        class="mt-1"
+                                    />
+                                    <p
+                                        class="mt-2 text-xs text-muted-foreground"
+                                    >
+                                        Icône carrée PNG, SVG ou ICO. Format
+                                        conseillé : 32 × 32 ou 64 × 64 px,
+                                        maximum 1 Mo.
+                                    </p>
+                                </div>
                             </div>
                             <div class="space-y-4">
                                 <div>
