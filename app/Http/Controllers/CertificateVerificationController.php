@@ -1,0 +1,3 @@
+<?php
+namespace App\Http\Controllers;use App\Models\Certificate;use App\Models\CompanySetting;use Inertia\Inertia;use Inertia\Response;
+class CertificateVerificationController extends Controller {public function __invoke(string $token):Response{$certificate=Certificate::where('verification_token',$token)->firstOrFail();return Inertia::render('Certificates/Verify',['certificate'=>['number'=>$certificate->certificate_number,'type'=>$certificate->type->label(),'student'=>$certificate->student_name,'formation'=>$certificate->formation_name,'issue_date'=>$certificate->issue_date,'result'=>$certificate->result],'school'=>CompanySetting::current()->only(['trading_name','logo_url'])]);}}

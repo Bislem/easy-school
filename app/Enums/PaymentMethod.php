@@ -11,6 +11,7 @@ enum PaymentMethod: string
     case BANK_TRANSFER = 'bank_transfer';
     case CASH = 'cash';
     case ALGERIA_POST = 'algeria_post';
+    case OTHER = 'other';
 
     public function label(): string
     {
@@ -22,6 +23,7 @@ enum PaymentMethod: string
             self::BANK_TRANSFER => 'Virement bancaire',
             self::CASH => 'Espèces',
             self::ALGERIA_POST => 'Algérie Poste',
+            self::OTHER => 'Autre',
         };
     }
 }

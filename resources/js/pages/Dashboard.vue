@@ -35,16 +35,30 @@ interface DashboardData {
         teachers_today: number;
         rooms_occupied: number;
         rooms_available: number;
+        waiting_registrations: number;
+        stopped_students: number;
+        completed_hours: number;
+        groups_near_completion: number;
+        cancelled_postponed_today: number;
+        active_employees: number;
+        teachers: number;
+        other_staff: number;
     };
     finance: {
         collected: number | null;
         remaining: number | null;
         overdue: number | null;
         upcoming: number | null;
+        expected: number;
+        expenses: number;
+        salaries_due: number;
+        salaries_paid: number;
+        net_cash_flow: number;
     };
     attendance: {
         rate: number | null;
-        recent_absences: unknown[];
+        recent_absences: any[];
+        low_groups: any[];
         missing_documents: unknown[];
     };
     schedule: { today: any[]; upcoming: any[] };
@@ -236,21 +250,79 @@ const roleLabel = computed(() =>
                         </article>
                     </section>
 
+                    <section class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                        <article
+                            v-for="item in [
+                                {
+                                    label: 'Inscriptions en attente',
+                                    value: dashboard.stats
+                                        .waiting_registrations,
+                                },
+                                {
+                                    label: 'Étudiants arrêtés',
+                                    value: dashboard.stats.stopped_students,
+                                },
+                                {
+                                    label: 'Groupes proches de la fin',
+                                    value: dashboard.stats
+                                        .groups_near_completion,
+                                },
+                                {
+                                    label: 'Heures de formation terminées',
+                                    value: `${dashboard.stats.completed_hours} h`,
+                                },
+                                {
+                                    label: 'Employés actifs',
+                                    value: dashboard.stats.active_employees,
+                                },
+                                {
+                                    label: 'Enseignants',
+                                    value: dashboard.stats.teachers,
+                                },
+                                {
+                                    label: 'Autres employés',
+                                    value: dashboard.stats.other_staff,
+                                },
+                                {
+                                    label: 'Séances annulées/reportées',
+                                    value: dashboard.stats
+                                        .cancelled_postponed_today,
+                                },
+                            ]"
+                            :key="item.label"
+                            class="rounded-xl border bg-card p-4"
+                        >
+                            <p class="text-xs text-muted-foreground">
+                                {{ item.label }}
+                            </p>
+                            <p class="mt-1 text-xl font-semibold">
+                                {{ item.value }}
+                            </p>
+                        </article>
+                    </section>
+
                     <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                         <article
                             v-for="item in [
                                 {
                                     label: 'Revenus encaissés',
                                     icon: CircleDollarSign,
+                                    value: dashboard.finance.collected,
                                 },
-                                { label: 'Reste à payer', icon: WalletCards },
+                                {
+                                    label: 'Reste à payer',
+                                    icon: WalletCards,
+                                    value: dashboard.finance.remaining,
+                                },
                                 {
                                     label: 'Paiements en retard',
                                     icon: AlertTriangle,
+                                    value: dashboard.finance.overdue,
                                 },
                                 {
-                                    label: 'Prochains paiements',
-                                    icon: CalendarClock,
+                                    label: 'Flux net estimé',
+                                    icon: TrendingUp,
+                                    value: dashboard.finance.net_cash_flow,
                                 },
                             ]"
                             :key="item.label"
@@ -267,12 +339,44 @@ const roleLabel = computed(() =>
                                     <p class="text-sm font-medium">
                                         {{ item.label }}
                                     </p>
-                                    <p class="text-xs text-muted-foreground">
-                                        Disponible avec le module de paiements
+                                    <p class="text-lg font-semibold">
+                                        {{ money(item.value || 0) }}
                                     </p>
                                 </div>
                             </div>
                         </article>
+                    </section>
+
+                    <section class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                        <div
+                            v-for="item in [
+                                {
+                                    label: 'Revenu attendu',
+                                    value: dashboard.finance.expected,
+                                },
+                                {
+                                    label: 'Dépenses',
+                                    value: dashboard.finance.expenses,
+                                },
+                                {
+                                    label: 'Salaires dus',
+                                    value: dashboard.finance.salaries_due,
+                                },
+                                {
+                                    label: 'Salaires payés',
+                                    value: dashboard.finance.salaries_paid,
+                                },
+                            ]"
+                            :key="item.label"
+                            class="rounded-xl border bg-card p-4"
+                        >
+                            <p class="text-xs text-muted-foreground">
+                                {{ item.label }}
+                            </p>
+                            <p class="mt-1 text-lg font-semibold">
+                                {{ money(item.value) }}
+                            </p>
+                        </div>
                     </section>
 
                     <div class="grid gap-6 xl:grid-cols-[1.5fr_1fr]">
@@ -610,9 +714,11 @@ const roleLabel = computed(() =>
                                             >Taux de présence global</span
                                         >
                                     </div>
-                                    <span class="text-sm text-muted-foreground"
-                                        >Non suivi</span
-                                    >
+                                    <span class="text-sm font-semibold">{{
+                                        dashboard.attendance.rate === null
+                                            ? '—'
+                                            : `${dashboard.attendance.rate}%`
+                                    }}</span>
                                 </div>
                                 <div
                                     class="flex items-center justify-between rounded-xl bg-muted/50 p-4"
@@ -624,9 +730,10 @@ const roleLabel = computed(() =>
                                             >Absences récentes</span
                                         >
                                     </div>
-                                    <span class="text-sm text-muted-foreground"
-                                        >Non suivi</span
-                                    >
+                                    <span class="text-sm font-semibold">{{
+                                        dashboard.attendance.recent_absences
+                                            .length
+                                    }}</span>
                                 </div>
                                 <div
                                     class="flex items-center justify-between rounded-xl bg-muted/50 p-4"
@@ -635,12 +742,12 @@ const roleLabel = computed(() =>
                                         <FileWarning
                                             class="size-5 text-rose-500"
                                         /><span class="text-sm"
-                                            >Documents manquants</span
+                                            >Groupes à faible présence</span
                                         >
                                     </div>
-                                    <span class="text-sm text-muted-foreground"
-                                        >Non suivi</span
-                                    >
+                                    <span class="text-sm font-semibold">{{
+                                        dashboard.attendance.low_groups.length
+                                    }}</span>
                                 </div>
                                 <div
                                     class="flex items-center justify-between rounded-xl bg-emerald-50 p-4"

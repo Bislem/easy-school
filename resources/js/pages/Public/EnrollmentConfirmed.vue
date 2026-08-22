@@ -5,7 +5,7 @@ defineProps<{ enrollment: any }>();
 </script>
 
 <template>
-    <Head title="Inscription confirmée" />
+    <Head title="Demande confirmée" />
     <main
         class="flex min-h-screen items-center justify-center bg-slate-50 px-4 py-10"
     >
@@ -14,12 +14,12 @@ defineProps<{ enrollment: any }>();
         >
             <CheckCircle2 class="mx-auto size-16 text-green-600" />
             <h1 class="mt-5 text-3xl font-black text-slate-900">
-                Inscription confirmée
+                Demande confirmée
             </h1>
             <p class="mt-3 leading-7 text-slate-600">
-                Votre adresse e-mail a été vérifiée et votre inscription à
-                <strong>{{ enrollment.form.course.title }}</strong> est
-                maintenant confirmée.
+                Votre adresse e-mail a été vérifiée. Votre demande pour
+                <strong>{{ enrollment.form.course.title }}</strong> est est
+                maintenant en attente d’étude par l’administration.
             </p>
             <div class="mt-6 rounded-xl bg-slate-50 p-4">
                 <p class="text-sm text-slate-500">Votre groupe</p>

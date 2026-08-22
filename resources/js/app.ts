@@ -23,7 +23,18 @@ const pages = import.meta.glob<DefineComponent>([
     './pages/Admin/Expenses/**/*.vue',
     './pages/Admin/Salaries/**/*.vue',
     './pages/Admin/TrainingPlans/**/*.vue',
+    './pages/Admin/Staff/**/*.vue',
+    './pages/Admin/Badges/**/*.vue',
+    './pages/Admin/Finance/**/*.vue',
+    './pages/Admin/Certificates/**/*.vue',
+    './pages/Admin/Reports/**/*.vue',
+    './pages/Admin/Audit/**/*.vue',
+    './pages/Admin/Attendance/**/*.vue',
     './pages/Admin/Settings/**/*.vue',
+    './pages/Salary/**/*.vue',
+    './pages/Badge/**/*.vue',
+    './pages/Portal/**/*.vue',
+    './pages/Certificates/**/*.vue',
     './pages/Public/**/*.vue',
 ]);
 

@@ -5,470 +5,358 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import AdminLayout from '@/layouts/AdminLayout.vue';
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
-import {
-    Mail,
-    Pencil,
-    Phone,
-    Plus,
-    Search,
-    UserRound,
-    X,
-} from 'lucide-vue-next';
+import { Eye, Plus, Search, X } from 'lucide-vue-next';
 import { ref } from 'vue';
-
-interface Student {
-    id: number;
-    first_name: string;
-    last_name: string;
-    email: string;
-    phone: string;
-    birth_date?: string | null;
-    address?: string | null;
-    notes?: string | null;
-    is_active: boolean;
-}
-
-interface PaginationLink {
-    url: string | null;
-    label: string;
-    active: boolean;
-}
-
 const props = defineProps<{
-    students: { data: Student[]; links: PaginationLink[]; total: number };
-    filters: { search?: string; status?: string };
+    students: any;
+    courses: any[];
+    levels: string[];
+    groups: number[];
+    studentStatuses: string[];
+    filters: any;
 }>();
-
-const search = ref(props.filters.search ?? '');
-const status = ref(props.filters.status ?? '');
-const modalOpen = ref(false);
-const editingStudent = ref<Student | null>(null);
+const labels: Record<string, string> = {
+    active: 'Actif',
+    enrolled: 'Présent / inscrit',
+    waiting: 'En attente',
+    stopped: 'Arrêté',
+    suspended: 'Suspendu',
+    completed: 'Terminé',
+    cancelled: 'Annulé',
+};
+const filters = ref({
+    search: props.filters.search ?? '',
+    course_id: props.filters.course_id ?? '',
+    level: props.filters.level ?? '',
+    group: props.filters.group ?? '',
+    student_status: props.filters.student_status ?? '',
+    registered_from: props.filters.registered_from ?? '',
+    registered_to: props.filters.registered_to ?? '',
+});
+const modal = ref(false);
 const form = useForm({
     first_name: '',
     last_name: '',
     email: '',
     phone: '',
+    parent_phone: '',
     birth_date: '',
+    registration_date: new Date().toISOString().slice(0, 10),
+    school_level: '',
     address: '',
     notes: '',
+    status: 'active',
     is_active: true,
+    photo: null as File | null,
 });
-
-function applyFilters() {
-    router.get(
-        '/admin/students',
-        { search: search.value, status: status.value },
-        { preserveState: true, replace: true },
-    );
-}
-
-function openCreate() {
-    editingStudent.value = null;
-    form.reset();
-    form.clearErrors();
-    form.is_active = true;
-    modalOpen.value = true;
-}
-
-function openEdit(student: Student) {
-    editingStudent.value = student;
-    form.clearErrors();
-    form.first_name = student.first_name;
-    form.last_name = student.last_name;
-    form.email = student.email;
-    form.phone = student.phone;
-    form.birth_date = student.birth_date ?? '';
-    form.address = student.address ?? '';
-    form.notes = student.notes ?? '';
-    form.is_active = student.is_active;
-    modalOpen.value = true;
-}
-
-function closeModal() {
-    modalOpen.value = false;
-    form.clearErrors();
+function apply() {
+    router.get('/admin/students', filters.value, {
+        preserveState: true,
+        replace: true,
+    });
 }
 function submit() {
-    const options = { preserveScroll: true, onSuccess: closeModal };
-    if (editingStudent.value)
-        form.put(`/admin/students/${editingStudent.value.id}`, options);
-    else form.post('/admin/students', options);
+    form.post('/admin/students', {
+        forceFormData: true,
+        onSuccess: () => (modal.value = false),
+    });
 }
-function toggleActive(student: Student) {
-    router.patch(
-        `/admin/students/${student.id}/toggle-active`,
-        {},
-        { preserveScroll: true },
-    );
+function photo(e: Event) {
+    form.photo = (e.target as HTMLInputElement).files?.[0] ?? null;
 }
-const fullName = (student: Student) =>
-    `${student.first_name} ${student.last_name}`;
-const paginationLabel = (label: string) =>
-    label
-        .replace('&laquo;', '‹')
-        .replace('&raquo;', '›')
-        .replace('Previous', 'Précédent')
-        .replace('Next', 'Suivant');
+function pageLabel(v: string) {
+    return v
+        .replace('&laquo; Previous', 'Précédent')
+        .replace('Next &raquo;', 'Suivant');
+}
 </script>
-
 <template>
-    <AdminLayout>
-        <Head title="Gestion des étudiants" />
-        <main class="flex-1 p-4 sm:p-6 lg:p-8">
-            <div class="mx-auto max-w-6xl space-y-6">
-                <div
-                    class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"
+    <Head title="Étudiants" /><AdminLayout
+        ><main class="flex-1 p-4 sm:p-6 lg:p-8">
+            <div class="mx-auto max-w-7xl space-y-6">
+                <header
+                    class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
                 >
                     <div>
                         <h1 class="text-2xl font-semibold">
-                            Gestion des étudiants
+                            Dossiers étudiants
                         </h1>
-                        <p class="mt-1 text-sm text-muted-foreground">
-                            Gérez les dossiers des étudiants. Ces profils ne
-                            disposent d'aucun accès à l'application.
+                        <p class="text-sm text-muted-foreground">
+                            Un dossier peut contenir plusieurs inscriptions au
+                            fil du temps.
                         </p>
                     </div>
-                    <Button class="w-full sm:w-auto" @click="openCreate"
+                    <Button @click="modal = true"
                         ><Plus class="mr-2 size-4" />Ajouter un étudiant</Button
                     >
-                </div>
-
+                </header>
                 <form
-                    class="grid gap-3 rounded-xl border bg-card p-4 sm:grid-cols-[1fr_180px_auto]"
-                    @submit.prevent="applyFilters"
+                    class="grid gap-3 rounded-xl border bg-card p-4 sm:grid-cols-2 lg:grid-cols-4"
+                    @submit.prevent="apply"
                 >
-                    <div class="relative">
+                    <div class="relative sm:col-span-2">
                         <Search
-                            class="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
+                            class="absolute top-2.5 left-3 size-4 text-muted-foreground"
                         /><Input
-                            v-model="search"
+                            v-model="filters.search"
                             class="pl-9"
-                            placeholder="Rechercher par nom, e-mail ou téléphone"
+                            placeholder="Nom, e-mail ou téléphone"
                         />
                     </div>
                     <select
-                        v-model="status"
-                        class="h-9 rounded-md border border-input bg-transparent px-3 text-sm"
+                        v-model="filters.course_id"
+                        class="h-9 rounded-md border bg-background px-3"
+                    >
+                        <option value="">Toutes les formations</option>
+                        <option
+                            v-for="c in courses"
+                            :key="c.id"
+                            :value="String(c.id)"
+                        >
+                            {{ c.title }}
+                        </option></select
+                    ><select
+                        v-model="filters.student_status"
+                        class="h-9 rounded-md border bg-background px-3"
                     >
                         <option value="">Tous les statuts</option>
-                        <option value="1">Étudiants actifs</option>
-                        <option value="0">Étudiants inactifs</option></select
-                    ><Button type="submit" variant="outline">Rechercher</Button>
+                        <option
+                            v-for="s in studentStatuses"
+                            :key="s"
+                            :value="s"
+                        >
+                            {{ labels[s] }}
+                        </option></select
+                    ><select
+                        v-model="filters.level"
+                        class="h-9 rounded-md border bg-background px-3"
+                    >
+                        <option value="">Tous les niveaux</option>
+                        <option v-for="l in levels" :key="l" :value="l">
+                            {{ l }}
+                        </option></select
+                    ><select
+                        v-model="filters.group"
+                        class="h-9 rounded-md border bg-background px-3"
+                    >
+                        <option value="">Tous les groupes</option>
+                        <option v-for="g in groups" :key="g" :value="String(g)">
+                            Groupe {{ g }}
+                        </option></select
+                    ><Input
+                        v-model="filters.registered_from"
+                        type="date"
+                    /><Input v-model="filters.registered_to" type="date" />
+                    <div class="flex justify-end sm:col-span-2 lg:col-span-4">
+                        <Button variant="outline">Appliquer les filtres</Button>
+                    </div>
                 </form>
-
-                <div
-                    class="hidden overflow-hidden rounded-xl border bg-card md:block"
-                >
-                    <table class="w-full text-sm">
-                        <thead class="border-b bg-muted/40 text-left">
-                            <tr>
-                                <th class="px-5 py-3 font-medium">Étudiant</th>
-                                <th class="px-5 py-3 font-medium">Téléphone</th>
-                                <th class="px-5 py-3 font-medium">Adresse</th>
-                                <th class="px-5 py-3 font-medium">Statut</th>
-                                <th class="px-5 py-3 text-right font-medium">
-                                    Actions
-                                </th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y">
-                            <tr
-                                v-for="student in students.data"
-                                :key="student.id"
-                            >
-                                <td class="px-5 py-4">
-                                    <p class="font-medium">
-                                        {{ fullName(student) }}
-                                    </p>
-                                    <p class="text-xs text-muted-foreground">
-                                        {{ student.email }}
-                                    </p>
-                                </td>
-                                <td class="px-5 py-4">{{ student.phone }}</td>
-                                <td
-                                    class="max-w-48 truncate px-5 py-4 text-muted-foreground"
+                <section class="overflow-hidden rounded-xl border bg-card">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead class="border-b bg-muted/40 text-left">
+                                <tr>
+                                    <th class="p-4">Étudiant</th>
+                                    <th class="p-4">Formation actuelle</th>
+                                    <th class="p-4">Niveau / groupe</th>
+                                    <th class="p-4">Statut</th>
+                                    <th class="p-4 text-right">Dossier</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y">
+                                <tr
+                                    v-for="student in students.data"
+                                    :key="student.id"
                                 >
-                                    {{ student.address || '—' }}
-                                </td>
-                                <td class="px-5 py-4">
-                                    <span
-                                        class="rounded-full px-2.5 py-1 text-xs font-medium"
-                                        :class="
-                                            student.is_active
-                                                ? 'bg-green-100 text-green-700'
-                                                : 'bg-red-100 text-red-700'
-                                        "
-                                        >{{
-                                            student.is_active
-                                                ? 'Actif'
-                                                : 'Inactif'
-                                        }}</span
-                                    >
-                                </td>
-                                <td class="px-5 py-4">
-                                    <div class="flex justify-end gap-2">
+                                    <td class="p-4">
+                                        <div class="flex items-center gap-3">
+                                            <img
+                                                v-if="student.photo_url"
+                                                :src="student.photo_url"
+                                                class="size-10 rounded-full object-cover"
+                                            />
+                                            <div
+                                                v-else
+                                                class="grid size-10 place-items-center rounded-full bg-muted"
+                                            >
+                                                {{ student.first_name[0]
+                                                }}{{ student.last_name[0] }}
+                                            </div>
+                                            <div>
+                                                <p class="font-medium">
+                                                    {{ student.full_name }}
+                                                </p>
+                                                <p
+                                                    class="text-xs text-muted-foreground"
+                                                >
+                                                    {{ student.phone }} ·
+                                                    {{
+                                                        student.email ||
+                                                        'Sans e-mail'
+                                                    }}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="p-4">
+                                        {{
+                                            student.enrollments[0]?.form?.course
+                                                ?.title ||
+                                            student.enrollments[0]
+                                                ?.training_plan_group?.plan
+                                                ?.course?.title || '—'
+                                        }}
+                                    </td>
+                                    <td class="p-4">
+                                        {{
+                                            student.enrollments[0]?.level || '—'
+                                        }}
+                                        /
+                                        {{
+                                            student.enrollments[0]?.group_number
+                                                ? `Groupe ${student.enrollments[0].group_number}`
+                                                : '—'
+                                        }}
+                                    </td>
+                                    <td class="p-4">
+                                        <span
+                                            class="rounded-full bg-muted px-2 py-1 text-xs"
+                                            >{{ labels[student.status] }}</span
+                                        >
+                                    </td>
+                                    <td class="p-4 text-right">
                                         <Button
+                                            as-child
                                             size="sm"
                                             variant="outline"
-                                            @click="openEdit(student)"
-                                            ><Pencil class="size-4" /><span
-                                                class="sr-only"
-                                                >Modifier</span
+                                            ><Link
+                                                :href="`/admin/students/${student.id}`"
+                                                ><Eye
+                                                    class="mr-2 size-4"
+                                                />Ouvrir</Link
                                             ></Button
-                                        ><Button
-                                            size="sm"
-                                            :variant="
-                                                student.is_active
-                                                    ? 'destructive'
-                                                    : 'outline'
-                                            "
-                                            @click="toggleActive(student)"
-                                            >{{
-                                                student.is_active
-                                                    ? 'Désactiver'
-                                                    : 'Activer'
-                                            }}</Button
                                         >
-                                    </div>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-
-                <div class="grid gap-3 md:hidden">
-                    <article
-                        v-for="student in students.data"
-                        :key="student.id"
-                        class="rounded-xl border bg-card p-4"
-                    >
-                        <div class="flex items-start justify-between gap-3">
-                            <div class="min-w-0">
-                                <h2 class="truncate font-semibold">
-                                    {{ fullName(student) }}
-                                </h2>
-                                <p
-                                    class="mt-1 flex items-center gap-1.5 truncate text-sm text-muted-foreground"
-                                >
-                                    <Mail class="size-3.5 shrink-0" />{{
-                                        student.email
-                                    }}
-                                </p>
-                            </div>
-                            <span
-                                class="shrink-0 rounded-full px-2.5 py-1 text-xs font-medium"
-                                :class="
-                                    student.is_active
-                                        ? 'bg-green-100 text-green-700'
-                                        : 'bg-red-100 text-red-700'
-                                "
-                                >{{
-                                    student.is_active ? 'Actif' : 'Inactif'
-                                }}</span
-                            >
-                        </div>
-                        <p
-                            class="mt-3 flex items-center gap-2 text-sm text-muted-foreground"
-                        >
-                            <Phone class="size-4" />{{ student.phone }}
-                        </p>
-                        <p
-                            v-if="student.address"
-                            class="mt-2 text-sm text-muted-foreground"
-                        >
-                            {{ student.address }}
-                        </p>
-                        <div class="mt-4 grid grid-cols-2 gap-2">
-                            <Button variant="outline" @click="openEdit(student)"
-                                ><Pencil class="mr-2 size-4" />Modifier</Button
-                            ><Button
-                                :variant="
-                                    student.is_active
-                                        ? 'destructive'
-                                        : 'outline'
-                                "
-                                @click="toggleActive(student)"
-                                >{{
-                                    student.is_active ? 'Désactiver' : 'Activer'
-                                }}</Button
-                            >
-                        </div>
-                    </article>
-                </div>
-
-                <div
-                    v-if="students.data.length === 0"
-                    class="rounded-xl border border-dashed p-10 text-center"
-                >
-                    <UserRound class="mx-auto size-10 text-muted-foreground" />
-                    <p class="mt-3 text-muted-foreground">
-                        Aucun étudiant trouvé.
-                    </p>
-                </div>
-                <nav
-                    v-if="students.links.length > 3"
-                    class="flex flex-wrap justify-center gap-1"
-                >
+                                    </td>
+                                </tr>
+                                <tr v-if="!students.data.length">
+                                    <td
+                                        colspan="5"
+                                        class="p-10 text-center text-muted-foreground"
+                                    >
+                                        Aucun étudiant trouvé.
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+                <nav class="flex flex-wrap justify-center gap-1">
                     <Link
-                        v-for="link in students.links"
-                        :key="link.label"
-                        :href="link.url || '#'"
+                        v-for="l in students.links"
+                        :key="l.label"
+                        :href="l.url || '#'"
                         class="rounded-md border px-3 py-2 text-sm"
                         :class="{
-                            'bg-primary text-primary-foreground': link.active,
-                            'pointer-events-none opacity-50': !link.url,
+                            'bg-primary text-primary-foreground': l.active,
+                            'pointer-events-none opacity-40': !l.url,
                         }"
-                        >{{ paginationLabel(link.label) }}</Link
-                    >
+                        v-html="pageLabel(l.label)"
+                    />
                 </nav>
             </div>
         </main>
-
         <div
-            v-if="modalOpen"
-            class="fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center sm:p-4"
-            @click.self="closeModal"
+            v-if="modal"
+            class="fixed inset-0 z-50 overflow-y-auto bg-black/50 p-4"
         >
-            <div
-                class="max-h-[94vh] w-full overflow-y-auto rounded-t-2xl bg-background p-5 shadow-2xl sm:max-w-xl sm:rounded-2xl sm:p-6"
-            >
-                <div class="flex items-center justify-between">
-                    <div>
-                        <h2 class="text-xl font-semibold">
-                            {{
-                                editingStudent
-                                    ? "Modifier l'étudiant"
-                                    : 'Ajouter un étudiant'
-                            }}
-                        </h2>
-                        <p class="mt-1 text-sm text-muted-foreground">
-                            Ce profil est un dossier administratif sans accès de
-                            connexion.
-                        </p>
-                    </div>
-                    <Button
-                        type="button"
-                        size="icon"
-                        variant="ghost"
-                        @click="closeModal"
-                        ><X class="size-5"
+            <div class="mx-auto my-8 max-w-2xl rounded-xl bg-background p-6">
+                <div class="flex justify-between">
+                    <h2 class="text-xl font-semibold">
+                        Nouveau dossier étudiant
+                    </h2>
+                    <Button variant="ghost" size="icon" @click="modal = false"
+                        ><X
                     /></Button>
                 </div>
-                <form class="mt-6 space-y-4" @submit.prevent="submit">
-                    <div class="grid gap-4 sm:grid-cols-2">
-                        <div>
-                            <Label for="first_name">Prénom</Label
-                            ><Input
-                                id="first_name"
-                                v-model="form.first_name"
-                                class="mt-1"
-                                required
-                                autofocus
-                            /><InputError
-                                :message="form.errors.first_name"
-                                class="mt-1"
-                            />
-                        </div>
-                        <div>
-                            <Label for="last_name">Nom</Label
-                            ><Input
-                                id="last_name"
-                                v-model="form.last_name"
-                                class="mt-1"
-                                required
-                            /><InputError
-                                :message="form.errors.last_name"
-                                class="mt-1"
-                            />
-                        </div>
+                <form
+                    class="mt-5 grid gap-4 sm:grid-cols-2"
+                    @submit.prevent="submit"
+                >
+                    <div>
+                        <Label>Prénom</Label
+                        ><Input v-model="form.first_name" required /><InputError
+                            :message="form.errors.first_name"
+                        />
                     </div>
                     <div>
-                        <Label for="email">Adresse e-mail</Label
-                        ><Input
-                            id="email"
-                            v-model="form.email"
-                            type="email"
-                            class="mt-1"
-                            required
-                        /><InputError
+                        <Label>Nom</Label
+                        ><Input v-model="form.last_name" required />
+                    </div>
+                    <div>
+                        <Label>Téléphone</Label
+                        ><Input v-model="form.phone" required />
+                    </div>
+                    <div>
+                        <Label>Téléphone parent</Label
+                        ><Input v-model="form.parent_phone" />
+                    </div>
+                    <div>
+                        <Label>E-mail</Label
+                        ><Input v-model="form.email" type="email" /><InputError
                             :message="form.errors.email"
-                            class="mt-1"
-                        />
-                    </div>
-                    <div class="grid gap-4 sm:grid-cols-2">
-                        <div>
-                            <Label for="phone">Téléphone</Label
-                            ><Input
-                                id="phone"
-                                v-model="form.phone"
-                                type="tel"
-                                class="mt-1"
-                                required
-                            /><InputError
-                                :message="form.errors.phone"
-                                class="mt-1"
-                            />
-                        </div>
-                        <div>
-                            <Label for="birth_date">Date de naissance</Label
-                            ><Input
-                                id="birth_date"
-                                v-model="form.birth_date"
-                                type="date"
-                                class="mt-1"
-                            /><InputError
-                                :message="form.errors.birth_date"
-                                class="mt-1"
-                            />
-                        </div>
-                    </div>
-                    <div>
-                        <Label for="address">Adresse</Label
-                        ><Input
-                            id="address"
-                            v-model="form.address"
-                            class="mt-1"
-                        /><InputError
-                            :message="form.errors.address"
-                            class="mt-1"
                         />
                     </div>
                     <div>
-                        <Label for="notes">Notes administratives</Label
+                        <Label>Date de naissance</Label
+                        ><Input v-model="form.birth_date" type="date" />
+                    </div>
+                    <div>
+                        <Label>Date d’inscription</Label
+                        ><Input v-model="form.registration_date" type="date" />
+                    </div>
+                    <div>
+                        <Label>Niveau scolaire</Label
+                        ><Input v-model="form.school_level" />
+                    </div>
+                    <div>
+                        <Label>Photo</Label
+                        ><Input type="file" accept="image/*" @change="photo" />
+                    </div>
+                    <div>
+                        <Label>Statut</Label
+                        ><select
+                            v-model="form.status"
+                            class="mt-1 h-9 w-full rounded-md border bg-background px-3"
+                        >
+                            <option
+                                v-for="s in studentStatuses"
+                                :key="s"
+                                :value="s"
+                            >
+                                {{ labels[s] }}
+                            </option>
+                        </select>
+                    </div>
+                    <div class="sm:col-span-2">
+                        <Label>Adresse</Label><Input v-model="form.address" />
+                    </div>
+                    <div class="sm:col-span-2">
+                        <Label>Notes</Label
                         ><textarea
-                            id="notes"
                             v-model="form.notes"
-                            rows="3"
-                            class="mt-1 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
-                        ></textarea
-                        ><InputError
-                            :message="form.errors.notes"
-                            class="mt-1"
+                            class="mt-1 min-h-24 w-full rounded-md border bg-background p-3"
                         />
                     </div>
-                    <label class="flex items-center gap-3 rounded-lg border p-3"
-                        ><input
-                            v-model="form.is_active"
-                            type="checkbox"
-                            class="size-4 rounded border-gray-300 text-primary"
-                        /><span class="text-sm font-medium"
-                            >Dossier étudiant actif</span
-                        ></label
-                    >
-                    <div
-                        class="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end"
-                    >
+                    <div class="flex justify-end gap-2 sm:col-span-2">
                         <Button
                             type="button"
                             variant="outline"
-                            @click="closeModal"
+                            @click="modal = false"
                             >Annuler</Button
-                        ><Button type="submit" :disabled="form.processing">{{
-                            form.processing ? 'Enregistrement…' : 'Enregistrer'
-                        }}</Button>
+                        ><Button :disabled="form.processing">Créer</Button>
                     </div>
                 </form>
             </div>
-        </div>
-    </AdminLayout>
+        </div></AdminLayout
+    >
 </template>

@@ -13,4 +13,5 @@ class TrainingPlanGroup extends Model
     public function plan(): BelongsTo { return $this->belongsTo(TrainingPlan::class, 'training_plan_id'); }
     public function classroom(): BelongsTo { return $this->belongsTo(Classroom::class); }
     public function sessions(): HasMany { return $this->hasMany(TrainingSession::class); }
+    public function enrollments(): HasMany { return $this->hasMany(CourseEnrollment::class)->where('status', 'registered'); }
 }

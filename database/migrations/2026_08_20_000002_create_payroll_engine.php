@@ -1,0 +1,25 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration {
+    public function up(): void {
+        Schema::table('training_sessions', function(Blueprint $table){ $table->string('status')->default('planned')->after('notes')->index(); $table->timestamp('completed_at')->nullable()->index(); });
+        Schema::create('salary_configurations', function(Blueprint $table){ $table->id(); $table->foreignId('staff_id')->constrained('staff')->cascadeOnDelete(); $table->string('salary_type')->index(); $table->decimal('base_rate',14,2); $table->date('effective_from')->index(); $table->date('effective_to')->nullable()->index(); $table->text('notes')->nullable(); $table->timestamps(); $table->index(['staff_id','effective_from','effective_to']); });
+        Schema::create('salary_statements', function(Blueprint $table){ $table->id(); $table->foreignId('staff_id')->constrained('staff')->restrictOnDelete(); $table->foreignId('salary_configuration_id')->nullable()->constrained()->nullOnDelete(); $table->string('reference')->unique(); $table->date('period_start')->index(); $table->date('period_end')->index(); $table->string('salary_type'); $table->decimal('base_rate',14,2); $table->decimal('units',10,2)->default(1); $table->decimal('gross_salary',14,2); $table->decimal('bonuses',14,2)->default(0); $table->decimal('deductions',14,2)->default(0); $table->decimal('advances',14,2)->default(0); $table->decimal('exceptional_payments',14,2)->default(0); $table->decimal('reimbursements',14,2)->default(0); $table->decimal('net_salary',14,2); $table->decimal('amount_paid',14,2)->default(0); $table->decimal('remaining_amount',14,2); $table->string('status')->default('pending')->index(); $table->json('calculation_details')->nullable(); $table->text('notes')->nullable(); $table->foreignId('generated_by')->nullable()->constrained('users')->nullOnDelete(); $table->timestamps(); $table->index(['staff_id','period_start','period_end']); });
+        Schema::create('salary_adjustments', function(Blueprint $table){ $table->id(); $table->foreignId('salary_statement_id')->constrained()->cascadeOnDelete(); $table->string('type')->index(); $table->string('label'); $table->decimal('amount',14,2); $table->text('notes')->nullable(); $table->timestamps(); });
+        Schema::create('salary_payments', function(Blueprint $table){ $table->id(); $table->foreignId('salary_statement_id')->constrained()->restrictOnDelete(); $table->foreignId('staff_id')->constrained('staff')->restrictOnDelete(); $table->foreignId('expense_id')->nullable()->unique()->constrained()->nullOnDelete(); $table->decimal('amount',14,2); $table->timestamp('paid_at')->index(); $table->string('payment_method'); $table->string('reference')->unique(); $table->text('notes')->nullable(); $table->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete(); $table->timestamps(); });
+
+        $completedSessionIds=DB::table('training_sessions')->join('training_plan_groups','training_sessions.training_plan_group_id','=','training_plan_groups.id')->join('training_plans','training_plan_groups.training_plan_id','=','training_plans.id')->where('training_plans.status','completed')->pluck('training_sessions.id');
+        DB::table('training_sessions')->whereIn('id',$completedSessionIds)->update(['status'=>'completed','completed_at'=>DB::raw('ends_at')]);
+        DB::table('expenses')->where('category','Salaire')->whereNotNull('staff_id')->orderBy('id')->each(function($expense){
+            $ref='LEGACY-SAL-'.$expense->id; $period=$expense->salary_period ?: $expense->expense_date;
+            $statementId=DB::table('salary_statements')->insertGetId(['staff_id'=>$expense->staff_id,'reference'=>$ref,'period_start'=>$period,'period_end'=>$period,'salary_type'=>'custom','base_rate'=>$expense->amount,'units'=>1,'gross_salary'=>$expense->amount,'net_salary'=>$expense->amount,'amount_paid'=>$expense->amount,'remaining_amount'=>0,'status'=>'paid','calculation_details'=>json_encode(['legacy_expense_id'=>$expense->id]),'notes'=>$expense->notes,'generated_by'=>$expense->created_by,'created_at'=>$expense->created_at,'updated_at'=>$expense->updated_at]);
+            DB::table('salary_payments')->insert(['salary_statement_id'=>$statementId,'staff_id'=>$expense->staff_id,'expense_id'=>$expense->id,'amount'=>$expense->amount,'paid_at'=>$expense->expense_date,'payment_method'=>$expense->payment_method ?: 'other','reference'=>'LEGACY-PAY-'.$expense->id,'notes'=>'Paiement migré depuis le module salaires historique.','created_by'=>$expense->created_by,'created_at'=>$expense->created_at,'updated_at'=>$expense->updated_at]);
+        });
+    }
+    public function down(): void { Schema::dropIfExists('salary_payments'); Schema::dropIfExists('salary_adjustments'); Schema::dropIfExists('salary_statements'); Schema::dropIfExists('salary_configurations'); Schema::table('training_sessions',fn(Blueprint $table)=>$table->dropColumn(['status','completed_at'])); }
+};

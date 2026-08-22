@@ -212,6 +212,24 @@ const pending = computed(() =>
                                 class="mt-1"
                             />
                         </div>
+                        <div>
+                            <Label for="parent_phone"
+                                >Téléphone du parent (facultatif)</Label
+                            >
+                            <Input
+                                id="parent_phone"
+                                name="parent_phone"
+                                type="tel"
+                            />
+                            <InputError :message="errors.parent_phone" />
+                        </div>
+                        <div>
+                            <Label for="level"
+                                >Niveau demandé (facultatif)</Label
+                            >
+                            <Input id="level" name="level" />
+                            <InputError :message="errors.level" />
+                        </div>
                     </div>
                     <Button class="mt-2 w-full" :disabled="processing">{{
                         processing

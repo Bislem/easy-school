@@ -9,6 +9,7 @@ use App\Enums\UserRole;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 
 class User extends Authenticatable
@@ -64,6 +65,18 @@ class User extends Authenticatable
     {
         return $this->hasMany(Expense::class, 'employee_id')->where('category', 'Salaire');
     }
+
+    public function staff(): HasOne
+    {
+        return $this->hasOne(Staff::class);
+    }
+
+    public function student(): HasOne
+    {
+        return $this->hasOne(Student::class);
+    }
+    public function schoolParent(): HasOne { return $this->hasOne(SchoolParent::class); }
+    public function portalNotifications(): HasMany { return $this->hasMany(PortalNotification::class, 'recipient_id')->latest('occurred_at'); }
 
     /**
      * Get the reservations for the user.

@@ -17,6 +17,7 @@ import {
     ClipboardCheck,
     ClipboardList,
     GraduationCap,
+    IdCard,
     LayoutDashboard,
     ReceiptText,
     Settings,
@@ -52,11 +53,79 @@ const mainNavItems: NavItem[] = [
                   icon: GraduationCap,
               },
               { title: 'Formations', href: '/admin/courses', icon: BookOpen },
-              { title: 'Présences', href: '#', icon: ClipboardCheck },
+              { title: 'Présences', href: '/admin/attendance', icon: ClipboardCheck },
               { title: 'Salles', href: '/admin/classrooms', icon: BookOpen },
               { title: 'Utilisateurs', href: '/admin/users', icon: Users },
+              { title: 'Personnel', href: '/admin/staff', icon: Users },
+              { title: 'Badges', href: '/admin/badges', icon: IdCard },
+              {
+                  title: 'Certificats',
+                  href: '/admin/certificates',
+                  icon: IdCard,
+              },
+              { title: 'Rapports', href: '/admin/reports', icon: ReceiptText },
+              {
+                  title: 'Journal d’audit',
+                  href: '/admin/audit',
+                  icon: ClipboardList,
+              },
               { title: 'Salaires', href: '/admin/salaries', icon: WalletCards },
+              {
+                  title: 'Finance étudiants',
+                  href: '/admin/finance',
+                  icon: ReceiptText,
+              },
               { title: 'Dépenses', href: '/admin/expenses', icon: ReceiptText },
+          ]
+        : []),
+    ...(role === 'teacher' || role === 'employee'
+        ? [
+              { title: 'Ma paie', href: '/my/salary', icon: WalletCards },
+              { title: 'Ma carte', href: '/my/card', icon: IdCard },
+          ]
+        : []),
+    ...(role === 'student'
+        ? [
+              { title: 'Mon espace', href: '/portal', icon: GraduationCap },
+              {
+                  title: 'Ma formation',
+                  href: '/portal/formation',
+                  icon: BookOpen,
+              },
+              {
+                  title: 'Mon planning',
+                  href: '/portal/planning',
+                  icon: CalendarRange,
+              },
+              {
+                  title: 'Présences',
+                  href: '/portal/attendance',
+                  icon: ClipboardCheck,
+              },
+              {
+                  title: 'Mes paiements',
+                  href: '/portal/payments',
+                  icon: ReceiptText,
+              },
+              { title: 'Ma carte', href: '/my/card', icon: IdCard },
+          ]
+        : []),
+    ...(role === 'parent'
+        ? [{ title: 'Espace parent', href: '/portal', icon: Users }]
+        : []),
+    ...(role === 'teacher'
+        ? [
+              { title: 'Mes groupes', href: '/portal/groups', icon: Users },
+              {
+                  title: 'Mes étudiants',
+                  href: '/portal/students',
+                  icon: GraduationCap,
+              },
+              {
+                  title: 'Mon planning',
+                  href: '/portal/planning',
+                  icon: CalendarRange,
+              },
           ]
         : []),
     ...(role === 'admin'

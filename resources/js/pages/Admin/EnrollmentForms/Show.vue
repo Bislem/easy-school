@@ -25,6 +25,7 @@ interface Enrollment {
     email: string;
     phone: string;
     confirmed_at?: string | null;
+    status: string;
     group_number?: number | null;
     student?: {
         id: number;
@@ -45,13 +46,23 @@ const props = defineProps<{
         pending: number;
         groups: Record<string, number>;
     };
+    applicationStatuses: string[];
 }>();
 const confirmed = computed(() =>
-    props.enrollments.data.filter((item) => item.confirmed_at),
+    props.enrollments.data.filter((item) => item.status === 'registered'),
 );
 const pending = computed(() =>
-    props.enrollments.data.filter((item) => !item.confirmed_at),
+    props.enrollments.data.filter((item) => item.status !== 'registered'),
 );
+const statusLabels: Record<string, string> = {
+    new: 'Nouveau',
+    contacted: 'Contacté',
+    waiting: 'En attente',
+    approved: 'Approuvé',
+    registered: 'Inscrit',
+    rejected: 'Rejeté',
+    cancelled: 'Annulé',
+};
 const groups = computed(() =>
     Array.from(
         { length: props.enrollmentForm.groups_count },
@@ -92,7 +103,7 @@ function addStudent() {
 function removeStudent(enrollment: Enrollment) {
     if (
         window.confirm(
-            `Supprimer l'inscription de ${enrollment.first_name} ${enrollment.last_name} ?`,
+            `Annuler l'inscription de ${enrollment.first_name} ${enrollment.last_name} ?`,
         )
     ) {
         router.delete(
@@ -106,6 +117,20 @@ function changeGroup(enrollment: Enrollment, event: Event) {
     router.patch(
         `/admin/enrollment-forms/${props.enrollmentForm.id}/enrollments/${enrollment.id}/group`,
         { group_number: group },
+        { preserveScroll: true },
+    );
+}
+function changeStatus(enrollment: Enrollment, event: Event) {
+    router.patch(
+        `/admin/enrollment-forms/${props.enrollmentForm.id}/enrollments/${enrollment.id}/status`,
+        { status: (event.target as HTMLSelectElement).value },
+        { preserveScroll: true },
+    );
+}
+function register(enrollment: Enrollment) {
+    router.post(
+        `/admin/enrollment-forms/${props.enrollmentForm.id}/enrollments/${enrollment.id}/register`,
+        {},
         { preserveScroll: true },
     );
 }
@@ -334,9 +359,7 @@ function changeGroup(enrollment: Enrollment, event: Event) {
                 </section>
 
                 <section v-if="pending.length">
-                    <h2 class="mb-3 text-lg font-semibold">
-                        En attente de confirmation
-                    </h2>
+                    <h2 class="mb-3 text-lg font-semibold">Candidatures</h2>
                     <div class="grid gap-3 sm:grid-cols-2">
                         <article
                             v-for="item in pending"
@@ -352,9 +375,33 @@ function changeGroup(enrollment: Enrollment, event: Event) {
                             <p class="text-sm text-muted-foreground">
                                 {{ item.phone }}
                             </p>
-                            <span
-                                class="mt-3 inline-block rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-700"
-                                >E-mail non confirmé</span
+                            <p class="mt-2 text-xs text-muted-foreground">
+                                {{
+                                    item.confirmed_at
+                                        ? 'E-mail confirmé'
+                                        : 'E-mail non confirmé'
+                                }}
+                            </p>
+                            <select
+                                :value="item.status"
+                                class="mt-3 h-9 w-full rounded-md border bg-background px-3 text-sm"
+                                @change="changeStatus(item, $event)"
+                            >
+                                <option
+                                    v-for="value in applicationStatuses.filter(
+                                        (value) => value !== 'registered',
+                                    )"
+                                    :key="value"
+                                    :value="value"
+                                >
+                                    {{ statusLabels[value] }}
+                                </option>
+                            </select>
+                            <Button
+                                v-if="item.status === 'approved'"
+                                class="mt-2 w-full"
+                                @click="register(item)"
+                                >Inscrire comme étudiant</Button
                             >
                             <Button
                                 class="mt-3 w-full text-red-600"

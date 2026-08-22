@@ -26,6 +26,7 @@ test('an administrator can add and remove a student from a form', function () {
         ->delete(route('admin.enrollment-forms.enrollments.destroy', [$form, $enrollment]))
         ->assertSessionHasNoErrors();
 
-    expect($form->enrollments()->count())->toBe(0)
+    expect($form->enrollments()->count())->toBe(1)
+        ->and($enrollment->refresh()->status->value)->toBe('cancelled')
         ->and(Student::where('email', 'lina@example.com')->exists())->toBeTrue();
 });

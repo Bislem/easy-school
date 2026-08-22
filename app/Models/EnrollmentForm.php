@@ -36,6 +36,7 @@ class EnrollmentForm extends Model
     public function teacher(): BelongsTo { return $this->belongsTo(User::class, 'teacher_id'); }
     public function classroom(): BelongsTo { return $this->belongsTo(Classroom::class); }
     public function enrollments(): HasMany { return $this->hasMany(CourseEnrollment::class); }
+    public function trainingPlans(): HasMany { return $this->hasMany(TrainingPlan::class); }
 
     public function groupCapacity(): int
     {
@@ -51,7 +52,7 @@ class EnrollmentForm extends Model
 
     public function nextAvailableGroup(): ?int
     {
-        $counts = $this->enrollments()->whereNotNull('confirmed_at')
+        $counts = $this->enrollments()->where('status', 'registered')
             ->selectRaw('group_number, COUNT(*) as total')
             ->groupBy('group_number')
             ->pluck('total', 'group_number');

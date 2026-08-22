@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Admin;
 use App\Enums\UserRole;
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Models\EmployeeType;
+use App\Models\Staff;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -45,9 +47,10 @@ class UsersController extends Controller
             $validated['password'] = str()->password(32);
         }
 
-        User::create($validated + [
+        $user = User::create($validated + [
             'email_verified_at' => now(),
         ]);
+        $this->syncStaff($user);
 
         return back()->with('success', 'Utilisateur créé avec succès.');
     }
@@ -68,6 +71,7 @@ class UsersController extends Controller
         }
 
         $user->update($validated);
+        $this->syncStaff($user);
 
         return back()->with('success', 'Utilisateur mis à jour avec succès.');
     }
@@ -106,5 +110,18 @@ class UsersController extends Controller
             : $validated['role'] !== UserRole::EMPLOYEE->value;
 
         return $validated;
+    }
+
+    private function syncStaff(User $user): void
+    {
+        if (! in_array($user->role, [UserRole::TEACHER, UserRole::EMPLOYEE], true)) return;
+        $type = EmployeeType::where('slug', $user->role === UserRole::TEACHER ? 'teacher' : 'other')->firstOrFail();
+        $parts = preg_split('/\s+/', trim($user->name), 2);
+        Staff::updateOrCreate(['user_id' => $user->id], [
+            'employee_type_id' => $type->id, 'first_name' => $parts[0], 'last_name' => $parts[1] ?? '',
+            'email' => $user->email, 'phone' => $user->phone, 'birth_date' => $user->birth_date,
+            'employment_status' => $user->is_active ? 'active' : 'inactive',
+            'employee_code' => 'EMP-'.str_pad((string) $user->id, 6, '0', STR_PAD_LEFT),
+        ]);
     }
 }
