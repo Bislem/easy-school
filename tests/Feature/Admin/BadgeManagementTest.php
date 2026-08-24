@@ -23,3 +23,16 @@ test('qr payload uses only an opaque verification url', function () {
     $badge=new Badge(['verification_token'=>$token]);
     expect($badge->verification_url)->toContain($token)->not->toContain('first_name');
 });
+
+test('an administrator can print a single badge as a card sized pdf', function () {
+    $admin = User::factory()->create(['role' => UserRole::ADMIN]);
+    $student = Student::create(['first_name' => 'Lina', 'last_name' => 'Kaci', 'phone' => '-', 'status' => 'active', 'is_active' => true]);
+    $badge = $student->badges()->create([
+        'card_number' => 'ESC-26-PRINTTEST', 'verification_token' => hash('sha256', 'print-test'),
+        'issue_date' => '2026-08-24', 'status' => 'active', 'first_name' => 'Lina', 'last_name' => 'Kaci',
+        'person_type' => 'student', 'role_label' => 'Étudiante', 'issued_by' => $admin->id,
+    ]);
+
+    $this->actingAs($admin)->get(route('admin.badges.print', $badge))
+        ->assertOk()->assertHeader('content-type', 'application/pdf');
+});

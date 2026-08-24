@@ -41,7 +41,7 @@ const labels: Record<string, string> = {
             <img
                 v-if="badge.photo_url_snapshot"
                 :src="badge.photo_url_snapshot"
-                class="h-full w-[27%] rounded-lg object-cover"
+                class="h-full w-[27%] rounded-lg object-cover object-center"
             />
             <div
                 v-else

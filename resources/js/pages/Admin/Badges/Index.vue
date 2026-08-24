@@ -2,9 +2,11 @@
 import BadgeCard from '@/components/BadgeCard.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import AdminLayout from '@/layouts/AdminLayout.vue';
 import { Head, router, useForm, usePage } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
+import { ChevronDown, Eye, Printer, RefreshCw, ShieldAlert, CirclePause } from 'lucide-vue-next';
 const props = defineProps({
     badges: { type: Object, required: true },
     students: { type: Array, required: true },
@@ -188,33 +190,8 @@ function reissue(b: any) {
                                     </div>
                                 </td>
                                 <td>{{ labels[b.display_status] }}</td>
-                                <td class="space-x-1 whitespace-nowrap">
-                                    <Button
-                                        size="sm"
-                                        variant="outline"
-                                        @click="preview = b"
-                                        >Voir</Button
-                                    ><Button
-                                        as-child
-                                        size="sm"
-                                        variant="outline"
-                                        ><a
-                                            :href="`/admin/badges/${b.id}/print`"
-                                            >Imprimer</a
-                                        ></Button
-                                    ><Button
-                                        size="sm"
-                                        variant="outline"
-                                        @click="setStatus(b, 'lost')"
-                                        >Perdue</Button
-                                    ><Button
-                                        size="sm"
-                                        variant="outline"
-                                        @click="setStatus(b, 'suspended')"
-                                        >Suspendre</Button
-                                    ><Button size="sm" @click="reissue(b)"
-                                        >Rééditer</Button
-                                    >
+                                <td class="whitespace-nowrap text-right">
+                                    <DropdownMenu><DropdownMenuTrigger as-child><Button size="sm" variant="outline">Actions<ChevronDown class="ml-2 size-4"/></Button></DropdownMenuTrigger><DropdownMenuContent align="end" class="w-52"><DropdownMenuLabel>{{b.first_name}} {{b.last_name}}</DropdownMenuLabel><DropdownMenuSeparator/><DropdownMenuItem @select="preview=b"><Eye class="mr-2 size-4"/>Aperçu</DropdownMenuItem><DropdownMenuItem as-child><a :href="`/admin/badges/${b.id}/print`"><Printer class="mr-2 size-4"/>Imprimer</a></DropdownMenuItem><DropdownMenuItem @select="reissue(b)"><RefreshCw class="mr-2 size-4"/>Rééditer</DropdownMenuItem><DropdownMenuSeparator/><DropdownMenuItem @select="setStatus(b,'lost')"><ShieldAlert class="mr-2 size-4"/>Marquer perdue</DropdownMenuItem><DropdownMenuItem @select="setStatus(b,'suspended')"><CirclePause class="mr-2 size-4"/>Suspendre</DropdownMenuItem></DropdownMenuContent></DropdownMenu>
                                 </td>
                             </tr>
                         </tbody>

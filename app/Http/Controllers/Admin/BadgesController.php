@@ -60,7 +60,7 @@ class BadgesController extends Controller
     public function print(Badge $badge, BadgeQrCode $qr, Code39Barcode $barcode): HttpResponse
     {
         Gate::authorize(BadgePermission::PRINT->value);
-        return $this->pdf(collect([$badge]),$qr,$barcode)->download($badge->card_number.'.pdf');
+        return $this->pdf($badge->newCollection([$badge]),$qr,$barcode,true)->download($badge->card_number.'.pdf');
     }
 
     public function batch(Request $request, BadgeQrCode $qr, Code39Barcode $barcode): HttpResponse
@@ -77,17 +77,28 @@ class BadgesController extends Controller
         return $person->badges()->create(['badge_template_id'=>$templateId,'replaces_badge_id'=>$replaces?->id,'card_number'=>$number,'verification_token'=>hash('sha256',str()->uuid().str()->random(40)),'barcode_value'=>($data['barcode_enabled']??false)?$number:null,'issue_date'=>$data['issue_date'],'expiration_date'=>$data['expiration_date']??null,'status'=>'active','first_name'=>$person->first_name,'last_name'=>$person->last_name,'person_type'=>$student?'student':'staff','role_label'=>$student?'Étudiant':$person->employeeType->name,'formation_label'=>$enrollment?->form?->course?->title,'group_label'=>$enrollment?->group_number?'Groupe '.$enrollment->group_number:null,'photo_url_snapshot'=>$person->photo_url,'issued_by'=>$request->user()->id,'metadata'=>['source_id'=>$person->id]]);
     }
 
-    private function pdf($badges,BadgeQrCode $qr,Code39Barcode $barcode)
+    private function pdf($badges,BadgeQrCode $qr,Code39Barcode $barcode,bool $single=false)
     {
         $badges->loadMissing('template');$qrCodes=$badges->mapWithKeys(fn($b)=>[$b->id=>'data:image/svg+xml;base64,'.base64_encode($qr->svg($b->verification_url,150))]);
         $barcodes=$badges->mapWithKeys(fn($b)=>[$b->id=>$b->barcode_value?'data:image/svg+xml;base64,'.base64_encode($barcode->svg($b->barcode_value,45)):null]);
-        $photos=$badges->mapWithKeys(fn($b)=>[$b->id=>$this->localImage($b->photo_url_snapshot)]);$school=CompanySetting::current();
-        return Pdf::loadView('admin.badges.print',['badges'=>$badges,'qrCodes'=>$qrCodes,'barcodes'=>$barcodes,'photos'=>$photos,'school'=>$school,'schoolLogo'=>$this->localImage($school->logo_url)])->setPaper('a4');
+        $photos=$badges->mapWithKeys(fn($b)=>[$b->id=>$this->localPhoto($b->photo_url_snapshot)]);$school=CompanySetting::current();
+        $pdf=Pdf::loadView('admin.badges.print',['badges'=>$badges,'qrCodes'=>$qrCodes,'barcodes'=>$barcodes,'photos'=>$photos,'school'=>$school,'schoolLogo'=>$this->localImage($school->logo_url),'single'=>$single]);
+        return $single ? $pdf->setPaper([0,0,242.65,153.01]) : $pdf->setPaper('a4');
     }
 
     private function localImage(?string $url): ?string
     {
         if(!$url)return null;$path=parse_url($url,PHP_URL_PATH);if(!str_starts_with((string)$path,'/storage/'))return null;$file=public_path(ltrim($path,'/'));if(!is_file($file))return null;
         return 'data:'.(mime_content_type($file)?:'image/jpeg').';base64,'.base64_encode(file_get_contents($file));
+    }
+
+    private function localPhoto(?string $url): ?array
+    {
+        if(!$url)return null;$path=parse_url($url,PHP_URL_PATH);if(!str_starts_with((string)$path,'/storage/'))return null;$file=public_path(ltrim($path,'/'));
+        if(!is_file($file)||!($size=@getimagesize($file))||!$size[0]||!$size[1])return null;
+        $aspect=$size[0]/$size[1];
+        if($aspect>=18/25){$width=25*$aspect;$style='height:25mm;width:'.$width.'mm;margin-left:'.((18-$width)/2).'mm;';}
+        else{$height=18/$aspect;$style='width:18mm;height:'.$height.'mm;margin-top:'.((25-$height)/2).'mm;';}
+        return ['src'=>'data:'.(mime_content_type($file)?:'image/jpeg').';base64,'.base64_encode(file_get_contents($file)),'style'=>$style];
     }
 }
