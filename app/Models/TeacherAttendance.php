@@ -3,6 +3,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 class TeacherAttendance extends Model
 {
     protected $fillable=['training_session_id','scheduled_teacher_id','actual_teacher_id','status','arrival_time','departure_time','worked_minutes','is_justified','justification','notes','recorded_by','validated_at','validated_by'];
@@ -11,4 +12,5 @@ class TeacherAttendance extends Model
     public function scheduledTeacher():BelongsTo{return $this->belongsTo(User::class,'scheduled_teacher_id');}
     public function actualTeacher():BelongsTo{return $this->belongsTo(User::class,'actual_teacher_id');}
     public function histories():MorphMany{return $this->morphMany(AttendanceHistory::class,'attendance');}
+    public function salaryStatements():BelongsToMany{return $this->belongsToMany(SalaryStatement::class,'salary_statement_teacher_attendances')->withTimestamps();}
 }

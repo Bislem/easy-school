@@ -5,7 +5,15 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import AdminLayout from '@/layouts/AdminLayout.vue';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3';
-import { Pencil, Plus, Search, UserCheck, UserX, X } from 'lucide-vue-next';
+import {
+    Eye,
+    Pencil,
+    Plus,
+    Search,
+    UserCheck,
+    UserX,
+    X,
+} from 'lucide-vue-next';
 import { ref } from 'vue';
 
 interface ManagedUser {
@@ -19,6 +27,12 @@ interface ManagedUser {
     can_login: boolean;
     is_active: boolean;
     created_at: string;
+    staff?: {
+        id: number;
+        employee_code: string;
+        employment_status: string;
+        employee_type?: { name: string } | null;
+    } | null;
 }
 
 interface PaginationLink {
@@ -129,7 +143,7 @@ const paginationLabel = (label: string) =>
 
 <template>
     <AdminLayout>
-        <Head title="Gestion des utilisateurs" />
+        <Head title="Personnel" />
 
         <main class="flex-1 p-4 sm:p-6 lg:p-8">
             <div class="mx-auto max-w-6xl space-y-6">
@@ -137,20 +151,17 @@ const paginationLabel = (label: string) =>
                     class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"
                 >
                     <div>
-                        <h1 class="text-2xl font-semibold">
-                            Gestion des utilisateurs
-                        </h1>
+                        <h1 class="text-2xl font-semibold">Personnel</h1>
                         <p class="mt-1 text-sm text-muted-foreground">
-                            Gérez les administrateurs, enseignants et employés
-                            de l’établissement.
+                            Gérez les employés, enseignants, administrateurs et
+                            leurs accès.
                         </p>
                     </div>
                     <Button
                         type="button"
                         class="w-full sm:w-auto"
                         @click="openCreate"
-                        ><Plus class="mr-2 size-4" />Ajouter un
-                        utilisateur</Button
+                        ><Plus class="mr-2 size-4" />Ajouter un membre</Button
                     >
                 </div>
 
@@ -192,9 +203,7 @@ const paginationLabel = (label: string) =>
                     <table class="w-full text-sm">
                         <thead class="border-b bg-muted/40 text-left">
                             <tr>
-                                <th class="px-5 py-3 font-medium">
-                                    Utilisateur
-                                </th>
+                                <th class="px-5 py-3 font-medium">Personnel</th>
                                 <th class="px-5 py-3 font-medium">Rôle</th>
                                 <th class="px-5 py-3 font-medium">Fonction</th>
                                 <th class="px-5 py-3 font-medium">Téléphone</th>
@@ -216,7 +225,11 @@ const paginationLabel = (label: string) =>
                                     {{ roleLabel(user.role) }}
                                 </td>
                                 <td class="px-5 py-4 text-muted-foreground">
-                                    {{ user.job_title || '—' }}
+                                    {{
+                                        user.staff?.employee_type?.name ||
+                                        user.job_title ||
+                                        '—'
+                                    }}
                                 </td>
                                 <td class="px-5 py-4 text-muted-foreground">
                                     {{ user.phone || '—' }}
@@ -240,6 +253,16 @@ const paginationLabel = (label: string) =>
                                 </td>
                                 <td class="px-5 py-4">
                                     <div class="flex justify-end gap-2">
+                                        <Button
+                                            v-if="user.staff"
+                                            as-child
+                                            size="sm"
+                                            variant="outline"
+                                            title="Ouvrir le dossier"
+                                            ><Link
+                                                :href="`/admin/staff/${user.staff.id}`"
+                                                ><Eye class="size-4" /></Link
+                                        ></Button>
                                         <Button
                                             size="sm"
                                             variant="outline"
@@ -374,8 +397,8 @@ const paginationLabel = (label: string) =>
                         <h2 class="text-xl font-semibold">
                             {{
                                 editingUser
-                                    ? "Modifier l'utilisateur"
-                                    : 'Ajouter un utilisateur'
+                                    ? 'Modifier le membre du personnel'
+                                    : 'Ajouter un membre du personnel'
                             }}
                         </h2>
                         <p class="mt-1 text-sm text-muted-foreground">

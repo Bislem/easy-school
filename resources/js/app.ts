@@ -17,6 +17,7 @@ const pages = import.meta.glob<DefineComponent>([
     './pages/settings/TwoFactor.vue',
     './pages/Admin/Users/**/*.vue',
     './pages/Admin/Classrooms/**/*.vue',
+    './pages/Admin/SchoolSites/**/*.vue',
     './pages/Admin/Courses/**/*.vue',
     './pages/Admin/Students/**/*.vue',
     './pages/Admin/EnrollmentForms/**/*.vue',

@@ -18,7 +18,7 @@ class UsersController extends Controller
 {
     public function index(Request $request): Response
     {
-        $users = User::query()
+        $users = User::query()->with(['staff:id,user_id,employee_type_id,employee_code,employment_status,hire_date,photo_path', 'staff.employeeType:id,name,is_teacher'])
             ->whereIn('role', [UserRole::ADMIN->value, UserRole::TEACHER->value, UserRole::EMPLOYEE->value])
             ->when($request->string('search')->trim()->toString(), function ($query, string $search) {
                 $query->where(function ($query) use ($search) {

@@ -5,7 +5,6 @@ namespace App\Services;
 use App\Enums\SalaryType;
 use App\Models\SalaryConfiguration;
 use App\Models\Staff;
-use App\Models\TrainingSession;
 use App\Models\TeacherAttendance;
 use Carbon\CarbonInterface;
 use Illuminate\Validation\ValidationException;
@@ -14,22 +13,39 @@ class SalaryCalculator
 {
     public function calculate(Staff $staff, SalaryConfiguration $configuration, CarbonInterface $start, CarbonInterface $end, ?float $manualUnits = null, ?float $manualAmount = null): array
     {
-        abort_unless($configuration->staff_id === $staff->id, 422);
-        $rate = (float) $configuration->base_rate; $sessions = collect(); $units = 1.0; $validatedTeaching = collect();
-        if (in_array($configuration->salary_type, [SalaryType::HOURLY, SalaryType::PER_SESSION], true)) {
+        $rate = (float) $configuration->base_rate; $units = 1.0; $validatedTeaching = collect();
+        $isTeachingSalary = in_array($configuration->salary_type, [SalaryType::HOURLY, SalaryType::PER_SESSION], true)
+            || ($configuration->salary_type === SalaryType::DAILY && (bool) $staff->employeeType?->is_teacher);
+        if ($isTeachingSalary) {
             if (! $staff->user_id) throw ValidationException::withMessages(['staff_id'=>'Cet employé ne possède pas de compte enseignant lié.']);
-            $sessions = TrainingSession::where(fn($query)=>$query->where('teacher_id',$staff->user_id)->orWhereHas('teacherAttendance',fn($attendance)=>$attendance->where('actual_teacher_id',$staff->user_id)))
-                ->where('status','completed')->whereBetween('starts_at',[$start->copy()->startOfDay(),$end->copy()->endOfDay()])->orderBy('starts_at')->get();
-            $validatedTeaching=TeacherAttendance::whereIn('training_session_id',$sessions->pluck('id'))->where('actual_teacher_id',$staff->user_id)->whereNotNull('validated_at')->whereIn('status',['present','late','replaced'])->get();
+            $validatedTeaching = TeacherAttendance::with('session')
+                ->where('actual_teacher_id', $staff->user_id)
+                ->whereNotNull('validated_at')
+                ->whereIn('status', ['present', 'late', 'replaced'])
+                ->whereDoesntHave('salaryStatements')
+                ->whereHas('session', fn ($query) => $query->where('status', 'completed')
+                    ->whereBetween('starts_at', [$start->copy()->startOfDay(), $end->copy()->endOfDay()]))
+                ->get()->sortBy('session.starts_at')->values();
+            if ($validatedTeaching->isEmpty()) {
+                throw ValidationException::withMessages(['period'=>'Aucune heure enseignante validée et non comptabilisée pour ce mois.']);
+            }
         }
         $gross = match($configuration->salary_type) {
             SalaryType::MONTHLY => $rate,
-            SalaryType::HOURLY => $rate * ($units = round(($validatedTeaching->isNotEmpty()?$validatedTeaching->sum('worked_minutes'):$sessions->sum(fn($session)=>$session->starts_at->diffInMinutes($session->ends_at)))/60,2)),
-            SalaryType::PER_SESSION => $rate * ($units = (float)($validatedTeaching->isNotEmpty()?$validatedTeaching->count():$sessions->count())),
-            SalaryType::DAILY => $rate * ($units = $this->requiredUnits($manualUnits,'worked_units')),
+            SalaryType::HOURLY => $rate * ($units = round($validatedTeaching->sum('worked_minutes') / 60, 2)),
+            SalaryType::PER_SESSION => $rate * ($units = (float) $validatedTeaching->count()),
+            SalaryType::DAILY => $rate * ($units = $isTeachingSalary
+                ? (float) $validatedTeaching->pluck('session.starts_at')->map(fn ($date) => $date->toDateString())->unique()->count()
+                : $this->requiredUnits($manualUnits,'worked_units')),
             SalaryType::CUSTOM => $manualAmount ?? throw ValidationException::withMessages(['manual_amount'=>'Le montant manuel est obligatoire.']),
         };
-        return ['units'=>$units,'gross'=>round($gross,2),'details'=>['session_ids'=>$sessions->pluck('id')->all(),'session_count'=>$sessions->count(),'validated_worked_hours'=>$configuration->salary_type===SalaryType::HOURLY?$units:null,'completed_hours'=>round($sessions->sum(fn($session)=>$session->starts_at->diffInMinutes($session->ends_at))/60,2),'period_start'=>$start->toDateString(),'period_end'=>$end->toDateString()]];
+        return ['units'=>$units,'gross'=>round($gross,2),'details'=>[
+            'teacher_attendance_ids'=>$validatedTeaching->pluck('id')->all(),
+            'session_ids'=>$validatedTeaching->pluck('training_session_id')->all(),
+            'session_count'=>$validatedTeaching->count(),
+            'validated_worked_hours'=>$validatedTeaching->isNotEmpty()?round($validatedTeaching->sum('worked_minutes')/60,2):null,
+            'period_start'=>$start->toDateString(),'period_end'=>$end->toDateString()
+        ]];
     }
 
     private function requiredUnits(?float $units, string $field): float

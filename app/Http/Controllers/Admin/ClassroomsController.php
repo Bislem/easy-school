@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Classroom;
+use App\Models\SchoolSite;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -14,22 +15,25 @@ class ClassroomsController extends Controller
 {
     public function index(Request $request): Response
     {
-        $classrooms = Classroom::query()
+        $classrooms = Classroom::query()->with('site:id,name,code,wilaya,commune')
             ->when($request->string('search')->trim()->toString(), function ($query, string $search) {
                 $query->where(function ($query) use ($search) {
                     $query->where('name', 'like', "%{$search}%")
                         ->orWhere('code', 'like', "%{$search}%")
-                        ->orWhere('location', 'like', "%{$search}%");
+                        ->orWhere('location', 'like', "%{$search}%")
+                        ->orWhereHas('site', fn ($site) => $site->where('name', 'like', "%{$search}%")->orWhere('wilaya', 'like', "%{$search}%"));
                 });
             })
             ->when($request->filled('status'), fn ($query) => $query->where('is_active', $request->boolean('status')))
+            ->when($request->filled('site_id'), fn ($query) => $query->where('school_site_id', $request->integer('site_id')))
             ->orderBy('name')
             ->paginate(15)
             ->withQueryString();
 
         return Inertia::render('Admin/Classrooms/Index', [
             'classrooms' => $classrooms,
-            'filters' => $request->only(['search', 'status']),
+            'sites' => SchoolSite::orderBy('name')->get(['id', 'name', 'code', 'wilaya', 'is_active']),
+            'filters' => $request->only(['search', 'status', 'site_id']),
         ]);
     }
 
@@ -59,6 +63,7 @@ class ClassroomsController extends Controller
     private function validateClassroom(Request $request, ?Classroom $classroom = null): array
     {
         return $request->validate([
+            'school_site_id' => ['required', 'exists:school_sites,id'],
             'name' => ['required', 'string', 'max:255'],
             'code' => ['required', 'string', 'max:50', Rule::unique('classrooms')->ignore($classroom)],
             'capacity' => ['required', 'integer', 'min:1', 'max:10000'],

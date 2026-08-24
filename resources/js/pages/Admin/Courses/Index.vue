@@ -8,7 +8,7 @@ import { Head, Link, router, useForm } from '@inertiajs/vue3';
 import {
     Award,
     BookOpen,
-    Clock,
+    Layers3,
     Pencil,
     Plus,
     Search,
@@ -28,6 +28,16 @@ interface Course {
     prerequisites?: string | null;
     is_certified: boolean;
     is_active: boolean;
+    levels: CourseLevel[];
+}
+interface CourseLevel {
+    id: number;
+    name: string;
+    code: string;
+    duration_hours: number;
+    price: string | number;
+    prerequisites?: string | null;
+    is_active: boolean;
 }
 
 interface PaginationLink {
@@ -45,6 +55,10 @@ const search = ref(props.filters.search ?? '');
 const status = ref(props.filters.status ?? '');
 const modalOpen = ref(false);
 const editingCourse = ref<Course | null>(null);
+const levelModalOpen = ref(false);
+const levelFormModalOpen = ref(false);
+const levelCourse = ref<Course | null>(null);
+const editingLevel = ref<CourseLevel | null>(null);
 const form = useForm({
     title: '',
     code: '',
@@ -55,6 +69,14 @@ const form = useForm({
     objectives: '',
     prerequisites: '',
     is_certified: false,
+    is_active: true,
+});
+const levelForm = useForm({
+    name: '',
+    code: '',
+    duration_hours: 1,
+    price: 0,
+    prerequisites: '',
     is_active: true,
 });
 
@@ -111,6 +133,55 @@ function toggleActive(course: Course) {
         `/admin/courses/${course.id}/toggle-active`,
         {},
         { preserveScroll: true },
+    );
+}
+function openLevels(course: Course) {
+    levelCourse.value = course;
+    levelModalOpen.value = true;
+}
+function openLevelForm(level: CourseLevel | null = null) {
+    if (!levelCourse.value) return;
+    editingLevel.value = level;
+    levelForm.clearErrors();
+    levelForm.name = level?.name ?? '';
+    levelForm.code = level?.code ?? '';
+    levelForm.duration_hours = level?.duration_hours ?? 1;
+    levelForm.price = Number(level?.price ?? 0);
+    levelForm.prerequisites = level?.prerequisites ?? '';
+    levelForm.is_active = level?.is_active ?? true;
+    levelFormModalOpen.value = true;
+}
+function submitLevel() {
+    if (!levelCourse.value) return;
+    const url = `/admin/courses/${levelCourse.value.id}/levels${editingLevel.value ? `/${editingLevel.value.id}` : ''}`;
+    const options = {
+        preserveScroll: true,
+        onSuccess: () => {
+            levelFormModalOpen.value = false;
+            levelCourse.value =
+                props.courses.data.find(
+                    (course) => course.id === levelCourse.value?.id,
+                ) ?? levelCourse.value;
+        },
+    };
+    editingLevel.value
+        ? levelForm.put(url, options)
+        : levelForm.post(url, options);
+}
+function toggleLevel(level: CourseLevel) {
+    if (!levelCourse.value) return;
+    router.patch(
+        `/admin/courses/${levelCourse.value.id}/levels/${level.id}/toggle-active`,
+        {},
+        {
+            preserveScroll: true,
+            onSuccess: () => {
+                levelCourse.value =
+                    props.courses.data.find(
+                        (course) => course.id === levelCourse.value?.id,
+                    ) ?? levelCourse.value;
+            },
+        },
     );
 }
 
@@ -182,8 +253,7 @@ const paginationLabel = (label: string) =>
                         <thead class="border-b bg-muted/40 text-left">
                             <tr>
                                 <th class="px-5 py-3 font-medium">Formation</th>
-                                <th class="px-5 py-3 font-medium">Durée</th>
-                                <th class="px-5 py-3 font-medium">Tarif</th>
+                                <th class="px-5 py-3 font-medium">Niveaux</th>
                                 <th class="px-5 py-3 font-medium">Statut</th>
                                 <th class="px-5 py-3 text-right font-medium">
                                     Actions
@@ -226,10 +296,8 @@ const paginationLabel = (label: string) =>
                                     </div>
                                 </td>
                                 <td class="px-5 py-4">
-                                    {{ course.duration_hours }} h
-                                </td>
-                                <td class="px-5 py-4 font-medium">
-                                    {{ money(course.price) }}
+                                    <strong>{{ course.levels.length }}</strong>
+                                    niveau(x)
                                 </td>
                                 <td class="px-5 py-4">
                                     <span
@@ -248,6 +316,14 @@ const paginationLabel = (label: string) =>
                                 </td>
                                 <td class="px-5 py-4">
                                     <div class="flex justify-end gap-2">
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            @click="openLevels(course)"
+                                            ><Layers3
+                                                class="mr-2 size-4"
+                                            />Niveaux</Button
+                                        >
                                         <Button
                                             size="sm"
                                             variant="outline"
@@ -308,11 +384,11 @@ const paginationLabel = (label: string) =>
                             >
                         </div>
                         <div class="mt-4 flex flex-wrap gap-4 text-sm">
-                            <span class="flex items-center gap-1.5"
-                                ><Clock
-                                    class="size-4 text-muted-foreground"
-                                />{{ course.duration_hours }} h</span
-                            ><strong>{{ money(course.price) }}</strong
+                            <span class="flex items-center gap-1.5 font-medium">
+                                <Layers3 class="size-4" />{{
+                                    course.levels.length
+                                }}
+                                niveau(x)</span
                             ><span
                                 v-if="course.is_certified"
                                 class="flex items-center gap-1 text-amber-600"
@@ -325,7 +401,12 @@ const paginationLabel = (label: string) =>
                         >
                             {{ course.description }}
                         </p>
-                        <div class="mt-4 grid grid-cols-2 gap-2">
+                        <div class="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                            <Button
+                                variant="outline"
+                                @click="openLevels(course)"
+                                ><Layers3 class="mr-2 size-4" />Niveaux</Button
+                            >
                             <Button variant="outline" @click="openEdit(course)"
                                 ><Pencil class="mr-2 size-4" />Modifier</Button
                             ><Button
@@ -377,7 +458,7 @@ const paginationLabel = (label: string) =>
             <div
                 class="max-h-[94vh] w-full overflow-y-auto rounded-t-2xl bg-background p-5 shadow-2xl sm:max-w-2xl sm:rounded-2xl sm:p-6"
             >
-                <div class="flex items-center justify-between">
+                <div class="flex items-start justify-between gap-4">
                     <div>
                         <h2 class="text-xl font-semibold">
                             {{
@@ -439,49 +520,6 @@ const paginationLabel = (label: string) =>
                             :message="form.errors.category"
                             class="mt-1"
                         />
-                    </div>
-                    <div class="grid gap-4 sm:grid-cols-2">
-                        <div>
-                            <Label for="duration_hours">Volume horaire</Label>
-                            <div class="relative">
-                                <Input
-                                    id="duration_hours"
-                                    v-model="form.duration_hours"
-                                    type="number"
-                                    min="1"
-                                    class="mt-1 pr-10"
-                                    required
-                                /><span
-                                    class="absolute top-1/2 right-3 translate-y-[-35%] text-sm text-muted-foreground"
-                                    >h</span
-                                >
-                            </div>
-                            <InputError
-                                :message="form.errors.duration_hours"
-                                class="mt-1"
-                            />
-                        </div>
-                        <div>
-                            <Label for="price">Tarif</Label>
-                            <div class="relative">
-                                <Input
-                                    id="price"
-                                    v-model="form.price"
-                                    type="number"
-                                    min="0"
-                                    step="0.01"
-                                    class="mt-1 pr-14"
-                                    required
-                                /><span
-                                    class="absolute top-1/2 right-3 translate-y-[-35%] text-sm text-muted-foreground"
-                                    >DZD</span
-                                >
-                            </div>
-                            <InputError
-                                :message="form.errors.price"
-                                class="mt-1"
-                            />
-                        </div>
                     </div>
                     <div>
                         <Label for="description">Description</Label
@@ -556,6 +594,184 @@ const paginationLabel = (label: string) =>
                         ><Button type="submit" :disabled="form.processing">{{
                             form.processing ? 'Enregistrement…' : 'Enregistrer'
                         }}</Button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        <div
+            v-if="levelModalOpen && levelCourse"
+            class="fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center sm:p-4"
+            @click.self="levelModalOpen = false"
+        >
+            <div
+                class="max-h-[94vh] w-full overflow-y-auto rounded-t-2xl bg-background p-5 sm:max-w-2xl sm:rounded-2xl sm:p-6"
+            >
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h2 class="text-xl font-semibold">
+                            Niveaux · {{ levelCourse.title }}
+                        </h2>
+                        <p class="mt-1 text-sm text-muted-foreground">
+                            Créez et gérez les niveaux de cette formation.
+                        </p>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <Button @click="openLevelForm()"
+                            ><Plus class="mr-2 size-4" />Ajouter un
+                            niveau</Button
+                        ><Button
+                            size="icon"
+                            variant="ghost"
+                            @click="levelModalOpen = false"
+                            ><X class="size-5"
+                        /></Button>
+                    </div>
+                </div>
+                <div
+                    v-if="levelCourse.levels.length"
+                    class="mt-5 divide-y rounded-lg border"
+                >
+                    <div
+                        v-for="level in levelCourse.levels"
+                        :key="level.id"
+                        class="flex items-center justify-between gap-3 p-3"
+                    >
+                        <div>
+                            <p class="font-medium">
+                                {{ level.name }} · {{ level.code }}
+                            </p>
+                            <p class="text-xs text-muted-foreground">
+                                {{ level.duration_hours }} h ·
+                                {{ money(level.price) }} ·
+                                {{ level.is_active ? 'Actif' : 'Inactif' }}
+                            </p>
+                        </div>
+                        <div class="flex gap-2">
+                            <Button
+                                size="icon"
+                                variant="outline"
+                                title="Modifier"
+                                @click="openLevelForm(level)"
+                                ><Pencil class="size-4" /></Button
+                            ><Button
+                                size="sm"
+                                variant="outline"
+                                @click="toggleLevel(level)"
+                                >{{
+                                    level.is_active ? 'Désactiver' : 'Activer'
+                                }}</Button
+                            >
+                        </div>
+                    </div>
+                </div>
+                <div
+                    v-else
+                    class="mt-5 rounded-lg border border-dashed p-8 text-center"
+                >
+                    <Layers3 class="mx-auto size-8 text-muted-foreground" />
+                    <p class="mt-2 font-medium">Aucun niveau</p>
+                    <p class="mt-1 text-sm text-muted-foreground">
+                        Ajoutez le premier niveau de cette formation.
+                    </p>
+                </div>
+            </div>
+        </div>
+        <div
+            v-if="levelFormModalOpen && levelCourse"
+            class="fixed inset-0 z-[60] flex items-end justify-center bg-black/50 sm:items-center sm:p-4"
+            @click.self="levelFormModalOpen = false"
+        >
+            <div
+                class="max-h-[94vh] w-full overflow-y-auto rounded-t-2xl bg-background p-5 sm:max-w-xl sm:rounded-2xl sm:p-6"
+            >
+                <div class="flex items-center justify-between gap-4">
+                    <div>
+                        <h2 class="text-xl font-semibold">
+                            {{
+                                editingLevel
+                                    ? 'Modifier le niveau'
+                                    : 'Nouveau niveau'
+                            }}
+                        </h2>
+                        <p class="mt-1 text-sm text-muted-foreground">
+                            {{ levelCourse.title }}
+                        </p>
+                    </div>
+                    <Button
+                        size="icon"
+                        variant="ghost"
+                        @click="levelFormModalOpen = false"
+                        ><X class="size-5"
+                    /></Button>
+                </div>
+                <form class="mt-6 space-y-4" @submit.prevent="submitLevel">
+                    <div class="grid gap-4 sm:grid-cols-2">
+                        <div>
+                            <Label>Nom</Label
+                            ><Input
+                                v-model="levelForm.name"
+                                class="mt-1"
+                                placeholder="Débutant"
+                                required
+                            /><InputError :message="levelForm.errors.name" />
+                        </div>
+                        <div>
+                            <Label>Code</Label
+                            ><Input
+                                v-model="levelForm.code"
+                                class="mt-1 uppercase"
+                                placeholder="N1"
+                                required
+                            /><InputError :message="levelForm.errors.code" />
+                        </div>
+                    </div>
+                    <div class="grid gap-4 sm:grid-cols-2">
+                        <div>
+                            <Label>Volume horaire</Label
+                            ><Input
+                                v-model="levelForm.duration_hours"
+                                class="mt-1"
+                                type="number"
+                                min="1"
+                                required
+                            />
+                        </div>
+                        <div>
+                            <Label>Tarif (DZD)</Label
+                            ><Input
+                                v-model="levelForm.price"
+                                class="mt-1"
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                required
+                            />
+                        </div>
+                    </div>
+                    <div>
+                        <Label>Prérequis</Label
+                        ><textarea
+                            v-model="levelForm.prerequisites"
+                            rows="3"
+                            class="mt-1 w-full rounded-md border bg-background p-3 text-sm"
+                        />
+                    </div>
+                    <label class="flex items-center gap-3"
+                        ><input
+                            v-model="levelForm.is_active"
+                            type="checkbox"
+                            class="size-4"
+                        /><span class="text-sm">Niveau actif</span></label
+                    >
+                    <div class="flex justify-end gap-2">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            @click="levelFormModalOpen = false"
+                            >Annuler</Button
+                        ><Button :disabled="levelForm.processing"
+                            >Enregistrer le niveau</Button
+                        >
                     </div>
                 </form>
             </div>

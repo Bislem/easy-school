@@ -19,23 +19,9 @@ use Inertia\Response;
 
 class StaffController extends Controller
 {
-    public function index(Request $request): Response
+    public function index(Request $request): RedirectResponse
     {
-        Gate::authorize('viewAny', Staff::class);
-        $staff = Staff::query()->with(['employeeType:id,name,slug,is_teacher', 'user:id,email,role,can_login,is_active'])
-            ->when($request->string('search')->trim()->toString(), fn ($query, string $search) => $query->where(fn ($query) => $query
-                ->where('first_name', 'like', "%{$search}%")->orWhere('last_name', 'like', "%{$search}%")
-                ->orWhere('email', 'like', "%{$search}%")->orWhere('phone', 'like', "%{$search}%")
-                ->orWhere('employee_code', 'like', "%{$search}%")))
-            ->when($request->filled('type'), fn ($query) => $query->where('employee_type_id', $request->integer('type')))
-            ->when($request->string('status')->toString(), fn ($query, string $status) => $query->where('employment_status', $status))
-            ->latest()->paginate(15)->withQueryString();
-
-        return Inertia::render('Admin/Staff/Index', [
-            'staff' => $staff, 'employeeTypes' => $this->types(),
-            'filters' => $request->only(['search', 'type', 'status']),
-            'statuses' => $this->statuses(),
-        ]);
+        return to_route('admin.users.index', $request->only(['search']));
     }
 
     public function show(Staff $staff): Response
@@ -103,7 +89,7 @@ class StaffController extends Controller
             'employee_type_id' => ['required', Rule::exists('employee_types', 'id')->where('is_active', true)],
             'employee_code' => ['required', 'string', 'max:50', Rule::unique('staff')->ignore($staff)],
             'phone' => ['nullable', 'string', 'max:50'],
-            'email' => ['nullable', 'email', 'max:255', Rule::unique('staff')->ignore($staff), Rule::unique('users')->ignore($staff?->user_id)],
+            'email' => ['required', 'email', 'max:255', Rule::unique('staff')->ignore($staff), Rule::unique('users')->ignore($staff?->user_id)],
             'address' => ['nullable', 'string', 'max:1000'], 'birth_date' => ['nullable', 'date', 'before:today'],
             'hire_date' => ['nullable', 'date'], 'employment_status' => ['required', Rule::enum(EmploymentStatus::class)],
             'notes' => ['nullable', 'string', 'max:5000'], 'photo' => ['nullable', 'image', 'max:5120'],
@@ -122,15 +108,12 @@ class StaffController extends Controller
         if ($request->hasFile('photo')) $data['photo_path'] = $request->file('photo')->store('staff', 'public');
 
         $user = $staff->user;
-        if ($canLogin || $user) {
-            abort_if(blank($data['email']), 422, 'Une adresse e-mail est requise pour autoriser la connexion.');
-            $payload = ['name' => trim($data['first_name'].' '.$data['last_name']), 'email' => $data['email'], 'phone' => $data['phone'] ?? null,
-                'birth_date' => $data['birth_date'] ?? null, 'role' => $type->is_teacher ? UserRole::TEACHER : UserRole::EMPLOYEE,
-                'job_title' => $type->name, 'can_login' => $canLogin, 'is_active' => $data['employment_status'] === 'active'];
-            if (filled($request->input('password'))) $payload['password'] = $request->input('password');
-            $user ? $user->update($payload) : $user = User::create($payload + ['email_verified_at' => now()]);
-            $data['user_id'] = $user->id;
-        }
+        $payload = ['name' => trim($data['first_name'].' '.$data['last_name']), 'email' => $data['email'], 'phone' => $data['phone'] ?? null,
+            'birth_date' => $data['birth_date'] ?? null, 'role' => $type->is_teacher ? UserRole::TEACHER : UserRole::EMPLOYEE,
+            'job_title' => $type->name, 'can_login' => $canLogin, 'is_active' => $data['employment_status'] === 'active'];
+        if (filled($request->input('password'))) $payload['password'] = $request->input('password');
+        $user ? $user->update($payload) : $user = User::create($payload + ['email_verified_at' => now(), 'password' => str()->password(32)]);
+        $data['user_id'] = $user->id;
         $staff->fill($data)->save();
         return $staff;
     }

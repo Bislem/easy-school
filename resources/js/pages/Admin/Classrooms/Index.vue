@@ -24,6 +24,15 @@ interface Classroom {
     location?: string | null;
     description?: string | null;
     is_active: boolean;
+    school_site_id: number;
+    site: Site;
+}
+interface Site {
+    id: number;
+    name: string;
+    code: string;
+    wilaya: string;
+    is_active: boolean;
 }
 
 interface PaginationLink {
@@ -34,15 +43,18 @@ interface PaginationLink {
 
 const props = defineProps<{
     classrooms: { data: Classroom[]; links: PaginationLink[]; total: number };
-    filters: { search?: string; status?: string };
+    sites: Site[];
+    filters: { search?: string; status?: string; site_id?: string };
 }>();
 
 const search = ref(props.filters.search ?? '');
 const status = ref(props.filters.status ?? '');
+const siteId = ref(props.filters.site_id ?? '');
 const modalOpen = ref(false);
 const editingClassroom = ref<Classroom | null>(null);
 
 const form = useForm({
+    school_site_id: '',
     name: '',
     code: '',
     capacity: 1,
@@ -54,7 +66,7 @@ const form = useForm({
 function applyFilters() {
     router.get(
         '/admin/classrooms',
-        { search: search.value, status: status.value },
+        { search: search.value, status: status.value, site_id: siteId.value },
         { preserveState: true, replace: true },
     );
 }
@@ -64,6 +76,8 @@ function openCreate() {
     form.reset();
     form.clearErrors();
     form.capacity = 1;
+    form.school_site_id =
+        props.sites.length === 1 ? String(props.sites[0].id) : '';
     form.is_active = true;
     modalOpen.value = true;
 }
@@ -72,6 +86,7 @@ function openEdit(classroom: Classroom) {
     editingClassroom.value = classroom;
     form.clearErrors();
     form.name = classroom.name;
+    form.school_site_id = String(classroom.school_site_id);
     form.code = classroom.code;
     form.capacity = classroom.capacity;
     form.location = classroom.location ?? '';
@@ -133,7 +148,7 @@ const paginationLabel = (label: string) =>
                 </div>
 
                 <form
-                    class="grid gap-3 rounded-xl border bg-card p-4 sm:grid-cols-[1fr_180px_auto]"
+                    class="grid gap-3 rounded-xl border bg-card p-4 sm:grid-cols-[1fr_180px_180px_auto]"
                     @submit.prevent="applyFilters"
                 >
                     <div class="relative">
@@ -145,6 +160,19 @@ const paginationLabel = (label: string) =>
                             placeholder="Rechercher par nom, code ou emplacement"
                         />
                     </div>
+                    <select
+                        v-model="siteId"
+                        class="h-9 rounded-md border border-input bg-transparent px-3 text-sm"
+                    >
+                        <option value="">Tous les sites</option>
+                        <option
+                            v-for="site in sites"
+                            :key="site.id"
+                            :value="String(site.id)"
+                        >
+                            {{ site.name }}
+                        </option>
+                    </select>
                     <select
                         v-model="status"
                         class="h-9 rounded-md border border-input bg-transparent px-3 text-sm"
@@ -163,6 +191,7 @@ const paginationLabel = (label: string) =>
                         <thead class="border-b bg-muted/40 text-left">
                             <tr>
                                 <th class="px-5 py-3 font-medium">Salle</th>
+                                <th class="px-5 py-3 font-medium">Site</th>
                                 <th class="px-5 py-3 font-medium">Capacité</th>
                                 <th class="px-5 py-3 font-medium">
                                     Emplacement
@@ -184,6 +213,14 @@ const paginationLabel = (label: string) =>
                                     </p>
                                     <p class="text-xs text-muted-foreground">
                                         Code : {{ classroom.code }}
+                                    </p>
+                                </td>
+                                <td class="px-5 py-4">
+                                    <p class="font-medium">
+                                        {{ classroom.site.name }}
+                                    </p>
+                                    <p class="text-xs text-muted-foreground">
+                                        {{ classroom.site.wilaya }}
                                     </p>
                                 </td>
                                 <td class="px-5 py-4">
@@ -257,6 +294,10 @@ const paginationLabel = (label: string) =>
                                 <p class="text-sm text-muted-foreground">
                                     Code : {{ classroom.code }}
                                 </p>
+                                <p class="mt-1 text-sm font-medium">
+                                    {{ classroom.site.name }} ·
+                                    {{ classroom.site.wilaya }}
+                                </p>
                             </div>
                             <span
                                 class="shrink-0 rounded-full px-2.5 py-1 text-xs font-medium"
@@ -274,9 +315,7 @@ const paginationLabel = (label: string) =>
                             class="mt-4 grid gap-2 text-sm text-muted-foreground"
                         >
                             <p class="flex items-center gap-2">
-                                <Users class="size-4" />{{
-                                    classroom.capacity
-                                }}
+                                <Users class="size-4" />{{ classroom.capacity }}
                                 places
                             </p>
                             <p class="flex items-center gap-2">
@@ -372,6 +411,34 @@ const paginationLabel = (label: string) =>
                     /></Button>
                 </div>
                 <form class="mt-6 space-y-4" @submit.prevent="submit">
+                    <div>
+                        <Label for="school_site_id">Site</Label
+                        ><select
+                            id="school_site_id"
+                            v-model="form.school_site_id"
+                            class="mt-1 h-9 w-full rounded-md border bg-background px-3 text-sm"
+                            required
+                        >
+                            <option value="" disabled>
+                                Sélectionner un site
+                            </option>
+                            <option
+                                v-for="site in sites"
+                                :key="site.id"
+                                :value="String(site.id)"
+                                :disabled="
+                                    !site.is_active &&
+                                    Number(form.school_site_id) !== site.id
+                                "
+                            >
+                                {{ site.name }} — {{ site.wilaya
+                                }}{{ site.is_active ? '' : ' (inactif)' }}
+                            </option></select
+                        ><InputError
+                            :message="form.errors.school_site_id"
+                            class="mt-1"
+                        />
+                    </div>
                     <div class="grid gap-4 sm:grid-cols-2">
                         <div>
                             <Label for="name">Nom de la salle</Label

@@ -2,6 +2,7 @@
 
 use App\Enums\UserRole;
 use App\Models\Course;
+use App\Models\CourseLevel;
 use App\Models\User;
 
 test('administrators can manage the course catalogue', function () {
@@ -23,6 +24,13 @@ test('administrators can manage the course catalogue', function () {
         ->assertSessionHasNoErrors();
 
     $course = Course::where('code', 'DEV-WEB')->firstOrFail();
+
+    $this->actingAs($admin)->post(route('admin.courses.levels.store', $course), [
+        'name' => 'Débutant', 'code' => 'N1', 'duration_hours' => 40,
+        'price' => 15000, 'prerequisites' => null, 'is_active' => true,
+    ])->assertSessionHasNoErrors();
+
+    expect(CourseLevel::whereBelongsTo($course)->firstOrFail()->name)->toBe('Débutant');
 
     $this->actingAs($admin)
         ->patch(route('admin.courses.toggle-active', $course))

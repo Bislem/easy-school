@@ -6,6 +6,7 @@ use App\Enums\SalaryType;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class SalaryStatement extends Model
 {
@@ -16,4 +17,5 @@ class SalaryStatement extends Model
     public function payments(): HasMany { return $this->hasMany(SalaryPayment::class); }
     public function adjustments(): HasMany { return $this->hasMany(SalaryAdjustment::class); }
     public function generator(): BelongsTo { return $this->belongsTo(User::class,'generated_by'); }
+    public function teacherAttendances(): BelongsToMany { return $this->belongsToMany(TeacherAttendance::class,'salary_statement_teacher_attendances')->withTimestamps(); }
 }

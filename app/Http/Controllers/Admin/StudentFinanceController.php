@@ -25,11 +25,11 @@ class StudentFinanceController extends Controller
     public function index(Request $request): Response
     {
         CourseEnrollment::whereNotNull('student_id')->with(['form.course', 'trainingPlanGroup.plan.course', 'installments', 'payments'])->each(fn($enrollment) => $this->finance->refresh($enrollment));
-        $enrollments = CourseEnrollment::with(['student:id,first_name,last_name', 'form.course:id,title,price', 'trainingPlanGroup.plan.course:id,title,price', 'installments'])
+        $enrollments = CourseEnrollment::with(['student:id,first_name,last_name', 'form.course:id,title,price', 'trainingPlanGroup.plan.course', 'installments', 'payments:id,course_enrollment_id,status,payment_date'])
             ->whereNotNull('student_id')->when($request->filled('status'), fn($q)=>$q->where('payment_status', $request->string('status')))
             ->when($request->filled('search'), function($q) use ($request) { $search=$request->string('search'); $q->whereHas('student', fn($s)=>$s->where('first_name','like',"%{$search}%")->orWhere('last_name','like',"%{$search}%")); })
             ->latest('registered_at')->paginate(20)->withQueryString();
-        $payments = StudentPayment::with(['student:id,first_name,last_name', 'enrollment.form.course:id,title', 'enrollment.trainingPlanGroup.plan.course:id,title', 'recorder:id,name'])->latest('payment_date')->limit(100)->get();
+        $payments = StudentPayment::with(['student:id,first_name,last_name', 'enrollment.form.course:id,title', 'enrollment.trainingPlanGroup.plan.course', 'recorder:id,name'])->latest('payment_date')->limit(100)->get();
         $expected=(float) CourseEnrollment::whereNotNull('student_id')->sum('final_price'); $collected=(float) CourseEnrollment::whereNotNull('student_id')->sum('total_paid');
         return Inertia::render('Admin/Finance/Index', ['enrollments'=>$enrollments, 'payments'=>$payments, 'methods'=>collect(PaymentMethod::cases())->map(fn($m)=>['value'=>$m->value,'label'=>$m->label()]), 'filters'=>$request->only(['search','status']), 'stats'=>['expected'=>$expected,'collected'=>$collected,'remaining'=>max(0,$expected-$collected),'overdue'=>(float)CourseEnrollment::where('payment_status','overdue')->sum('remaining_balance')], 'currency'=>['symbol'=>config('app.currency_symbol'),'code'=>config('app.currency_code')]]);
     }

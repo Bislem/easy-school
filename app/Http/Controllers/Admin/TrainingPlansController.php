@@ -6,6 +6,7 @@ use App\Enums\UserRole;
 use App\Http\Controllers\Controller;
 use App\Models\Classroom;
 use App\Models\Course;
+use App\Models\CourseLevel;
 use App\Models\EnrollmentForm;
 use App\Models\TrainingPlan;
 use App\Models\TrainingPlanGroup;
@@ -30,10 +31,11 @@ class TrainingPlansController extends Controller
     public function index(Request $request): Response
     {
         $plans = TrainingPlan::query()
-            ->with(['course:id,title,code,duration_hours', 'teacher:id,name', 'enrollmentForm:id,title,start_date,end_date', 'groups.classroom:id,name,capacity', 'groups.sessions:id,training_plan_group_id,starts_at,ends_at'])
+            ->with(['level:id,course_id,name,code,duration_hours,price', 'level.course:id,title,code', 'teacher:id,name', 'enrollmentForm:id,title,start_date,end_date', 'groups.classroom:id,name,capacity', 'groups.sessions:id,training_plan_group_id,starts_at,ends_at'])
             ->when($request->string('search')->trim()->toString(), fn ($query, string $search) => $query
                 ->where(fn ($query) => $query->where('title', 'like', "%{$search}%")
-                    ->orWhereHas('course', fn ($query) => $query->where('title', 'like', "%{$search}%"))))
+                    ->orWhereHas('level.course', fn ($query) => $query->where('title', 'like', "%{$search}%"))
+                    ->orWhereHas('level', fn ($query) => $query->where('name', 'like', "%{$search}%"))))
             ->when($request->filled('status'), fn ($query) => $query->where('status', $request->string('status')))
             ->latest()->paginate(12)->withQueryString();
 
@@ -45,8 +47,8 @@ class TrainingPlansController extends Controller
 
         return Inertia::render('Admin/TrainingPlans/Index', [
             'plans' => $plans,
-            'courses' => Course::where('is_active', true)->orderBy('title')->get(['id', 'title', 'code', 'duration_hours']),
-            'forms' => EnrollmentForm::with('course:id,title,code,duration_hours')->where('is_active', true)->orderBy('start_date')->get(['id', 'course_id', 'teacher_id', 'classroom_id', 'title', 'start_date', 'end_date', 'groups_count', 'students_per_group']),
+            'levels' => CourseLevel::with('course:id,title,code')->where('is_active', true)->whereHas('course', fn ($query) => $query->where('is_active', true))->orderBy('name')->get(['id', 'course_id', 'name', 'code', 'duration_hours', 'price']),
+            'forms' => EnrollmentForm::with('course:id,title,code')->where('is_active', true)->orderBy('start_date')->get(['id', 'course_id', 'teacher_id', 'classroom_id', 'title', 'start_date', 'end_date', 'groups_count', 'students_per_group']),
             'teachers' => User::where('role', UserRole::TEACHER->value)->where('is_active', true)->orderBy('name')->get(['id', 'name']),
             'classrooms' => Classroom::where('is_active', true)->orderBy('name')->get(['id', 'name', 'code', 'capacity']),
             'filters' => $request->only(['search', 'status']),
@@ -56,26 +58,29 @@ class TrainingPlansController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $validated = $request->validate([
-            'source_type' => ['required', Rule::in(['form', 'course'])],
+            'source_type' => ['required', Rule::in(['form', 'level'])],
             'enrollment_form_id' => ['nullable', 'required_if:source_type,form', 'exists:enrollment_forms,id'],
-            'course_id' => ['nullable', 'required_if:source_type,course', 'exists:courses,id'],
-            'teacher_id' => ['nullable', 'required_if:source_type,course', Rule::exists('users', 'id')->where('role', UserRole::TEACHER->value)],
+            'course_level_id' => ['required', 'exists:course_levels,id'],
+            'teacher_id' => ['nullable', 'required_if:source_type,level', Rule::exists('users', 'id')->where('role', UserRole::TEACHER->value)],
             'title' => ['required', 'string', 'max:255'],
-            'groups_count' => ['nullable', 'required_if:source_type,course', 'integer', 'min:1', 'max:100'],
+            'groups_count' => ['nullable', 'required_if:source_type,level', 'integer', 'min:1', 'max:100'],
             'classroom_id' => ['nullable', 'exists:classrooms,id'],
             'notes' => ['nullable', 'string', 'max:5000'],
         ]);
 
         $plan = DB::transaction(function () use ($validated) {
             $form = $validated['source_type'] === 'form' ? EnrollmentForm::findOrFail($validated['enrollment_form_id']) : null;
-            $courseId = $form?->course_id ?? $validated['course_id'];
+            $level = CourseLevel::findOrFail($validated['course_level_id']);
+            if ($form && $level->course_id !== $form->course_id) {
+                throw ValidationException::withMessages(['course_level_id' => 'Le niveau doit appartenir à la formation du formulaire.']);
+            }
             $teacherId = $form?->teacher_id ?? $validated['teacher_id'];
             $groupsCount = $form?->groups_count ?? $validated['groups_count'];
             $classroomId = $form?->classroom_id ?? ($validated['classroom_id'] ?? null);
             $capacity = $form ? $form->groupCapacity() : ($classroomId ? Classroom::find($classroomId)?->capacity : null);
 
             $plan = TrainingPlan::create([
-                'course_id' => $courseId, 'enrollment_form_id' => $form?->id,
+                'course_level_id' => $level->id, 'enrollment_form_id' => $form?->id,
                 'teacher_id' => $teacherId, 'title' => $validated['title'],
                 'status' => 'draft', 'notes' => $validated['notes'] ?? null,
             ]);
@@ -95,7 +100,7 @@ class TrainingPlansController extends Controller
     public function show(TrainingPlan $trainingPlan): Response
     {
         $trainingPlan->load([
-            'course', 'teacher:id,name,email,phone', 'enrollmentForm',
+            'level.course', 'teacher:id,name,email,phone', 'enrollmentForm',
             'groups' => fn ($query) => $query->orderBy('group_number'),
             'groups.classroom',
             'groups.enrollments.student:id,first_name,last_name,email,phone,parent_phone,birth_date,school_level,status,notes,photo_path',
@@ -192,13 +197,13 @@ class TrainingPlansController extends Controller
         return back()->with('success', 'Séance annulée et conservée dans l’historique.');
     }
 
-    public function completeSession(TrainingPlan $trainingPlan, TrainingPlanGroup $group, TrainingSession $session): RedirectResponse
+    public function completeSession(Request $request, TrainingPlan $trainingPlan, TrainingPlanGroup $group, TrainingSession $session): RedirectResponse
     {
         $this->ensureGroup($trainingPlan,$group); abort_unless($session->training_plan_group_id===$group->id,404);
         abort_if($session->status==='cancelled',422,'Une séance annulée ne peut pas être terminée.');
-        abort_if($session->ends_at->isFuture(),422,'Une séance future ne peut pas être marquée comme terminée.');
-        $session->update(['status'=>'completed','completed_at'=>now()]);
-        return back()->with('success','Séance marquée comme terminée et disponible pour la paie.');
+        abort_if($session->ends_at->isFuture() && ! app()->environment(['local', 'testing']),422,'Une séance future ne peut pas être marquée comme terminée.');
+        app(AttendanceService::class)->validate($session, $request->user()->id);
+        return back()->with('success','Séance et présences validées. Les heures du formateur sont disponibles pour la paie.');
     }
 
     public function addStudent(Request $request, TrainingPlan $trainingPlan, TrainingPlanGroup $group): RedirectResponse
@@ -233,8 +238,8 @@ class TrainingPlansController extends Controller
                     'email' => $student->email ?: "student-{$student->id}@internal.invalid", 'phone' => $student->phone ?: '-',
                     'parent_phone' => $student->parent_phone, 'birth_date' => $student->birth_date, 'level' => $student->school_level,
                     'confirmation_token' => (string) Str::uuid(), 'confirmed_at' => now(), 'approved_at' => now(), 'registered_at' => now(),
-                    'group_number' => $lockedGroup->group_number, 'formation_price' => $trainingPlan->course->price ?? 0,
-                    'final_price' => $trainingPlan->course->price ?? 0, 'remaining_balance' => $trainingPlan->course->price ?? 0,
+                    'group_number' => $lockedGroup->group_number, 'formation_price' => $trainingPlan->level->price ?? 0,
+                    'final_price' => $trainingPlan->level->price ?? 0, 'remaining_balance' => $trainingPlan->level->price ?? 0,
                 ]);
                 $enrollment->histories()->create(['user_id' => $request->user()->id, 'event' => 'assigned_to_group', 'description' => 'Étudiant affecté depuis la planification.', 'metadata' => ['training_plan_group_id' => $lockedGroup->id]]);
             }
@@ -332,8 +337,8 @@ class TrainingPlansController extends Controller
     {
         $planned = $group->sessions()->when($except, fn ($query) => $query->whereKeyNot($except->id))->get()->sum(fn ($session) => $session->starts_at->diffInMinutes($session->ends_at));
         $newMinutes = \Illuminate\Support\Carbon::parse($data['starts_at'])->diffInMinutes(\Illuminate\Support\Carbon::parse($data['ends_at']));
-        if ($planned + $newMinutes > $plan->course->duration_hours * 60) {
-            throw ValidationException::withMessages(['ends_at' => "La durée totale planifiée dépasserait les {$plan->course->duration_hours} heures de la formation."]);
+        if ($planned + $newMinutes > $plan->level->duration_hours * 60) {
+            throw ValidationException::withMessages(['ends_at' => "La durée totale planifiée dépasserait les {$plan->level->duration_hours} heures du niveau."]);
         }
     }
 

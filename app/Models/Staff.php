@@ -28,7 +28,6 @@ class Staff extends Model
     public function user(): BelongsTo { return $this->belongsTo(User::class); }
     public function employeeType(): BelongsTo { return $this->belongsTo(EmployeeType::class); }
     public function salaries(): HasMany { return $this->hasMany(Expense::class, 'staff_id')->where('category', 'Salaire'); }
-    public function salaryConfigurations(): HasMany { return $this->hasMany(SalaryConfiguration::class); }
     public function salaryStatements(): HasMany { return $this->hasMany(SalaryStatement::class); }
     public function salaryPayments(): HasMany { return $this->hasMany(SalaryPayment::class); }
     public function attendances(): HasMany { return $this->hasMany(EmployeeAttendance::class); }

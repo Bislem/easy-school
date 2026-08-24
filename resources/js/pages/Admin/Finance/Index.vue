@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import AdminLayout from '@/layouts/AdminLayout.vue';
 import { Head, router, useForm } from '@inertiajs/vue3';
+import { Printer } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
 
 const props = defineProps({
@@ -59,7 +60,10 @@ function open(e: any, what: string) {
     if (what === 'pay') payment.amount = String(e.remaining_balance);
     if (what === 'config') {
         config.formation_price = String(
-            e.formation_price ?? e.form?.course?.price ?? e.training_plan_group?.plan?.course?.price ?? 0,
+            e.formation_price ??
+                e.form?.course?.price ??
+                e.training_plan_group?.plan?.course?.price ??
+                0,
         );
         config.discount_amount = String(e.discount_amount ?? 0);
     }
@@ -98,6 +102,13 @@ function reverse(p: any) {
     const reason = prompt(`Motif de contrepassation de ${p.reference}`);
     if (reason)
         router.post(`/admin/finance/payments/${p.id}/reverse`, { reason });
+}
+function receiptPayment(enrollment: any) {
+    return [...(enrollment.payments ?? [])]
+        .filter((item: any) => item.status === 'completed')
+        .sort((a: any, b: any) =>
+            String(b.payment_date).localeCompare(String(a.payment_date)),
+        )[0];
 }
 </script>
 
@@ -197,7 +208,13 @@ function reverse(p: any) {
                                             {{ e.student.last_name }}</strong
                                         >
                                         <div class="text-muted-foreground">
-                                            {{ e.form?.course?.title || e.training_plan_group?.plan?.course?.title || 'Formation' }} · Groupe
+                                            {{
+                                                e.form?.course?.title ||
+                                                e.training_plan_group?.plan
+                                                    ?.course?.title ||
+                                                'Formation'
+                                            }}
+                                            · Groupe
                                             {{ e.group_number || '—' }}
                                         </div>
                                     </td>
@@ -217,10 +234,23 @@ function reverse(p: any) {
                                             @click="open(e, 'adjust')"
                                             >Ajuster</Button
                                         ><Button
-                                            size="sm"
-                                            :disabled="
-                                                Number(e.remaining_balance) <= 0
+                                            v-if="
+                                                e.payment_status === 'paid' &&
+                                                receiptPayment(e)
                                             "
+                                            as-child
+                                            size="sm"
+                                            variant="outline"
+                                            ><a
+                                                :href="`/admin/finance/payments/${receiptPayment(e).id}/receipt`"
+                                                target="_blank"
+                                                ><Printer
+                                                    class="mr-2 size-4"
+                                                />Imprimer le reçu</a
+                                            ></Button
+                                        ><Button
+                                            v-else
+                                            size="sm"
                                             @click="open(e, 'pay')"
                                             >Encaisser</Button
                                         >
@@ -263,7 +293,12 @@ function reverse(p: any) {
                                         {{ p.student.last_name }}
                                     </td>
                                     <td>
-                                        {{ p.enrollment.form?.course?.title || p.enrollment.training_plan_group?.plan?.course?.title || 'Formation' }}
+                                        {{
+                                            p.enrollment.form?.course?.title ||
+                                            p.enrollment.training_plan_group
+                                                ?.plan?.course?.title ||
+                                            'Formation'
+                                        }}
                                     </td>
                                     <td>{{ p.payment_date }}</td>
                                     <td

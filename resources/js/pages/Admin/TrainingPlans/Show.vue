@@ -100,7 +100,7 @@ interface Plan {
     status: string;
     teacher_id: number;
     notes?: string | null;
-    course: { title: string; code: string; duration_hours: number };
+    level: { name: string; code: string; duration_hours: number; course: { title: string; code: string } };
     teacher: Option;
     enrollment_form?: {
         title: string;
@@ -227,7 +227,7 @@ function openSession(group: Group, session?: Session) {
     sessionGroup.value = group;
     editingSession.value = session ?? null;
     sessionForm.clearErrors();
-    sessionForm.title = session?.title ?? props.plan.course.title;
+    sessionForm.title = session?.title ?? props.plan.level.course.title;
     sessionForm.classroom_id = session?.classroom_id
         ? String(session.classroom_id)
         : group.classroom_id
@@ -396,8 +396,8 @@ watch(() => props.plan.groups, (groups) => {
                             {{ plan.title }}
                         </h1>
                         <p class="mt-1 text-muted-foreground">
-                            {{ plan.course.title }} · {{ plan.course.code }} ·
-                            {{ plan.course.duration_hours }} heures par groupe
+                            {{ plan.level.course.title }} · {{ plan.level.name }} ({{ plan.level.code }}) ·
+                            {{ plan.level.duration_hours }} heures par groupe
                         </p>
                         <p
                             v-if="plan.enrollment_form"
@@ -440,7 +440,7 @@ watch(() => props.plan.groups, (groups) => {
                     <div class="rounded-xl bg-muted/50 p-4">
                         <Clock3 class="size-5 text-primary" />
                         <p class="mt-2 text-2xl font-bold">
-                            {{ plan.course.duration_hours }}h
+                            {{ plan.level.duration_hours }}h
                         </p>
                         <p class="text-xs text-muted-foreground">
                             Durée requise par groupe
@@ -500,7 +500,7 @@ watch(() => props.plan.groups, (groups) => {
                                     ><Clock3 class="size-4" />{{
                                         group.planned_hours
                                     }}h /
-                                    {{ plan.course.duration_hours }}h</span
+                                    {{ plan.level.duration_hours }}h</span
                                 ><span class="flex items-center gap-1.5"><ClipboardCheck class="size-4"/>{{ group.attendance_stats.rate ?? '—' }}% présence · {{ group.attendance_stats.missing_sessions }} feuille(s) manquante(s)</span
                                 >
                             </div>
@@ -511,12 +511,12 @@ watch(() => props.plan.groups, (groups) => {
                                     class="h-full rounded-full"
                                     :class="
                                         group.planned_hours >=
-                                        plan.course.duration_hours
+                                        plan.level.duration_hours
                                             ? 'bg-emerald-500'
                                             : 'bg-primary'
                                     "
                                     :style="{
-                                        width: `${Math.min(100, (group.planned_hours / plan.course.duration_hours) * 100)}%`,
+                                        width: `${Math.min(100, (group.planned_hours / plan.level.duration_hours) * 100)}%`,
                                     }"
                                 />
                             </div>
@@ -811,7 +811,7 @@ watch(() => props.plan.groups, (groups) => {
                     >
                         Les conflits de salle et de formateur sont vérifiés
                         automatiquement. La durée cumulée ne peut pas dépasser
-                        {{ plan.course.duration_hours }} heures par groupe.
+                        {{ plan.level.duration_hours }} heures par groupe.
                     </div>
                     <div class="flex justify-end gap-2">
                         <Button

@@ -20,7 +20,14 @@ interface Course {
     id: number;
     title: string;
     code: string;
+}
+interface CourseLevel {
+    id: number;
+    name: string;
+    code: string;
     duration_hours: number;
+    price: string | number;
+    course: Course;
 }
 interface FormOption {
     id: number;
@@ -42,7 +49,7 @@ interface Plan {
     id: number;
     title: string;
     status: string;
-    course: Course;
+    level: CourseLevel;
     teacher: Option;
     enrollment_form?: FormOption | null;
     groups: any[];
@@ -54,7 +61,7 @@ const props = defineProps<{
         data: Plan[];
         links: Array<{ url: string | null; label: string; active: boolean }>;
     };
-    courses: Course[];
+    levels: CourseLevel[];
     forms: FormOption[];
     teachers: Option[];
     classrooms: Option[];
@@ -66,7 +73,7 @@ const status = ref(props.filters.status ?? '');
 const form = useForm({
     source_type: 'form',
     enrollment_form_id: '',
-    course_id: '',
+    course_level_id: '',
     teacher_id: '',
     title: '',
     groups_count: 1,
@@ -76,8 +83,15 @@ const form = useForm({
 const selectedForm = computed(() =>
     props.forms.find((item) => item.id === Number(form.enrollment_form_id)),
 );
-const selectedCourse = computed(() =>
-    props.courses.find((item) => item.id === Number(form.course_id)),
+const availableLevels = computed(() =>
+    selectedForm.value
+        ? props.levels.filter(
+              (item) => item.course.id === selectedForm.value?.course.id,
+          )
+        : props.levels,
+);
+const selectedLevel = computed(() =>
+    props.levels.find((item) => item.id === Number(form.course_level_id)),
 );
 watch(
     () => form.enrollment_form_id,
@@ -87,10 +101,10 @@ watch(
     },
 );
 watch(
-    () => form.course_id,
+    () => form.course_level_id,
     () => {
-        if (form.source_type === 'course' && selectedCourse.value)
-            form.title = `Planification — ${selectedCourse.value.title}`;
+        if (selectedLevel.value)
+            form.title = `Planification — ${selectedLevel.value.course.title} · ${selectedLevel.value.name}`;
     },
 );
 function openCreate() {
@@ -193,7 +207,8 @@ const statusTone: Record<string, string> = {
                                 {{ plan.title }}
                             </h2>
                             <p class="mt-1 text-sm text-muted-foreground">
-                                {{ plan.course.title }} · {{ plan.course.code }}
+                                {{ plan.level.course.title }} ·
+                                {{ plan.level.name }}
                             </p>
                         </div>
                         <div class="rounded-xl bg-primary/10 p-3 text-primary">
@@ -311,13 +326,13 @@ const statusTone: Record<string, string> = {
                             type="button"
                             class="rounded-xl border p-4 text-left"
                             :class="
-                                form.source_type === 'course'
+                                form.source_type === 'level'
                                     ? 'border-primary bg-primary/5'
                                     : ''
                             "
-                            @click="form.source_type = 'course'"
+                            @click="form.source_type = 'level'"
                         >
-                            <p class="font-medium">Formation seule</p>
+                            <p class="font-medium">Niveau seul</p>
                             <p class="text-xs text-muted-foreground">
                                 Créer librement les groupes
                             </p>
@@ -345,34 +360,59 @@ const statusTone: Record<string, string> = {
                             :message="form.errors.enrollment_form_id"
                             class="mt-1"
                         />
+                        <div class="mt-4">
+                            <Label>Niveau</Label
+                            ><select
+                                v-model="form.course_level_id"
+                                class="mt-1 h-9 w-full rounded-md border bg-background px-3 text-sm"
+                                required
+                            >
+                                <option value="" disabled>
+                                    Sélectionner le niveau
+                                </option>
+                                <option
+                                    v-for="level in availableLevels"
+                                    :key="level.id"
+                                    :value="String(level.id)"
+                                >
+                                    {{ level.name }} —
+                                    {{ level.duration_hours }}h
+                                </option></select
+                            ><InputError
+                                :message="form.errors.course_level_id"
+                                class="mt-1"
+                            />
+                        </div>
                         <p
                             v-if="selectedForm"
                             class="mt-2 rounded-lg bg-muted p-3 text-xs"
                         >
                             Du {{ selectedForm.start_date }} au
                             {{ selectedForm.end_date }} ·
-                            {{ selectedForm.course.duration_hours }} heures
+                            {{ selectedLevel?.duration_hours || '—' }} heures
                         </p>
                     </div>
                     <template v-else
                         ><div>
-                            <Label>Formation</Label
+                            <Label>Niveau de formation</Label
                             ><select
-                                v-model="form.course_id"
+                                v-model="form.course_level_id"
                                 class="mt-1 h-9 w-full rounded-md border bg-background px-3 text-sm"
                                 required
                             >
                                 <option value="" disabled>Sélectionner</option>
                                 <option
-                                    v-for="course in courses"
-                                    :key="course.id"
-                                    :value="String(course.id)"
+                                    v-for="level in levels"
+                                    :key="level.id"
+                                    :value="String(level.id)"
                                 >
-                                    {{ course.title }} —
-                                    {{ course.duration_hours }}h
+                                    {{ level.course.title }} —
+                                    {{ level.name }} ({{
+                                        level.duration_hours
+                                    }}h)
                                 </option></select
                             ><InputError
-                                :message="form.errors.course_id"
+                                :message="form.errors.course_level_id"
                                 class="mt-1"
                             />
                         </div>

@@ -15,6 +15,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -25,7 +26,7 @@ class AttendanceController extends Controller
     public function index(Request $request): Response
     {
         Gate::authorize(AttendancePermission::VIEW->value);
-        $sessions=TrainingSession::with(['group.plan.course:id,title','group.enrollments.student','classroom:id,name','teacher:id,name','teacherAttendance.actualTeacher:id,name','attendances.student'])
+        $sessions=TrainingSession::with(['group.plan.course','group.enrollments.student','classroom:id,name','teacher:id,name','teacherAttendance.actualTeacher:id,name','attendances.student'])
             ->when($request->filled('date_from'),fn($q)=>$q->whereDate('starts_at','>=',$request->date('date_from')))
             ->when($request->filled('date_to'),fn($q)=>$q->whereDate('starts_at','<=',$request->date('date_to')))
             ->when($request->filled('status'),fn($q)=>$q->whereHas('attendances',fn($a)=>$a->where('status',$request->string('status'))))
@@ -74,6 +75,7 @@ class AttendanceController extends Controller
         $data=$request->validate(['status'=>['required',Rule::in(['present','absent','late','excused','replaced','cancelled'])],'actual_teacher_id'=>['nullable','exists:users,id'],'worked_minutes'=>['required','integer','min:0','max:1440'],'is_justified'=>['boolean'],'justification'=>['nullable','string','max:2000'],'notes'=>['nullable','string','max:2000'],'correction_reason'=>['nullable','string','max:2000']]);
         if($data['status']==='replaced'&&!($data['actual_teacher_id']??null))return back()->withErrors(['actual_teacher_id'=>'Sélectionnez le remplaçant.']);
         $record=TeacherAttendance::firstOrNew(['training_session_id'=>$session->id]);$old=$record->exists?$record->getAttributes():null;
+        if($record->exists&&$record->salaryStatements()->exists()) throw ValidationException::withMessages(['attendance'=>'Ce pointage est déjà inclus dans un bulletin de salaire et ne peut plus être modifié.']);
         if($record->validated_at&&blank($data['correction_reason']??null))return back()->withErrors(['correction_reason'=>'Le motif de correction est obligatoire.']);
         $record->fill([...$data,'scheduled_teacher_id'=>$session->teacher_id,'actual_teacher_id'=>$data['actual_teacher_id']??($data['status']==='present'||$data['status']==='late'?$session->teacher_id:null),'recorded_by'=>$request->user()->id,'validated_at'=>now(),'validated_by'=>$request->user()->id])->save();
         $record->histories()->create(['user_id'=>$request->user()->id,'event'=>$old?'updated':'created','old_values'=>$old,'new_values'=>$record->getAttributes(),'reason'=>$data['correction_reason']??null,'occurred_at'=>now()]);

@@ -17,6 +17,7 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Carbon;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
@@ -29,6 +30,8 @@ class SalariesController extends Controller
 
     public function index(Request $request): Response
     {
+        $personnel = User::whereIn('role', [UserRole::TEACHER->value, UserRole::EMPLOYEE->value])
+            ->with('staff.employeeType:id,name,is_teacher')->orderBy('name')->get();
         $statements = SalaryStatement::with(['staff.employeeType:id,name','payments','adjustments'])
             ->when($request->filled('staff_id'), fn($q)=>$q->where('staff_id',$request->integer('staff_id')))
             ->when($request->string('status')->toString(), fn($q,$status)=>$q->where('status',$status))
@@ -36,9 +39,9 @@ class SalariesController extends Controller
             ->latest('period_end')->paginate(15)->withQueryString();
         return Inertia::render('Admin/Salaries/Index', [
             'statements'=>$statements,
-            'configurations'=>SalaryConfiguration::with('staff.employeeType:id,name')->latest('effective_from')->get(),
+            'configurations'=>SalaryConfiguration::latest('effective_from')->get(),
             'payments'=>SalaryPayment::with(['staff.employeeType:id,name','statement:id,reference,period_start,period_end'])->latest('paid_at')->limit(100)->get(),
-            'employees'=>Staff::with('employeeType:id,name,is_teacher')->orderBy('last_name')->orderBy('first_name')->get(),
+            'employees'=>$personnel->pluck('staff')->filter()->values(),
             'salaryTypes'=>collect(SalaryType::cases())->map(fn($type)=>$type->value),
             'filters'=>$request->only(['staff_id','status','period']),
             'currency'=>['symbol'=>config('app.currency_symbol'),'code'=>config('app.currency_code')],
@@ -47,9 +50,7 @@ class SalariesController extends Controller
 
     public function storeConfiguration(Request $request): RedirectResponse
     {
-        $data=$request->validate(['staff_id'=>['required','exists:staff,id'],'salary_type'=>['required',Rule::enum(SalaryType::class)],'base_rate'=>['required','numeric','min:0'],'effective_from'=>['required','date'],'effective_to'=>['nullable','date','after_or_equal:effective_from'],'notes'=>['nullable','string','max:5000']]);
-        $overlap=SalaryConfiguration::where('staff_id',$data['staff_id'])->whereDate('effective_from','<=',$data['effective_to']??'9999-12-31')->where(fn($q)=>$q->whereNull('effective_to')->orWhereDate('effective_to','>=',$data['effective_from']))->exists();
-        if($overlap) throw ValidationException::withMessages(['effective_from'=>'Une configuration salariale existe déjà sur cette période.']);
+        $data=$request->validate(['name'=>['required','string','max:150'],'salary_type'=>['required',Rule::enum(SalaryType::class)],'base_rate'=>['required','numeric','min:0'],'effective_from'=>['required','date'],'effective_to'=>['nullable','date','after_or_equal:effective_from'],'notes'=>['nullable','string','max:5000']]);
         SalaryConfiguration::create($data);
         return back()->with('success','Configuration salariale enregistrée.');
     }
@@ -66,17 +67,17 @@ class SalariesController extends Controller
 
     public function generate(Request $request): RedirectResponse
     {
-        $data=$request->validate(['staff_id'=>['required','exists:staff,id'],'period_start'=>['required','date'],'period_end'=>['required','date','after_or_equal:period_start'],'worked_units'=>['nullable','numeric','min:0'],'manual_amount'=>['nullable','numeric','min:0'],'notes'=>['nullable','string','max:5000'],'adjustments'=>['array'],'adjustments.*.type'=>['required',Rule::in(['bonus','deduction','advance','exceptional','reimbursement'])],'adjustments.*.label'=>['required','string','max:255'],'adjustments.*.amount'=>['required','numeric','min:0.01'],'adjustments.*.notes'=>['nullable','string','max:2000']]);
-        $staff=Staff::findOrFail($data['staff_id']); $start=$request->date('period_start'); $end=$request->date('period_end');
-        $configuration=SalaryConfiguration::where('staff_id',$staff->id)->whereDate('effective_from','<=',$end)->where(fn($q)=>$q->whereNull('effective_to')->orWhereDate('effective_to','>=',$start))->latest('effective_from')->first();
-        if(!$configuration) throw ValidationException::withMessages(['staff_id'=>'Aucune configuration salariale active pour cette période.']);
-        if(SalaryStatement::where('staff_id',$staff->id)->whereDate('period_start',$start)->whereDate('period_end',$end)->exists()) throw ValidationException::withMessages(['period_start'=>'Un bulletin existe déjà pour cette période.']);
-        $calculation=$this->calculator->calculate($staff,$configuration,$start,$end,isset($data['worked_units'])?(float)$data['worked_units']:null,isset($data['manual_amount'])?(float)$data['manual_amount']:null);
+        $data=$request->validate(['staff_id'=>['required','exists:staff,id'],'salary_configuration_id'=>['required','exists:salary_configurations,id'],'period'=>['required','date_format:Y-m'],'worked_units'=>['nullable','numeric','min:0'],'manual_amount'=>['nullable','numeric','min:0'],'notes'=>['nullable','string','max:5000'],'adjustments'=>['array'],'adjustments.*.type'=>['required',Rule::in(['bonus','deduction','advance','exceptional','reimbursement'])],'adjustments.*.label'=>['required','string','max:255'],'adjustments.*.amount'=>['required','numeric','min:0.01'],'adjustments.*.notes'=>['nullable','string','max:2000']]);
+        $staff=Staff::findOrFail($data['staff_id']); $start=Carbon::createFromFormat('Y-m',$data['period'])->startOfMonth(); $end=$start->copy()->endOfMonth();
+        $configuration=SalaryConfiguration::findOrFail($data['salary_configuration_id']);
+        if($configuration->effective_from->gt($end) || ($configuration->effective_to && $configuration->effective_to->lt($start))) throw ValidationException::withMessages(['salary_configuration_id'=>'Cette configuration salariale n’est pas active sur la période choisie.']);
         $adjustments=collect($data['adjustments']??[]); $sum=fn(string $type)=>(float)$adjustments->where('type',$type)->sum('amount');
         $bonuses=$sum('bonus'); $deductions=$sum('deduction'); $advances=$sum('advance'); $exceptional=$sum('exceptional'); $reimbursements=$sum('reimbursement');
-        $net=max(0,$calculation['gross']+$bonuses+$exceptional+$reimbursements-$deductions-$advances);
-        $statement=DB::transaction(function()use($staff,$configuration,$start,$end,$calculation,$bonuses,$deductions,$advances,$exceptional,$reimbursements,$net,$data,$adjustments,$request){
+        $statement=DB::transaction(function()use($staff,$configuration,$start,$end,$bonuses,$deductions,$advances,$exceptional,$reimbursements,$data,$adjustments,$request){
+            $calculation=$this->calculator->calculate($staff,$configuration,$start,$end,isset($data['worked_units'])?(float)$data['worked_units']:null,isset($data['manual_amount'])?(float)$data['manual_amount']:null);
+            $net=max(0,$calculation['gross']+$bonuses+$exceptional+$reimbursements-$deductions-$advances);
             $statement=SalaryStatement::create(['staff_id'=>$staff->id,'salary_configuration_id'=>$configuration->id,'reference'=>'SAL-'.$start->format('Ym').'-'.$staff->employee_code.'-'.str()->upper(str()->random(4)),'period_start'=>$start,'period_end'=>$end,'salary_type'=>$configuration->salary_type,'base_rate'=>$configuration->base_rate,'units'=>$calculation['units'],'gross_salary'=>$calculation['gross'],'bonuses'=>$bonuses,'deductions'=>$deductions,'advances'=>$advances,'exceptional_payments'=>$exceptional,'reimbursements'=>$reimbursements,'net_salary'=>$net,'amount_paid'=>0,'remaining_amount'=>$net,'status'=>$net>0?'pending':'paid','calculation_details'=>$calculation['details'],'notes'=>$data['notes']??null,'generated_by'=>$request->user()->id]);
+            $statement->teacherAttendances()->attach($calculation['details']['teacher_attendance_ids']);
             foreach($adjustments as $adjustment)$statement->adjustments()->create($adjustment);
             return $statement;
         });
@@ -100,7 +101,7 @@ class SalariesController extends Controller
 
     public function print(SalaryStatement $statement): HttpResponse
     {
-        $statement->load(['staff.employeeType','payments','adjustments']);
+        $statement->load(['staff.employeeType','payments','adjustments','configuration','teacherAttendances.scheduledTeacher:id,name','teacherAttendances.actualTeacher:id,name','teacherAttendances.session.group.plan.course','teacherAttendances.session.group.plan.level']);
         return Pdf::loadView('admin.salaries.statement',['statement'=>$statement,'currency'=>config('app.currency_symbol')])->download($statement->reference.'.pdf');
     }
 }

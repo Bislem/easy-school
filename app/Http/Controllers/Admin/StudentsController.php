@@ -32,12 +32,12 @@ class StudentsController extends Controller
             ->when($request->string('student_status')->toString(), fn ($query, string $status) => $query->where('status', $status))
             ->when($request->filled('course_id'), fn ($query) => $query->whereHas('enrollments', fn ($query) => $query->where('status', 'registered')->where(fn($enrollment)=>$enrollment
                 ->whereHas('form', fn ($form) => $form->where('course_id', $request->integer('course_id')))
-                ->orWhereHas('trainingPlanGroup.plan', fn($plan)=>$plan->where('course_id',$request->integer('course_id'))))))
+                ->orWhereHas('trainingPlanGroup.plan.level', fn($level)=>$level->where('course_id',$request->integer('course_id'))))))
             ->when($request->string('level')->trim()->toString(), fn ($query, string $level) => $query->whereHas('enrollments', fn ($query) => $query->where('status', 'registered')->where('level', $level)))
             ->when($request->filled('group'), fn ($query) => $query->whereHas('enrollments', fn ($query) => $query->where('status', 'registered')->where('group_number', $request->integer('group'))))
             ->when($request->date('registered_from'), fn ($query, $date) => $query->whereDate('registration_date', '>=', $date))
             ->when($request->date('registered_to'), fn ($query, $date) => $query->whereDate('registration_date', '<=', $date))
-            ->with(['enrollments' => fn ($query) => $query->where('status', 'registered')->with(['form.course:id,title','trainingPlanGroup.plan.course:id,title'])->latest('registered_at')])
+            ->with(['enrollments' => fn ($query) => $query->where('status', 'registered')->with(['form.course:id,title','trainingPlanGroup.plan.level.course:id,title'])->latest('registered_at')])
             ->orderBy('last_name')
             ->orderBy('first_name')
             ->paginate(15)
@@ -96,7 +96,7 @@ class StudentsController extends Controller
 
     public function show(Student $student): Response
     {
-        $student->load(['enrollments.form.course', 'enrollments.trainingPlanGroup.plan.course', 'enrollments.installments', 'enrollments.payments.recorder:id,name', 'badges.template', 'certificates.enrollment.form.course', 'histories.user:id,name', 'files', 'user:id,email,is_active', 'attendances.session.group.plan.course', 'attendances.session.teacher:id,name']);
+        $student->load(['enrollments.form.course', 'enrollments.trainingPlanGroup.plan.level.course', 'enrollments.installments', 'enrollments.payments.recorder:id,name', 'badges.template', 'certificates.enrollment.form.course', 'histories.user:id,name', 'files', 'user:id,email,is_active', 'attendances.session.group.plan.level.course', 'attendances.session.teacher:id,name']);
         $expected=\App\Models\TrainingSession::whereHas('group.enrollments',fn($q)=>$q->where('student_id',$student->id)->where('status','registered'))->count();
         $records=$student->attendances;$present=$records->whereIn('status',['present','late'])->count();$consecutive=0;
         foreach($records->sortByDesc(fn($a)=>$a->session?->starts_at) as $record){if($record->status!=='absent')break;$consecutive++;}

@@ -12,7 +12,7 @@ class EnrollmentFinanceService
         $paid = (float) $enrollment->payments()->whereIn('status', ['completed', 'reversal'])->sum('amount');
         $base = (float) ($enrollment->formation_price
             ?? $enrollment->form()->with('course')->first()?->course?->price
-            ?? $enrollment->trainingPlanGroup()->with('plan.course')->first()?->plan?->course?->price
+            ?? $enrollment->trainingPlanGroup()->with('plan.level')->first()?->plan?->level?->price
             ?? 0);
         $final = max(0, $base - (float) $enrollment->discount_amount + (float) $enrollment->adjustment_total);
         $remaining = max(0, $final - $paid);

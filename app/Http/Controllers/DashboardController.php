@@ -59,9 +59,9 @@ class DashboardController extends Controller
             ->latest('registered_at')
             ->limit(6)
             ->get();
-        $todaySessions = TrainingSession::with(['group.plan.course:id,title', 'group:id,name,training_plan_id', 'classroom:id,name', 'teacher:id,name','attendances','teacherAttendance'])
+        $todaySessions = TrainingSession::with(['group.plan.course', 'group:id,name,training_plan_id', 'classroom:id,name', 'teacher:id,name','attendances','teacherAttendance'])
             ->whereBetween('starts_at', [$today->copy()->startOfDay(), $today->copy()->endOfDay()])->orderBy('starts_at')->get();
-        $upcomingSessions = TrainingSession::with(['group.plan.course:id,title', 'group:id,name,training_plan_id', 'classroom:id,name', 'teacher:id,name'])
+        $upcomingSessions = TrainingSession::with(['group.plan.course', 'group:id,name,training_plan_id', 'classroom:id,name', 'teacher:id,name'])
             ->where('starts_at', '>', now())->orderBy('starts_at')->limit(6)->get();
         $occupiedRoomIds = $todaySessions->pluck('classroom_id')->unique();
         $activeRooms = Classroom::where('is_active', true)->count();

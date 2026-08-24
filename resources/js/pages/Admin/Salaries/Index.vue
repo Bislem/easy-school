@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import AdminLayout from '@/layouts/AdminLayout.vue';
 import { Head, useForm } from '@inertiajs/vue3';
-import { Calculator, Download, Plus, WalletCards, X } from 'lucide-vue-next';
+import { Calculator, Check, ChevronsUpDown, Download, Plus, Search, WalletCards, X } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
 const props = defineProps({
     statements: { type: Object, required: true },
@@ -19,6 +19,8 @@ const props = defineProps({
 const tab = ref('pending'),
     configOpen = ref(false),
     generateOpen = ref(false),
+    employeeSearch = ref(''),
+    employeeDropdownOpen = ref(false),
     paying = ref<any>(null);
 const labels: any = {
     monthly: 'Mensuel fixe',
@@ -35,7 +37,7 @@ const adjustmentLabels: any = {
     reimbursement: 'Remboursement',
 };
 const config = useForm({
-    staff_id: '',
+    name: '',
     salary_type: 'monthly',
     base_rate: '',
     effective_from: new Date().toISOString().slice(0, 10),
@@ -44,8 +46,8 @@ const config = useForm({
 });
 const statement = useForm({
     staff_id: '',
-    period_start: new Date().toISOString().slice(0, 7) + '-01',
-    period_end: new Date().toISOString().slice(0, 10),
+    salary_configuration_id: '',
+    period: new Date().toISOString().slice(0, 7),
     worked_units: '',
     manual_amount: '',
     notes: '',
@@ -60,9 +62,21 @@ const payment = useForm({
 });
 const selected = computed(() =>
     props.configurations.find(
-        (c: any) => String(c.staff_id) === statement.staff_id,
+        (c: any) => String(c.id) === statement.salary_configuration_id,
     ),
 );
+const filteredEmployees = computed(() => {
+    const query = employeeSearch.value.trim().toLowerCase();
+    return props.employees.filter((employee: any) =>
+        !query || `${employee.name} ${employee.employee_code ?? ''} ${employee.employee_type?.name ?? ''}`.toLowerCase().includes(query),
+    );
+});
+const selectedEmployee = computed(() => props.employees.find((employee: any) => String(employee.id) === statement.staff_id));
+function selectEmployee(employee: any) {
+    statement.staff_id = String(employee.id);
+    employeeSearch.value = '';
+    employeeDropdownOpen.value = false;
+}
 const money = (v: any) =>
     `${Number(v).toLocaleString('fr-FR', { minimumFractionDigits: 2 })} ${props.currency.symbol}`;
 function addAdjustment() {
@@ -220,9 +234,9 @@ function pay() {
                         :key="c.id"
                         class="rounded-xl border bg-card p-4"
                     >
-                        <b>{{ c.staff.name }}</b>
+                        <b>{{ c.name }}</b>
                         <p class="text-sm text-muted-foreground">
-                            {{ c.staff.employee_type.name }}
+                            Configuration générale réutilisable
                         </p>
                         <p class="mt-3">
                             {{ labels[c.salary_type] }} ·
@@ -274,23 +288,8 @@ function pay() {
                         ><X
                     /></Button>
                 </div>
+                <label><Label>Nom de la configuration</Label><Input v-model="config.name" required placeholder="Ex. Formateur horaire standard"/><InputError :message="config.errors.name"/></label>
                 <label
-                    ><Label>Employé</Label
-                    ><select
-                        v-model="config.staff_id"
-                        required
-                        class="h-9 w-full rounded-md border bg-background px-3"
-                    >
-                        <option value="" disabled>Sélectionner</option>
-                        <option
-                            v-for="e in employees"
-                            :key="e.id"
-                            :value="String(e.id)"
-                        >
-                            {{ e.name }} — {{ e.employee_type.name }}
-                        </option>
-                    </select></label
-                ><label
                     ><Label>Type</Label
                     ><select
                         v-model="config.salary_type"
@@ -342,37 +341,49 @@ function pay() {
                         ><X
                     /></Button>
                 </div>
+                <label class="relative block"
+                    ><Label>Employé</Label>
+                    <button type="button" class="mt-1 flex h-10 w-full items-center justify-between rounded-md border bg-background px-3 text-left text-sm" @click="employeeDropdownOpen = !employeeDropdownOpen">
+                        <span v-if="selectedEmployee"><b>{{ selectedEmployee.name }}</b> · {{ selectedEmployee.employee_type.name }}</span>
+                        <span v-else class="text-muted-foreground">Rechercher et sélectionner</span>
+                        <ChevronsUpDown class="size-4 text-muted-foreground"/>
+                    </button>
+                    <div v-if="employeeDropdownOpen" class="absolute z-20 mt-1 w-full rounded-md border bg-popover p-2 shadow-lg">
+                        <div class="relative mb-2"><Search class="absolute left-3 top-2.5 size-4 text-muted-foreground"/><Input v-model="employeeSearch" type="search" autofocus placeholder="Nom, matricule ou fonction" class="pl-9"/></div>
+                        <div class="max-h-56 overflow-y-auto">
+                            <button v-for="e in filteredEmployees" :key="e.id" type="button" class="flex w-full items-center gap-2 rounded px-2 py-2 text-left text-sm hover:bg-muted" @click="selectEmployee(e)">
+                                <Check class="size-4" :class="statement.staff_id === String(e.id) ? 'opacity-100' : 'opacity-0'"/>
+                                <span><b>{{ e.name }}</b><small class="block text-muted-foreground">{{ e.employee_code }} · {{ e.employee_type.name }}</small></span>
+                            </button>
+                            <p v-if="!filteredEmployees.length" class="p-3 text-center text-sm text-muted-foreground">Aucun employé trouvé.</p>
+                        </div>
+                    </div>
+                    <InputError :message="statement.errors.staff_id" />
+                </label>
                 <label
-                    ><Label>Employé</Label
+                    ><Label>Configuration salariale</Label
                     ><select
-                        v-model="statement.staff_id"
+                        v-model="statement.salary_configuration_id"
                         required
                         class="h-9 w-full rounded-md border bg-background px-3"
                     >
                         <option value="" disabled>Sélectionner</option>
                         <option
-                            v-for="e in employees"
-                            :key="e.id"
-                            :value="String(e.id)"
+                            v-for="c in configurations"
+                            :key="c.id"
+                            :value="String(c.id)"
                         >
-                            {{ e.name }}
+                            {{ c.name }} — {{ labels[c.salary_type] }} · {{ money(c.base_rate) }}
                         </option></select
                     ><small v-if="selected"
                         >{{ labels[selected.salary_type] }} ·
                         {{ money(selected.base_rate) }}</small
-                    ><InputError :message="statement.errors.staff_id"
+                    ><InputError :message="statement.errors.salary_configuration_id"
                 /></label>
-                <div class="grid grid-cols-2 gap-3">
-                    <label
-                        ><Label>Début</Label
-                        ><Input
-                            v-model="statement.period_start"
-                            type="date" /></label
-                    ><label
-                        ><Label>Fin</Label
-                        ><Input v-model="statement.period_end" type="date"
-                    /></label>
+                <div v-if="Object.keys(statement.errors).length" class="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+                    {{ Object.values(statement.errors)[0] }}
                 </div>
+                <label><Label>Mois de paie</Label><Input v-model="statement.period" type="month" required/><InputError :message="statement.errors.period"/></label>
                 <label v-if="selected?.salary_type === 'daily'"
                     ><Label>Jours travaillés</Label
                     ><Input

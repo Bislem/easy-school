@@ -13,6 +13,7 @@ import { type NavItem } from '@/types';
 import { Link, usePage } from '@inertiajs/vue3';
 import {
     BookOpen,
+    Building2,
     CalendarRange,
     ClipboardCheck,
     ClipboardList,
@@ -53,10 +54,14 @@ const mainNavItems: NavItem[] = [
                   icon: GraduationCap,
               },
               { title: 'Formations', href: '/admin/courses', icon: BookOpen },
-              { title: 'Présences', href: '/admin/attendance', icon: ClipboardCheck },
-              { title: 'Salles', href: '/admin/classrooms', icon: BookOpen },
-              { title: 'Utilisateurs', href: '/admin/users', icon: Users },
-              { title: 'Personnel', href: '/admin/staff', icon: Users },
+              { title: 'Sites', href: '/admin/sites', icon: Building2 },
+              {
+                  title: 'Présences',
+                  href: '/admin/attendance',
+                  icon: ClipboardCheck,
+              },
+              { title: 'Salles', href: '/admin/classrooms', icon: Building2 },
+              { title: 'Personnel', href: '/admin/users', icon: Users },
               { title: 'Badges', href: '/admin/badges', icon: IdCard },
               {
                   title: 'Certificats',

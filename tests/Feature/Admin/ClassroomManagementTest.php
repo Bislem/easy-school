@@ -2,11 +2,11 @@
 
 use App\Enums\UserRole;
 use App\Models\Classroom;
+use App\Models\SchoolSite;
 use App\Models\User;
 
 test('administrators can view classrooms', function () {
     $admin = User::factory()->create(['role' => UserRole::ADMIN]);
-
     $this->actingAs($admin)
         ->get(route('admin.classrooms.index'))
         ->assertOk();
@@ -22,10 +22,12 @@ test('teachers cannot manage classrooms', function () {
 
 test('administrators can create and disable a classroom', function () {
     $admin = User::factory()->create(['role' => UserRole::ADMIN]);
+    $site = SchoolSite::create(['name' => 'Site Béjaïa', 'code' => 'BEJ', 'wilaya' => 'Béjaïa', 'is_active' => true]);
 
     $this->actingAs($admin)
         ->post(route('admin.classrooms.store'), [
             'name' => 'Salle informatique',
+            'school_site_id' => $site->id,
             'code' => 'INFO-01',
             'capacity' => 24,
             'location' => 'Premier étage',
@@ -41,4 +43,13 @@ test('administrators can create and disable a classroom', function () {
         ->assertSessionHasNoErrors();
 
     expect($classroom->refresh()->is_active)->toBeFalse();
+});
+
+test('administrators can manage school sites', function () {
+    $admin = User::factory()->create(['role' => UserRole::ADMIN]);
+    $this->actingAs($admin)->post(route('admin.sites.store'), [
+        'name' => 'Annexe Alger', 'code' => 'ALG', 'wilaya' => 'Alger',
+        'commune' => 'Hydra', 'address' => null, 'phone' => null, 'is_active' => true,
+    ])->assertSessionHasNoErrors();
+    expect(SchoolSite::where('code', 'ALG')->exists())->toBeTrue();
 });

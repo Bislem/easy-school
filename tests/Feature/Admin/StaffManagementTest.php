@@ -5,7 +5,7 @@ use App\Models\EmployeeType;
 use App\Models\Staff;
 use App\Models\User;
 
-test('administrators can create staff without a login account', function () {
+test('administrators can create personnel with a user identity and no login access', function () {
     $admin = User::factory()->create(['role' => UserRole::ADMIN]);
     $type = EmployeeType::where('slug', 'secretary')->firstOrFail();
 
@@ -16,7 +16,9 @@ test('administrators can create staff without a login account', function () {
     ])->assertSessionHasNoErrors()->assertRedirect();
 
     $staff = Staff::where('employee_code', 'EMP-SEC-001')->firstOrFail();
-    expect($staff->user_id)->toBeNull()->and($staff->employeeType->slug)->toBe('secretary');
+    expect($staff->user_id)->not->toBeNull()
+        ->and($staff->user->can_login)->toBeFalse()
+        ->and($staff->employeeType->slug)->toBe('secretary');
 });
 
 test('teacher staff keeps a teacher user for planning compatibility', function () {
