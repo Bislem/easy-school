@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Enums\SalaryType;
+use App\Models\EmployeeAttendance;
 use App\Models\SalaryConfiguration;
 use App\Models\Staff;
 use App\Models\TeacherAttendance;
@@ -11,46 +12,81 @@ use Illuminate\Validation\ValidationException;
 
 class SalaryCalculator
 {
-    public function calculate(Staff $staff, SalaryConfiguration $configuration, CarbonInterface $start, CarbonInterface $end, ?float $manualUnits = null, ?float $manualAmount = null): array
+    public function attendanceSnapshot(Staff $staff, CarbonInterface $start, CarbonInterface $end, bool $onlyUnaccounted = true): array
     {
-        $rate = (float) $configuration->base_rate; $units = 1.0; $validatedTeaching = collect();
-        $isTeachingSalary = in_array($configuration->salary_type, [SalaryType::HOURLY, SalaryType::PER_SESSION], true)
-            || ($configuration->salary_type === SalaryType::DAILY && (bool) $staff->employeeType?->is_teacher);
-        if ($isTeachingSalary) {
-            if (! $staff->user_id) throw ValidationException::withMessages(['staff_id'=>'Cet employé ne possède pas de compte enseignant lié.']);
-            $validatedTeaching = TeacherAttendance::with('session')
+        $isTeacher = (bool) $staff->loadMissing('employeeType')->employeeType?->is_teacher;
+        $teacherAttendances = collect();
+        $employeeAttendances = collect();
+
+        if ($isTeacher) {
+            if (! $staff->user_id) {
+                throw ValidationException::withMessages(['staff_id' => 'Cet employé ne possède pas de compte enseignant lié.']);
+            }
+            $teacherAttendances = TeacherAttendance::with('session')
                 ->where('actual_teacher_id', $staff->user_id)
                 ->whereNotNull('validated_at')
                 ->whereIn('status', ['present', 'late', 'replaced'])
-                ->whereDoesntHave('salaryStatements')
-                ->whereHas('session', fn ($query) => $query->where('status', 'completed')
-                    ->whereBetween('starts_at', [$start->copy()->startOfDay(), $end->copy()->endOfDay()]))
-                ->get()->sortBy('session.starts_at')->values();
-            if ($validatedTeaching->isEmpty()) {
-                throw ValidationException::withMessages(['period'=>'Aucune heure enseignante validée et non comptabilisée pour ce mois.']);
-            }
+                ->when($onlyUnaccounted, fn ($query) => $query->whereDoesntHave('salaryStatements'))
+                ->whereHas('session', fn ($query) => $query->whereBetween('starts_at', [
+                    $start->copy()->startOfDay(), $end->copy()->endOfDay(),
+                ]))->get()->sortBy('session.starts_at')->values();
+        } else {
+            $employeeAttendances = EmployeeAttendance::query()
+                ->where('staff_id', $staff->id)
+                ->whereBetween('attendance_date', [$start->toDateString(), $end->toDateString()])
+                ->when($onlyUnaccounted, fn ($query) => $query->whereDoesntHave('salaryStatements'))
+                ->orderBy('attendance_date')->get();
         }
-        $gross = match($configuration->salary_type) {
-            SalaryType::MONTHLY => $rate,
-            SalaryType::HOURLY => $rate * ($units = round($validatedTeaching->sum('worked_minutes') / 60, 2)),
-            SalaryType::PER_SESSION => $rate * ($units = (float) $validatedTeaching->count()),
-            SalaryType::DAILY => $rate * ($units = $isTeachingSalary
-                ? (float) $validatedTeaching->pluck('session.starts_at')->map(fn ($date) => $date->toDateString())->unique()->count()
-                : $this->requiredUnits($manualUnits,'worked_units')),
-            SalaryType::CUSTOM => $manualAmount ?? throw ValidationException::withMessages(['manual_amount'=>'Le montant manuel est obligatoire.']),
-        };
-        return ['units'=>$units,'gross'=>round($gross,2),'details'=>[
-            'teacher_attendance_ids'=>$validatedTeaching->pluck('id')->all(),
-            'session_ids'=>$validatedTeaching->pluck('training_session_id')->all(),
-            'session_count'=>$validatedTeaching->count(),
-            'validated_worked_hours'=>$validatedTeaching->isNotEmpty()?round($validatedTeaching->sum('worked_minutes')/60,2):null,
-            'period_start'=>$start->toDateString(),'period_end'=>$end->toDateString()
-        ]];
+
+        $payableEmployeeAttendances = $employeeAttendances->whereIn('status', ['present', 'late']);
+        $workedMinutes = $isTeacher
+            ? $teacherAttendances->sum('worked_minutes')
+            : $payableEmployeeAttendances->sum('worked_minutes');
+        $workedDays = $isTeacher
+            ? $teacherAttendances->pluck('session.starts_at')->map(fn ($date) => $date->toDateString())->unique()->count()
+            : $payableEmployeeAttendances->pluck('attendance_date')->map(fn ($date) => $date->toDateString())->unique()->count();
+
+        return [
+            'is_teacher' => $isTeacher,
+            'teacher_attendance_ids' => $teacherAttendances->pluck('id')->all(),
+            'employee_attendance_ids' => $employeeAttendances->pluck('id')->all(),
+            'session_ids' => $teacherAttendances->pluck('training_session_id')->all(),
+            'session_count' => $teacherAttendances->count(),
+            'worked_hours' => round($workedMinutes / 60, 2),
+            'worked_days' => (float) $workedDays,
+        ];
     }
 
-    private function requiredUnits(?float $units, string $field): float
+    public function calculate(Staff $staff, SalaryConfiguration $configuration, CarbonInterface $start, CarbonInterface $end, ?float $manualUnits = null, ?float $manualAmount = null): array
     {
-        if ($units === null || $units < 0) throw ValidationException::withMessages([$field=>'Le nombre d’unités travaillées est obligatoire.']);
-        return $units;
+        $rate = (float) $configuration->base_rate;
+        $snapshot = $this->attendanceSnapshot($staff, $start, $end);
+
+        if (in_array($configuration->salary_type, [SalaryType::HOURLY, SalaryType::PER_SESSION, SalaryType::DAILY], true)
+            && $snapshot['teacher_attendance_ids'] === [] && $snapshot['employee_attendance_ids'] === []) {
+            throw ValidationException::withMessages(['period' => 'Aucun pointage non comptabilisé pour ce mois.']);
+        }
+
+        $units = match ($configuration->salary_type) {
+            SalaryType::MONTHLY, SalaryType::CUSTOM => 1.0,
+            SalaryType::HOURLY => $snapshot['worked_hours'],
+            SalaryType::PER_SESSION => $snapshot['is_teacher'] ? (float) $snapshot['session_count'] : $snapshot['worked_days'],
+            SalaryType::DAILY => $manualUnits ?? $snapshot['worked_days'],
+        };
+        $gross = match ($configuration->salary_type) {
+            SalaryType::MONTHLY => $rate,
+            SalaryType::CUSTOM => $manualAmount ?? throw ValidationException::withMessages(['manual_amount' => 'Le montant manuel est obligatoire.']),
+            default => $rate * $units,
+        };
+
+        return ['units' => $units, 'gross' => round($gross, 2), 'details' => [
+            'teacher_attendance_ids' => $snapshot['teacher_attendance_ids'],
+            'employee_attendance_ids' => $snapshot['employee_attendance_ids'],
+            'session_ids' => $snapshot['session_ids'],
+            'session_count' => $snapshot['session_count'],
+            'original_attendance_units' => $snapshot['worked_hours'],
+            'attendance_worked_hours' => $snapshot['worked_hours'],
+            'period_start' => $start->toDateString(), 'period_end' => $end->toDateString(),
+        ]];
     }
 }

@@ -2,23 +2,22 @@
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import AdminLayout from '@/layouts/AdminLayout.vue';
-import { Head, router, useForm } from '@inertiajs/vue3';
-import { Printer } from 'lucide-vue-next';
+import { Head, Link, router, useForm } from '@inertiajs/vue3';
+import { Banknote, Check, ChevronsUpDown, Download, ReceiptText, Search, Settings, TriangleAlert, WalletCards, X } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
 
 const props = defineProps({
     enrollments: { type: Object, required: true },
-    payments: { type: Array, required: true },
+    students: { type: Array, required: true },
     methods: { type: Array, required: true },
     filters: { type: Object, required: true },
     stats: { type: Object, required: true },
     currency: { type: Object, required: true },
 });
-const tab = ref('balances'),
-    selected = ref<any>(null),
+const selected = ref<any>(null),
     mode = ref('');
-const search = ref((props.filters as any).search ?? ''),
-    status = ref((props.filters as any).status ?? '');
+const studentSearch = ref(''), studentOpen = ref(false);
+const listFilters = useForm({ search: props.filters.search ?? '', student_id: props.filters.student_id ? String(props.filters.student_id) : '', status: props.filters.status ?? '', month: props.filters.month ?? '', payment_method: props.filters.payment_method ?? '' });
 const payment = useForm({
     amount: '',
     payment_date: new Date().toISOString().slice(0, 10),
@@ -26,11 +25,6 @@ const payment = useForm({
     student_installment_id: '',
     reference: '',
     notes: '',
-});
-const config = useForm({
-    formation_price: '',
-    discount_amount: '0',
-    installments: [] as any[],
 });
 const adjustment = useForm({ type: 'credit', amount: '', reason: '' });
 const statuses: Record<string, string> = {
@@ -41,46 +35,23 @@ const statuses: Record<string, string> = {
 };
 const money = (v: any) =>
     `${Number(v ?? 0).toLocaleString('fr-DZ', { minimumFractionDigits: 2 })} ${(props.currency as any).symbol}`;
-const overdue = computed(() =>
-    props.enrollments.data.filter((e: any) => e.payment_status === 'overdue'),
-);
+const selectedStudent = computed(() => props.students.find((s: any) => String(s.id) === listFilters.student_id));
+const filteredStudents = computed(() => { const query = studentSearch.value.toLowerCase().trim(); return props.students.filter((s: any) => !query || `${s.first_name} ${s.last_name}`.toLowerCase().includes(query)); });
 function filters() {
-    router.get(
-        '/admin/finance',
-        {
-            search: search.value || undefined,
-            status: status.value || undefined,
-        },
-        { preserveState: true, replace: true },
-    );
+    router.get('/admin/finance', listFilters.data(), { preserveState: true, preserveScroll: true, replace: true });
 }
+function selectStudent(student: any | null) { listFilters.student_id = student ? String(student.id) : ''; studentSearch.value = ''; studentOpen.value = false; }
+function clearFilters() { listFilters.defaults({ search: '', student_id: '', status: '', month: '', payment_method: '' }); listFilters.reset(); filters(); }
 function open(e: any, what: string) {
     selected.value = e;
     mode.value = what;
     if (what === 'pay') payment.amount = String(e.remaining_balance);
-    if (what === 'config') {
-        config.formation_price = String(
-            e.formation_price ??
-                e.form?.course?.price ??
-                e.training_plan_group?.plan?.course?.price ??
-                0,
-        );
-        config.discount_amount = String(e.discount_amount ?? 0);
-    }
 }
 function savePayment() {
     payment.post(`/admin/finance/enrollments/${selected.value.id}/payments`, {
         onSuccess: () => {
             mode.value = '';
             payment.reset();
-        },
-    });
-}
-function saveConfig() {
-    config.put(`/admin/finance/enrollments/${selected.value.id}`, {
-        onSuccess: () => {
-            mode.value = '';
-            config.reset();
         },
     });
 }
@@ -94,9 +65,6 @@ function saveAdjustment() {
             },
         },
     );
-}
-function addInstallment() {
-    config.installments.push({ amount: '', due_date: '', notes: '' });
 }
 function reverse(p: any) {
     const reason = prompt(`Motif de contrepassation de ${p.reference}`);
@@ -116,223 +84,18 @@ function receiptPayment(enrollment: any) {
     <Head title="Finance étudiants" /><AdminLayout
         ><main class="flex-1 p-4 sm:p-6 lg:p-8">
             <div class="mx-auto max-w-7xl space-y-6">
-                <header>
+                <header class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <h1 class="text-2xl font-semibold">Finance étudiants</h1>
                     <p class="text-sm text-muted-foreground">
                         Encaissements, échéances et soldes par inscription.
                     </p>
+                    <Button as-child variant="outline"><Link href="/admin/finance/settings"><Settings class="mr-2 size-4"/>Paramètres</Link></Button>
                 </header>
                 <section class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                    <div
-                        v-for="(value, key) in stats"
-                        :key="key"
-                        class="rounded-xl border bg-card p-4"
-                    >
-                        <p class="text-sm text-muted-foreground">
-                            {{
-                                {
-                                    expected: 'Revenu attendu',
-                                    collected: 'Encaissé',
-                                    remaining: 'Restant',
-                                    overdue: 'En retard',
-                                }[key]
-                            }}
-                        </p>
-                        <p class="mt-1 text-xl font-semibold">
-                            {{ money(value) }}
-                        </p>
-                    </div>
+                    <article v-for="card in [{key:'expected',label:'Revenu attendu',icon:ReceiptText,tone:'text-primary bg-primary/10'},{key:'collected',label:'Encaissé',icon:Banknote,tone:'text-emerald-600 bg-emerald-100'},{key:'remaining',label:'Restant',icon:WalletCards,tone:'text-amber-600 bg-amber-100'},{key:'overdue',label:'En retard',icon:TriangleAlert,tone:'text-red-600 bg-red-100'}]" :key="card.key" class="rounded-xl border bg-card p-4 shadow-sm"><div class="flex items-center justify-between gap-3"><div><p class="text-xs text-muted-foreground">{{card.label}}</p><b class="mt-1 block text-2xl">{{money(stats[card.key])}}</b></div><span class="rounded-lg p-2" :class="card.tone"><component :is="card.icon" class="size-5"/></span></div></article>
                 </section>
-                <div class="flex flex-wrap gap-2">
-                    <Button
-                        :variant="tab === 'balances' ? 'default' : 'outline'"
-                        @click="tab = 'balances'"
-                        >Soldes étudiants</Button
-                    ><Button
-                        :variant="tab === 'overdue' ? 'default' : 'outline'"
-                        @click="tab = 'overdue'"
-                        >Échéances en retard</Button
-                    ><Button
-                        :variant="tab === 'history' ? 'default' : 'outline'"
-                        @click="tab = 'history'"
-                        >Historique des paiements</Button
-                    >
-                </div>
-                <section
-                    v-if="tab !== 'history'"
-                    class="rounded-xl border bg-card"
-                >
-                    <div class="flex gap-2 border-b p-4">
-                        <Input
-                            v-model="search"
-                            placeholder="Rechercher un étudiant"
-                            @keyup.enter="filters"
-                        /><select
-                            v-model="status"
-                            class="rounded-md border bg-background px-3"
-                            @change="filters"
-                        >
-                            <option value="">Tous les statuts</option>
-                            <option
-                                v-for="(label, key) in statuses"
-                                :key="key"
-                                :value="key"
-                            >
-                                {{ label }}
-                            </option>
-                        </select>
-                    </div>
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-sm">
-                            <thead>
-                                <tr class="border-b text-left">
-                                    <th class="p-3">Étudiant / formation</th>
-                                    <th>Prix final</th>
-                                    <th>Payé</th>
-                                    <th>Reste</th>
-                                    <th>Statut</th>
-                                    <th></th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr
-                                    v-for="e in tab === 'overdue'
-                                        ? overdue
-                                        : enrollments.data"
-                                    :key="e.id"
-                                    class="border-b"
-                                >
-                                    <td class="p-3">
-                                        <strong
-                                            >{{ e.student.first_name }}
-                                            {{ e.student.last_name }}</strong
-                                        >
-                                        <div class="text-muted-foreground">
-                                            {{
-                                                e.form?.course?.title ||
-                                                e.training_plan_group?.plan
-                                                    ?.course?.title ||
-                                                'Formation'
-                                            }}
-                                            · Groupe
-                                            {{ e.group_number || '—' }}
-                                        </div>
-                                    </td>
-                                    <td>{{ money(e.final_price) }}</td>
-                                    <td>{{ money(e.total_paid) }}</td>
-                                    <td>{{ money(e.remaining_balance) }}</td>
-                                    <td>{{ statuses[e.payment_status] }}</td>
-                                    <td class="space-x-1 whitespace-nowrap">
-                                        <Button
-                                            size="sm"
-                                            variant="outline"
-                                            @click="open(e, 'config')"
-                                            >Configurer</Button
-                                        ><Button
-                                            size="sm"
-                                            variant="outline"
-                                            @click="open(e, 'adjust')"
-                                            >Ajuster</Button
-                                        ><Button
-                                            v-if="
-                                                e.payment_status === 'paid' &&
-                                                receiptPayment(e)
-                                            "
-                                            as-child
-                                            size="sm"
-                                            variant="outline"
-                                            ><a
-                                                :href="`/admin/finance/payments/${receiptPayment(e).id}/receipt`"
-                                                target="_blank"
-                                                ><Printer
-                                                    class="mr-2 size-4"
-                                                />Imprimer le reçu</a
-                                            ></Button
-                                        ><Button
-                                            v-else
-                                            size="sm"
-                                            @click="open(e, 'pay')"
-                                            >Encaisser</Button
-                                        >
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </section>
-                <section v-else class="rounded-xl border bg-card">
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-sm">
-                            <thead>
-                                <tr class="border-b text-left">
-                                    <th class="p-3">Référence</th>
-                                    <th>Étudiant</th>
-                                    <th>Formation</th>
-                                    <th>Date</th>
-                                    <th>Montant</th>
-                                    <th>Caissier</th>
-                                    <th></th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr
-                                    v-for="p in payments"
-                                    :key="p.id"
-                                    class="border-b"
-                                >
-                                    <td class="p-3">
-                                        {{ p.reference }}
-                                        <div
-                                            class="text-xs text-muted-foreground"
-                                        >
-                                            {{ p.status }}
-                                        </div>
-                                    </td>
-                                    <td>
-                                        {{ p.student.first_name }}
-                                        {{ p.student.last_name }}
-                                    </td>
-                                    <td>
-                                        {{
-                                            p.enrollment.form?.course?.title ||
-                                            p.enrollment.training_plan_group
-                                                ?.plan?.course?.title ||
-                                            'Formation'
-                                        }}
-                                    </td>
-                                    <td>{{ p.payment_date }}</td>
-                                    <td
-                                        :class="
-                                            Number(p.amount) < 0
-                                                ? 'text-destructive'
-                                                : ''
-                                        "
-                                    >
-                                        {{ money(p.amount) }}
-                                    </td>
-                                    <td>{{ p.recorder?.name || 'Système' }}</td>
-                                    <td class="space-x-1">
-                                        <Button
-                                            as-child
-                                            size="sm"
-                                            variant="outline"
-                                            ><a
-                                                :href="`/admin/finance/payments/${p.id}/receipt`"
-                                                >Reçu</a
-                                            ></Button
-                                        ><Button
-                                            v-if="p.status === 'completed'"
-                                            size="sm"
-                                            variant="outline"
-                                            @click="reverse(p)"
-                                            >Contrepasser</Button
-                                        >
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </section>
+                <form class="rounded-xl border bg-card p-4 shadow-sm" @submit.prevent="filters"><div class="grid gap-3 md:grid-cols-2 xl:grid-cols-5"><div class="relative"><Search class="absolute left-3 top-2.5 size-4 text-muted-foreground"/><Input v-model="listFilters.search" class="pl-9" placeholder="Étudiant ou formation…"/></div><div class="relative"><button type="button" class="flex h-9 w-full items-center justify-between rounded-md border bg-background px-3 text-left text-sm" @click="studentOpen=!studentOpen"><span>{{selectedStudent ? `${selectedStudent.first_name} ${selectedStudent.last_name}` : 'Tous les étudiants'}}</span><ChevronsUpDown class="size-4"/></button><div v-if="studentOpen" class="absolute z-30 mt-1 w-full min-w-72 rounded-md border bg-popover p-2 shadow-lg"><div class="relative mb-2"><Search class="absolute left-3 top-2.5 size-4 text-muted-foreground"/><Input v-model="studentSearch" autofocus class="pl-9" placeholder="Rechercher…"/></div><div class="max-h-56 overflow-y-auto"><button type="button" class="flex w-full gap-2 rounded p-2 text-sm hover:bg-muted" @click="selectStudent(null)"><Check class="size-4" :class="!listFilters.student_id?'opacity-100':'opacity-0'"/>Tous les étudiants</button><button v-for="student in filteredStudents" :key="student.id" type="button" class="flex w-full gap-2 rounded p-2 text-sm hover:bg-muted" @click="selectStudent(student)"><Check class="size-4" :class="listFilters.student_id===String(student.id)?'opacity-100':'opacity-0'"/>{{student.first_name}} {{student.last_name}}</button></div></div></div><Input v-model="listFilters.month" type="month"/><select v-model="listFilters.status" class="h-9 rounded-md border bg-background px-3 text-sm"><option value="">Tous les statuts</option><option v-for="(label,key) in statuses" :key="key" :value="key">{{label}}</option></select><select v-model="listFilters.payment_method" class="h-9 rounded-md border bg-background px-3 text-sm"><option value="">Tous les moyens</option><option v-for="method in methods" :key="method.value" :value="method.value">{{method.label}}</option></select></div><div class="mt-3 flex justify-end gap-2"><Button type="button" variant="ghost" @click="clearFilters">Réinitialiser</Button><Button><Search class="mr-2 size-4"/>Appliquer</Button></div></form>
+                <section class="space-y-3"><article v-for="e in enrollments.data" :key="e.id" class="overflow-hidden rounded-xl border bg-card shadow-sm"><div class="grid gap-4 p-4 lg:grid-cols-[1.4fr_1fr_1fr_auto] lg:items-center"><div><div class="flex flex-wrap items-center gap-2"><b>{{e.student.first_name}} {{e.student.last_name}}</b><span class="rounded-full px-2 py-0.5 text-xs" :class="e.payment_status==='paid'?'bg-emerald-100 text-emerald-700':e.payment_status==='overdue'?'bg-red-100 text-red-700':'bg-amber-100 text-amber-700'">{{statuses[e.payment_status]}}</span></div><p class="text-sm text-muted-foreground">{{e.form?.course?.title || e.training_plan_group?.plan?.course?.title || 'Formation'}} · Groupe {{e.group_number || '—'}}</p></div><div><p class="text-sm text-muted-foreground">Prix final</p><b>{{money(e.final_price)}}</b><p class="text-xs text-muted-foreground">Remise {{money(e.discount_amount)}}</p></div><div><div class="h-2 overflow-hidden rounded-full bg-muted"><div class="h-full bg-emerald-500" :style="{width:`${Number(e.final_price)?Math.min(100,Number(e.total_paid)/Number(e.final_price)*100):100}%`}"></div></div><p class="mt-2 text-xs"><span class="text-emerald-600">{{money(e.total_paid)}} encaissé</span> · <span class="text-amber-600">{{money(e.remaining_balance)}} restant</span></p></div><div class="flex gap-2"><Button size="sm" variant="outline" @click="open(e,'adjust')">Ajuster</Button><Button v-if="Number(e.remaining_balance)>0" size="sm" @click="open(e,'pay')">Encaisser</Button></div></div><div v-if="e.payments?.length" class="border-t bg-muted/20 px-4 py-3"><p class="mb-2 text-xs font-semibold uppercase text-muted-foreground">Paiements et reçus</p><div class="flex flex-wrap gap-2"><div v-for="p in e.payments" :key="p.id" class="flex items-center gap-2 rounded-lg border bg-background p-2 text-sm"><a :href="`/admin/finance/payments/${p.id}/receipt`" class="flex items-center gap-2"><Download class="size-4"/><span><b :class="Number(p.amount)<0?'text-destructive':''">{{money(p.amount)}}</b><small class="block text-muted-foreground">{{p.payment_date}} · {{p.recorder?.name || 'Système'}}</small></span></a><Button v-if="p.status==='completed'" size="sm" variant="ghost" @click="reverse(p)">Contrepasser</Button></div></div></div></article><div v-if="!enrollments.data.length" class="rounded-xl border border-dashed p-12 text-center text-muted-foreground">Aucun dossier financier trouvé.</div><div v-if="enrollments.links?.length>3" class="flex justify-center gap-1"><Link v-for="link in enrollments.links" :key="link.label" :href="link.url || '#'" preserve-scroll class="rounded-md border px-3 py-2 text-sm" :class="{'bg-primary text-primary-foreground':link.active,'pointer-events-none opacity-40':!link.url}" v-html="link.label"/></div></section>
                 <div
                     v-if="mode"
                     class="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4"
@@ -342,11 +105,7 @@ function receiptPayment(enrollment: any) {
                     >
                         <h2 class="text-lg font-semibold">
                             {{
-                                mode === 'pay'
-                                    ? 'Nouveau paiement'
-                                    : mode === 'config'
-                                      ? 'Conditions financières'
-                                      : 'Ajustement manuel'
+                                mode === 'pay' ? 'Nouveau paiement' : 'Ajustement manuel'
                             }}
                         </h2>
                         <form
@@ -398,42 +157,6 @@ function receiptPayment(enrollment: any) {
                                 placeholder="Note"
                             ></textarea
                             ><Button>Enregistrer et générer le reçu</Button>
-                        </form>
-                        <form
-                            v-else-if="mode === 'config'"
-                            class="mt-4 grid gap-3"
-                            @submit.prevent="saveConfig"
-                        >
-                            <Input
-                                v-model="config.formation_price"
-                                type="number"
-                                step="0.01"
-                                placeholder="Prix formation"
-                                required
-                            /><Input
-                                v-model="config.discount_amount"
-                                type="number"
-                                step="0.01"
-                                placeholder="Remise"
-                            />
-                            <div
-                                v-for="(i, k) in config.installments"
-                                :key="k"
-                                class="grid grid-cols-2 gap-2"
-                            >
-                                <Input
-                                    v-model="i.amount"
-                                    type="number"
-                                    step="0.01"
-                                    placeholder="Montant échéance"
-                                /><Input v-model="i.due_date" type="date" />
-                            </div>
-                            <Button
-                                type="button"
-                                variant="outline"
-                                @click="addInstallment"
-                                >Ajouter une échéance</Button
-                            ><Button>Enregistrer</Button>
                         </form>
                         <form
                             v-else

@@ -58,7 +58,6 @@ Route::middleware(['auth', 'verified', 'active', 'admin'])
         Route::get('attendance',[AttendanceController::class,'index'])->name('attendance.index');
         Route::put('attendance/sessions/{session}/students',[AttendanceController::class,'students'])->name('attendance.students');
         Route::patch('attendance/sessions/{session}/validate',[AttendanceController::class,'validateSheet'])->name('attendance.validate');
-        Route::patch('attendance/sessions/{session}/reopen',[AttendanceController::class,'reopen'])->name('attendance.reopen');
         Route::put('attendance/sessions/{session}/teacher',[AttendanceController::class,'teacher'])->name('attendance.teacher');
         Route::put('attendance/teachers/bulk',[AttendanceController::class,'teachersBulk'])->name('attendance.teachers.bulk');
         Route::put('attendance/employees',[AttendanceController::class,'employee'])->name('attendance.employee');
@@ -111,6 +110,7 @@ Route::middleware(['auth', 'verified', 'active', 'admin'])
         Route::get('reports/export/{format}',[ReportsController::class,'export'])->whereIn('format',['csv','pdf'])->name('reports.export');
         Route::get('audit',AuditController::class)->name('audit.index');
         Route::get('finance', [StudentFinanceController::class, 'index'])->name('finance.index');
+        Route::get('finance/settings', [StudentFinanceController::class, 'settings'])->name('finance.settings');
         Route::get('badges', [BadgesController::class, 'index'])->name('badges.index');
         Route::post('badges', [BadgesController::class, 'store'])->name('badges.store');
         Route::patch('badges/{badge}/status', [BadgesController::class, 'status'])->name('badges.status');
@@ -138,9 +138,15 @@ Route::middleware(['auth', 'verified', 'active', 'admin'])
         Route::delete('expenses/{expense}', [ExpensesController::class, 'destroy'])->name('expenses.destroy');
         Route::get('salaries', [SalariesController::class, 'index'])->name('salaries.index');
         Route::post('salaries', [SalariesController::class, 'storeLegacy'])->name('salaries.store');
+        Route::get('salaries/configurations', [SalariesController::class, 'configurations'])->name('salaries.configurations.index');
         Route::post('salaries/configurations', [SalariesController::class, 'storeConfiguration'])->name('salaries.configurations.store');
+        Route::put('salaries/configurations/{configuration}', [SalariesController::class, 'updateConfiguration'])->name('salaries.configurations.update');
+        Route::delete('salaries/configurations/{configuration}', [SalariesController::class, 'destroyConfiguration'])->name('salaries.configurations.destroy');
+        Route::get('salaries/attendance-preview', [SalariesController::class, 'attendancePreview'])->name('salaries.attendance-preview');
         Route::post('salaries/generate', [SalariesController::class, 'generate'])->name('salaries.generate');
         Route::post('salaries/{statement}/payments', [SalariesController::class, 'pay'])->name('salaries.payments.store');
+        Route::get('salaries/payments/{payment}/receipt', [SalariesController::class, 'paymentReceipt'])->name('salaries.payments.receipt');
+        Route::delete('salaries/{statement}', [SalariesController::class, 'destroy'])->name('salaries.destroy');
         Route::get('salaries/{statement}/print', [SalariesController::class, 'print'])->name('salaries.print');
         Route::get('planifications', [TrainingPlansController::class, 'index'])->name('training-plans.index');
         Route::post('planifications', [TrainingPlansController::class, 'store'])->name('training-plans.store');

@@ -7,7 +7,9 @@ use App\Models\Classroom;
 use App\Models\Course;
 use App\Models\CourseEnrollment;
 use App\Models\EnrollmentForm;
+use App\Models\EmployeeType;
 use App\Models\SchoolSite;
+use App\Models\Staff;
 use App\Models\Student;
 use App\Models\TrainingPlan;
 use App\Models\User;
@@ -93,6 +95,7 @@ class SchoolDemoSeeder extends Seeder
     private function seedStaff(): array
     {
         $password = Hash::make('password');
+        $employeeTypes = EmployeeType::query()->whereIn('slug', ['teacher', 'other'])->pluck('id', 'slug');
         $staff = [
             ['Yacine Benali', 'yacine.benali@easyschool.test', '0550 10 10 01', UserRole::TEACHER, 'Formateur Développement Web', true],
             ['Sonia Khelifi', 'sonia.khelifi@easyschool.test', '0550 10 10 02', UserRole::TEACHER, 'Formatrice Design Graphique', true],
@@ -103,10 +106,19 @@ class SchoolDemoSeeder extends Seeder
         ];
         $result = [];
         foreach ($staff as [$name, $email, $phone, $role, $job, $canLogin]) {
-            $result[$email] = User::updateOrCreate(['email' => $email], [
+            $user = User::updateOrCreate(['email' => $email], [
                 'name' => $name, 'phone' => $phone, 'password' => $password, 'role' => $role,
                 'job_title' => $job, 'is_active' => true, 'can_login' => $canLogin, 'email_verified_at' => now(),
             ]);
+            $parts = preg_split('/\s+/', trim($name), 2);
+            Staff::updateOrCreate(['user_id' => $user->id], [
+                'employee_type_id' => $employeeTypes[$role === UserRole::TEACHER ? 'teacher' : 'other'],
+                'first_name' => $parts[0], 'last_name' => $parts[1] ?? '',
+                'email' => $email, 'phone' => $phone, 'employment_status' => 'active',
+                'employee_code' => 'EMP-'.str_pad((string) $user->id, 6, '0', STR_PAD_LEFT),
+                'notes' => $job,
+            ]);
+            $result[$email] = $user;
         }
         return $result;
     }

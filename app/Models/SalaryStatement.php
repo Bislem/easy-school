@@ -18,4 +18,5 @@ class SalaryStatement extends Model
     public function adjustments(): HasMany { return $this->hasMany(SalaryAdjustment::class); }
     public function generator(): BelongsTo { return $this->belongsTo(User::class,'generated_by'); }
     public function teacherAttendances(): BelongsToMany { return $this->belongsToMany(TeacherAttendance::class,'salary_statement_teacher_attendances')->withTimestamps(); }
+    public function employeeAttendances(): BelongsToMany { return $this->belongsToMany(EmployeeAttendance::class,'salary_statement_employee_attendances')->withTimestamps(); }
 }

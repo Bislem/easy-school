@@ -61,6 +61,7 @@ interface Session {
     ends_at: string;
     notes?: string | null;
     status: 'planned' | 'completed' | 'cancelled';
+    attendance_status: 'pending' | 'completed' | 'validated';
     classroom: Option;
     teacher: Option;
     attendances: { student_id: number; status: string; notes?: string | null }[];
@@ -126,6 +127,9 @@ const rosterGroup = ref<Group | null>(null);
 const editingEnrollment = ref<Enrollment | null>(null);
 const attendanceDialog = ref(false);
 const attendanceSession = ref<Session | null>(null);
+const attendanceReadOnly = computed(
+    () => attendanceSession.value?.attendance_status !== 'pending',
+);
 const studentSearch = ref('');
 const groupForm = useForm({ name: '', classroom_id: '', capacity: '' });
 const sessionForm = useForm({
@@ -145,7 +149,10 @@ const settingsForm = useForm({
 const addStudentForm = useForm<{ student_ids: number[] }>({ student_ids: [] });
 const studentForm = useForm({ first_name: '', last_name: '', email: '', phone: '', parent_phone: '', school_level: '', notes: '' });
 const moveForm = useForm({ training_plan_group_id: '' });
-const attendanceForm = useForm<{ attendances: Record<number, string> }>({ attendances: {} });
+const attendanceForm = useForm<{
+    attendances: Record<number, string>;
+    validate_session: boolean;
+}>({ attendances: {}, validate_session: false });
 const attendanceSelectedIds = ref<number[]>([]);
 const filteredStudents = computed(() => {
     const search = studentSearch.value.trim().toLocaleLowerCase('fr');
@@ -259,10 +266,25 @@ function deleteSession(group: Group, session: Session) {
         );
 }
 function completeSession(group: Group, session: Session) {
+    if (
+        !window.confirm(
+            'Cette validation est définitive. Confirmer la séance et les présences ?',
+        )
+    )
+        return;
     router.patch(
         `/admin/planifications/${props.plan.id}/groupes/${group.id}/seances/${session.id}/complete`,
         {},
-        { preserveScroll: true },
+        {
+            preserveScroll: true,
+            onError: (errors) =>
+                window.alert(
+                    String(
+                        Object.values(errors)[0] ??
+                            'La validation de la séance a échoué.',
+                    ),
+                ),
+        },
     );
 }
 function submitSettings() {
@@ -345,6 +367,9 @@ function applyAttendanceStatus(status: string) {
 }
 function saveAttendance() {
     if (!rosterGroup.value || !attendanceSession.value) return;
+    attendanceForm.validate_session = window.confirm(
+        'Voulez-vous aussi valider définitivement cette séance ? Le formateur sera marqué présent et les présences seront verrouillées.',
+    );
     attendanceForm.put(`/admin/planifications/${props.plan.id}/groupes/${rosterGroup.value.id}/seances/${attendanceSession.value.id}/presences`, {
         preserveScroll: true,
         onSuccess: () => (attendanceDialog.value = false),
@@ -575,12 +600,15 @@ watch(() => props.plan.groups, (groups) => {
                                 <Button
                                     size="icon"
                                     variant="ghost"
-                                    title="Saisir les présences"
+                                    :title="session.attendance_status === 'pending' ? 'Saisir les présences' : 'Voir les présences'"
                                     @click="openAttendance(group, session)"
                                     ><ClipboardCheck class="size-4"
                                 /></Button>
                                 <Button
-                                    v-if="session.status !== 'completed'"
+                                    v-if="
+                                        session.status !== 'completed' &&
+                                        session.attendance_status === 'completed'
+                                    "
                                     size="icon"
                                     variant="ghost"
                                     title="Marquer terminée"
@@ -588,11 +616,13 @@ watch(() => props.plan.groups, (groups) => {
                                     ><CircleCheck class="size-4 text-green-600"
                                 /></Button>
                                 <Button
+                                    v-if="session.attendance_status !== 'validated' && session.status !== 'completed'"
                                     size="icon"
                                     variant="ghost"
                                     @click="openSession(group, session)"
                                     ><Pencil class="size-4" /></Button
                                 ><Button
+                                    v-if="session.attendance_status !== 'validated' && session.status !== 'completed'"
                                     size="icon"
                                     variant="ghost"
                                     class="text-destructive"
@@ -1008,11 +1038,11 @@ watch(() => props.plan.groups, (groups) => {
         <Dialog v-model:open="attendanceDialog">
             <DialogScrollContent class="max-w-2xl">
                 <DialogHeader>
-                    <DialogTitle>Présences · {{ attendanceSession?.title }}</DialogTitle>
-                    <DialogDescription>{{ rosterGroup?.name }} · les valeurs déjà enregistrées restent modifiables.</DialogDescription>
+                    <DialogTitle>{{ attendanceReadOnly ? 'Présences enregistrées' : 'Saisir les présences' }} · {{ attendanceSession?.title }}</DialogTitle>
+                    <DialogDescription>{{ rosterGroup?.name }} · {{ attendanceReadOnly ? 'consultation en lecture seule' : 'sélectionnez le statut de chaque étudiant' }}.</DialogDescription>
                 </DialogHeader>
                 <form v-if="rosterGroup" class="space-y-4" @submit.prevent="saveAttendance">
-                    <div class="flex flex-wrap items-center gap-2 rounded-lg border bg-muted/20 p-3">
+                    <div v-if="!attendanceReadOnly" class="flex flex-wrap items-center gap-2 rounded-lg border bg-muted/20 p-3">
                         <Button type="button" size="sm" variant="outline" @click="toggleAllAttendance">{{ attendanceSelectedIds.length===rosterGroup.enrollments.length?'Tout désélectionner':'Tout sélectionner' }}</Button>
                         <span class="mr-auto text-sm text-muted-foreground">{{ attendanceSelectedIds.length }} sélectionné(s)</span>
                         <Button type="button" size="sm" class="bg-emerald-600 hover:bg-emerald-700" :disabled="!attendanceSelectedIds.length" @click="applyAttendanceStatus('present')">Présents</Button>
@@ -1022,15 +1052,18 @@ watch(() => props.plan.groups, (groups) => {
                     </div>
                     <div class="overflow-hidden rounded-lg border">
                         <div v-for="enrollment in rosterGroup.enrollments" :key="enrollment.id" class="grid grid-cols-[32px_1fr_150px] items-center gap-3 border-b p-3 last:border-0" :class="attendanceSelectedIds.includes(enrollment.student_id)?'bg-primary/5':''">
-                            <input type="checkbox" :checked="attendanceSelectedIds.includes(enrollment.student_id)" class="size-4" @change="toggleAttendanceStudent(enrollment.student_id)" />
+                            <input type="checkbox" :checked="attendanceSelectedIds.includes(enrollment.student_id)" :disabled="attendanceReadOnly" class="size-4 disabled:opacity-40" @change="toggleAttendanceStudent(enrollment.student_id)" />
                             <span class="flex items-center gap-2 font-medium"><img v-if="enrollment.student.photo_url" :src="enrollment.student.photo_url" class="size-8 rounded-full object-cover"/>{{ studentName(enrollment.student) }}</span>
-                            <select v-model="attendanceForm.attendances[enrollment.student_id]" class="h-9 rounded-md border bg-background px-2 text-sm">
+                            <select v-model="attendanceForm.attendances[enrollment.student_id]" :disabled="attendanceReadOnly" class="h-9 rounded-md border bg-background px-2 text-sm disabled:cursor-default disabled:opacity-100">
                                 <option value="present">Présent</option><option value="absent">Absent</option><option value="late">En retard</option><option value="excused">Excusé</option>
                             </select>
                         </div>
                         <p v-if="!rosterGroup.enrollments.length" class="p-8 text-center text-sm text-muted-foreground">Ajoutez d’abord des étudiants au groupe.</p>
                     </div>
-                    <DialogFooter><Button :disabled="attendanceForm.processing || !rosterGroup.enrollments.length">Enregistrer les présences</Button></DialogFooter>
+                    <template v-if="!attendanceReadOnly">
+                        <InputError :message="Object.values(attendanceForm.errors)[0]" />
+                        <DialogFooter><Button :disabled="attendanceForm.processing || !rosterGroup.enrollments.length">Enregistrer les présences</Button></DialogFooter>
+                    </template>
                 </form>
             </DialogScrollContent>
         </Dialog>

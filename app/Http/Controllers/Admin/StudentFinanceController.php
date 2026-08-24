@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Models\CompanySetting;
 use App\Models\CourseEnrollment;
 use App\Models\StudentPayment;
+use App\Models\Student;
 use App\Services\EnrollmentFinanceService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\RedirectResponse;
@@ -25,13 +26,26 @@ class StudentFinanceController extends Controller
     public function index(Request $request): Response
     {
         CourseEnrollment::whereNotNull('student_id')->with(['form.course', 'trainingPlanGroup.plan.course', 'installments', 'payments'])->each(fn($enrollment) => $this->finance->refresh($enrollment));
-        $enrollments = CourseEnrollment::with(['student:id,first_name,last_name', 'form.course:id,title,price', 'trainingPlanGroup.plan.course', 'installments', 'payments:id,course_enrollment_id,status,payment_date'])
+        $query = CourseEnrollment::with(['student:id,first_name,last_name', 'form.course:id,title,price', 'trainingPlanGroup.plan.course', 'installments', 'payments' => fn ($query) => $query->with('recorder:id,name')->latest('payment_date')])
             ->whereNotNull('student_id')->when($request->filled('status'), fn($q)=>$q->where('payment_status', $request->string('status')))
-            ->when($request->filled('search'), function($q) use ($request) { $search=$request->string('search'); $q->whereHas('student', fn($s)=>$s->where('first_name','like',"%{$search}%")->orWhere('last_name','like',"%{$search}%")); })
-            ->latest('registered_at')->paginate(20)->withQueryString();
-        $payments = StudentPayment::with(['student:id,first_name,last_name', 'enrollment.form.course:id,title', 'enrollment.trainingPlanGroup.plan.course', 'recorder:id,name'])->latest('payment_date')->limit(100)->get();
-        $expected=(float) CourseEnrollment::whereNotNull('student_id')->sum('final_price'); $collected=(float) CourseEnrollment::whereNotNull('student_id')->sum('total_paid');
-        return Inertia::render('Admin/Finance/Index', ['enrollments'=>$enrollments, 'payments'=>$payments, 'methods'=>collect(PaymentMethod::cases())->map(fn($m)=>['value'=>$m->value,'label'=>$m->label()]), 'filters'=>$request->only(['search','status']), 'stats'=>['expected'=>$expected,'collected'=>$collected,'remaining'=>max(0,$expected-$collected),'overdue'=>(float)CourseEnrollment::where('payment_status','overdue')->sum('remaining_balance')], 'currency'=>['symbol'=>config('app.currency_symbol'),'code'=>config('app.currency_code')]]);
+            ->when($request->filled('student_id'), fn ($q) => $q->where('student_id', $request->integer('student_id')))
+            ->when($request->filled('search'), function($q) use ($request) { $search=$request->string('search')->trim(); $q->where(function ($q) use ($search) { $q->whereHas('student', fn($s)=>$s->where('first_name','like',"%{$search}%")->orWhere('last_name','like',"%{$search}%"))->orWhereHas('form.course', fn ($course) => $course->where('title', 'like', "%{$search}%")); }); })
+            ->when($request->filled('month'), fn ($q) => $q->whereHas('payments', fn ($payments) => $payments->whereBetween('payment_date', [$request->string('month').'-01', date('Y-m-t', strtotime($request->string('month').'-01'))])))
+            ->when($request->filled('payment_method'), fn ($q) => $q->whereHas('payments', fn ($payments) => $payments->where('payment_method', $request->string('payment_method'))));
+        $statsQuery = clone $query;
+        $expected=(float) (clone $statsQuery)->sum('final_price'); $collected=(float) (clone $statsQuery)->sum('total_paid');
+        $enrollments = $query->latest('registered_at')->paginate(20)->withQueryString();
+        return Inertia::render('Admin/Finance/Index', ['enrollments'=>$enrollments, 'students'=>Student::whereHas('enrollments')->orderBy('first_name')->orderBy('last_name')->get(['id','first_name','last_name']), 'methods'=>collect(PaymentMethod::cases())->map(fn($m)=>['value'=>$m->value,'label'=>$m->label()]), 'filters'=>$request->only(['search','student_id','status','month','payment_method']), 'stats'=>['expected'=>$expected,'collected'=>$collected,'remaining'=>(float)(clone $statsQuery)->sum('remaining_balance'),'overdue'=>(float)(clone $statsQuery)->where('payment_status','overdue')->sum('remaining_balance')], 'currency'=>['symbol'=>config('app.currency_symbol'),'code'=>config('app.currency_code')]]);
+    }
+
+    public function settings(Request $request): Response
+    {
+        $enrollments = CourseEnrollment::with(['student:id,first_name,last_name', 'form.course:id,title,price', 'trainingPlanGroup.plan.course', 'installments'])
+            ->whereNotNull('student_id')
+            ->when($request->filled('search'), function ($query) use ($request) { $search = $request->string('search')->trim(); $query->whereHas('student', fn ($student) => $student->where('first_name', 'like', "%{$search}%")->orWhere('last_name', 'like', "%{$search}%")); })
+            ->latest('registered_at')->paginate(18)->withQueryString();
+
+        return Inertia::render('Admin/Finance/Settings', ['enrollments' => $enrollments, 'filters' => $request->only('search'), 'currency' => ['symbol' => config('app.currency_symbol'), 'code' => config('app.currency_code')]]);
     }
 
     public function configure(Request $request, CourseEnrollment $enrollment): RedirectResponse

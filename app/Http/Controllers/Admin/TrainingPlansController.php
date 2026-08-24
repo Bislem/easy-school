@@ -178,7 +178,7 @@ class TrainingPlansController extends Controller
     {
         $this->ensureGroup($trainingPlan, $group);
         abort_unless($session->training_plan_group_id === $group->id, 404);
-        abort_if($session->status === 'completed', 422, 'Une séance terminée ne peut plus être modifiée car elle peut être utilisée par la paie.');
+        abort_if($session->status === 'completed' || $session->attendance_locked_at || $session->attendance_status === 'validated', 422, 'Une séance validée définitivement ne peut plus être modifiée.');
         $validated = $this->validateSession($request, $trainingPlan, $group);
         if(! $session->starts_at->equalTo(\Carbon\Carbon::parse($validated['starts_at'])) || ! $session->ends_at->equalTo(\Carbon\Carbon::parse($validated['ends_at']))) $validated['status']='postponed';
         $this->assertNoConflict($validated, $session);
@@ -192,7 +192,7 @@ class TrainingPlansController extends Controller
     {
         $this->ensureGroup($trainingPlan, $group);
         abort_unless($session->training_plan_group_id === $group->id, 404);
-        abort_if($session->status === 'completed', 422, 'Une séance terminée ne peut plus être supprimée car elle peut être utilisée par la paie.');
+        abort_if($session->status === 'completed' || $session->attendance_locked_at || $session->attendance_status === 'validated', 422, 'Une séance validée définitivement ne peut plus être supprimée.');
         $this->notifySessionAudience($trainingPlan,$group,$session,'session.cancelled','Séance annulée','Une séance de '.$trainingPlan->title.' a été annulée.');$session->update(['status'=>'cancelled']);
         return back()->with('success', 'Séance annulée et conservée dans l’historique.');
     }
@@ -201,9 +201,8 @@ class TrainingPlansController extends Controller
     {
         $this->ensureGroup($trainingPlan,$group); abort_unless($session->training_plan_group_id===$group->id,404);
         abort_if($session->status==='cancelled',422,'Une séance annulée ne peut pas être terminée.');
-        abort_if($session->ends_at->isFuture() && ! app()->environment(['local', 'testing']),422,'Une séance future ne peut pas être marquée comme terminée.');
         app(AttendanceService::class)->validate($session, $request->user()->id);
-        return back()->with('success','Séance et présences validées. Les heures du formateur sont disponibles pour la paie.');
+        return back()->with('success','Séance validée définitivement. Le formateur est marqué présent et ses heures sont disponibles pour la paie.');
     }
 
     public function addStudent(Request $request, TrainingPlan $trainingPlan, TrainingPlanGroup $group): RedirectResponse
@@ -282,10 +281,17 @@ class TrainingPlansController extends Controller
     {
         $this->ensureGroup($trainingPlan, $group);
         abort_unless($session->training_plan_group_id === $group->id, 404);
-        $validated = $request->validate(['attendances' => ['required', 'array'], 'attendances.*' => ['required', Rule::in(['present', 'absent', 'late', 'excused'])]]);
+        if ($session->attendance_status !== 'pending' || $session->attendances()->exists()) {
+            throw ValidationException::withMessages(['attendance' => 'Les présences ont déjà été saisies. Toute correction doit être effectuée dans le module Présences avec un justificatif.']);
+        }
+        $validated = $request->validate(['attendances' => ['required', 'array'], 'attendances.*' => ['required', Rule::in(['present', 'absent', 'late', 'excused'])], 'validate_session' => ['sometimes', 'boolean']]);
         $records=collect($validated['attendances'])->map(fn($status,$studentId)=>['student_id'=>(int)$studentId,'status'=>$status])->values()->all();
-        app(AttendanceService::class)->recordStudents($session,$records,$request->user()->id,null,true);
-        return back()->with('success', 'Présences enregistrées.');
+        app(AttendanceService::class)->recordStudents($session,$records,$request->user()->id);
+        if ($validated['validate_session'] ?? false) {
+            app(AttendanceService::class)->validate($session, $request->user()->id);
+            return back()->with('success', 'Présences et séance validées définitivement. Le formateur est marqué présent.');
+        }
+        return back()->with('success', 'Présences enregistrées une fois. La séance reste à valider.');
     }
 
     private function notifySessionAudience(TrainingPlan $plan,TrainingPlanGroup $group,TrainingSession $session,string $type,string $title,string $message): void

@@ -11,6 +11,7 @@ use App\Models\SalaryStatement;
 use App\Models\Staff;
 use App\Models\User;
 use App\Models\EmployeeType;
+use App\Models\CompanySetting;
 use App\Enums\UserRole;
 use App\Services\SalaryCalculator;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -23,6 +24,7 @@ use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 use Symfony\Component\HttpFoundation\Response as HttpResponse;
+use Illuminate\Http\JsonResponse;
 
 class SalariesController extends Controller
 {
@@ -32,27 +34,88 @@ class SalariesController extends Controller
     {
         $personnel = User::whereIn('role', [UserRole::TEACHER->value, UserRole::EMPLOYEE->value])
             ->with('staff.employeeType:id,name,is_teacher')->orderBy('name')->get();
-        $statements = SalaryStatement::with(['staff.employeeType:id,name','payments','adjustments'])
+        $period = null;
+        if (preg_match('/^\d{4}-\d{2}$/', $request->string('period')->toString())) {
+            try {
+                $period = Carbon::createFromFormat('!Y-m', $request->string('period')->toString());
+            } catch (\Throwable) {
+                $period = null;
+            }
+        }
+
+        $statementQuery = SalaryStatement::query()
+            ->with(['staff.employeeType:id,name','payments' => fn ($query) => $query->latest('paid_at'),'adjustments'])
+            ->when($request->string('search')->trim()->toString(), function ($query, $search) {
+                $query->where(function ($query) use ($search) {
+                    $query->where('reference', 'like', "%{$search}%")
+                        ->orWhereHas('staff', fn ($staff) => $staff
+                            ->where('first_name', 'like', "%{$search}%")
+                            ->orWhere('last_name', 'like', "%{$search}%")
+                            ->orWhere('employee_code', 'like', "%{$search}%"));
+                });
+            })
             ->when($request->filled('staff_id'), fn($q)=>$q->where('staff_id',$request->integer('staff_id')))
             ->when($request->string('status')->toString(), fn($q,$status)=>$q->where('status',$status))
-            ->when($request->string('period')->toString(), fn($q,$period)=>$q->whereDate('period_start','<=',$period.'-31')->whereDate('period_end','>=',$period.'-01'))
-            ->latest('period_end')->paginate(15)->withQueryString();
+            ->when($request->string('salary_type')->toString(), fn($q,$type)=>$q->where('salary_type',$type))
+            ->when($period, fn($q,$month)=>$q->whereDate('period_start','<=',$month->copy()->endOfMonth())->whereDate('period_end','>=',$month->copy()->startOfMonth()));
+
+        $summaryQuery = clone $statementQuery;
+        $summary = [
+            'statements' => (clone $summaryQuery)->count(),
+            'net' => (float) (clone $summaryQuery)->sum('net_salary'),
+            'paid' => (float) (clone $summaryQuery)->sum('amount_paid'),
+            'remaining' => (float) (clone $summaryQuery)->sum('remaining_amount'),
+            'hours' => (float) (clone $summaryQuery)->get()->sum(fn ($salary) => (float) data_get($salary->calculation_details, 'attendance_worked_hours', 0)),
+        ];
+        $statements = $statementQuery->latest('period_end')->latest('id')->paginate(15)->withQueryString();
         return Inertia::render('Admin/Salaries/Index', [
             'statements'=>$statements,
+            'summary'=>$summary,
             'configurations'=>SalaryConfiguration::latest('effective_from')->get(),
-            'payments'=>SalaryPayment::with(['staff.employeeType:id,name','statement:id,reference,period_start,period_end'])->latest('paid_at')->limit(100)->get(),
+            'payments'=>SalaryPayment::with(['staff.employeeType:id,name','statement:id,reference,period_start,period_end,salary_type,base_rate,units,gross_salary,bonuses,deductions,advances,exceptional_payments,reimbursements,net_salary,amount_paid,remaining_amount,status,calculation_details'])->latest('paid_at')->limit(100)->get(),
             'employees'=>$personnel->pluck('staff')->filter()->values(),
             'salaryTypes'=>collect(SalaryType::cases())->map(fn($type)=>$type->value),
-            'filters'=>$request->only(['staff_id','status','period']),
+            'filters'=>$request->only(['search','staff_id','status','period','salary_type']),
             'currency'=>['symbol'=>config('app.currency_symbol'),'code'=>config('app.currency_code')],
         ]);
     }
 
     public function storeConfiguration(Request $request): RedirectResponse
     {
-        $data=$request->validate(['name'=>['required','string','max:150'],'salary_type'=>['required',Rule::enum(SalaryType::class)],'base_rate'=>['required','numeric','min:0'],'effective_from'=>['required','date'],'effective_to'=>['nullable','date','after_or_equal:effective_from'],'notes'=>['nullable','string','max:5000']]);
+        $data=$this->validateConfiguration($request);
         SalaryConfiguration::create($data);
         return back()->with('success','Configuration salariale enregistrée.');
+    }
+
+    public function configurations(): Response
+    {
+        return Inertia::render('Admin/Salaries/Configurations', [
+            'configurations' => SalaryConfiguration::withCount('statements')->latest('effective_from')->get(),
+            'salaryTypes' => collect(SalaryType::cases())->map(fn ($type) => $type->value),
+            'currency' => ['symbol' => config('app.currency_symbol'), 'code' => config('app.currency_code')],
+        ]);
+    }
+
+    public function updateConfiguration(Request $request, SalaryConfiguration $configuration): RedirectResponse
+    {
+        $configuration->update($this->validateConfiguration($request));
+
+        return back()->with('success', 'Configuration salariale mise à jour.');
+    }
+
+    public function destroyConfiguration(SalaryConfiguration $configuration): RedirectResponse
+    {
+        if ($configuration->statements()->exists()) {
+            throw ValidationException::withMessages(['configuration' => 'Cette configuration est déjà utilisée par des bulletins et ne peut pas être supprimée. Vous pouvez modifier sa date de fin.']);
+        }
+        $configuration->delete();
+
+        return back()->with('success', 'Configuration salariale supprimée.');
+    }
+
+    private function validateConfiguration(Request $request): array
+    {
+        return $request->validate(['name'=>['required','string','max:150'],'salary_type'=>['required',Rule::enum(SalaryType::class)],'base_rate'=>['required','numeric','min:0'],'effective_from'=>['required','date'],'effective_to'=>['nullable','date','after_or_equal:effective_from'],'notes'=>['nullable','string','max:5000']]);
     }
 
     public function storeLegacy(Request $request): RedirectResponse
@@ -78,10 +141,40 @@ class SalariesController extends Controller
             $net=max(0,$calculation['gross']+$bonuses+$exceptional+$reimbursements-$deductions-$advances);
             $statement=SalaryStatement::create(['staff_id'=>$staff->id,'salary_configuration_id'=>$configuration->id,'reference'=>'SAL-'.$start->format('Ym').'-'.$staff->employee_code.'-'.str()->upper(str()->random(4)),'period_start'=>$start,'period_end'=>$end,'salary_type'=>$configuration->salary_type,'base_rate'=>$configuration->base_rate,'units'=>$calculation['units'],'gross_salary'=>$calculation['gross'],'bonuses'=>$bonuses,'deductions'=>$deductions,'advances'=>$advances,'exceptional_payments'=>$exceptional,'reimbursements'=>$reimbursements,'net_salary'=>$net,'amount_paid'=>0,'remaining_amount'=>$net,'status'=>$net>0?'pending':'paid','calculation_details'=>$calculation['details'],'notes'=>$data['notes']??null,'generated_by'=>$request->user()->id]);
             $statement->teacherAttendances()->attach($calculation['details']['teacher_attendance_ids']);
+            $statement->employeeAttendances()->attach($calculation['details']['employee_attendance_ids']);
             foreach($adjustments as $adjustment)$statement->adjustments()->create($adjustment);
             return $statement;
         });
         return back()->with('success','Bulletin '.$statement->reference.' calculé.');
+    }
+
+    public function attendancePreview(Request $request): JsonResponse
+    {
+        $data = $request->validate(['staff_id'=>['required','exists:staff,id'],'salary_configuration_id'=>['required','exists:salary_configurations,id'],'period'=>['required','date_format:Y-m']]);
+        $staff = Staff::findOrFail($data['staff_id']);
+        $configuration = SalaryConfiguration::findOrFail($data['salary_configuration_id']);
+        $start = Carbon::createFromFormat('Y-m', $data['period'])->startOfMonth();
+        $end = $start->copy()->endOfMonth();
+        $available = $this->calculator->attendanceSnapshot($staff, $start, $end);
+        $monthlyTotal = $this->calculator->attendanceSnapshot($staff, $start, $end, false);
+
+        return response()->json([
+            'salary_type' => $configuration->salary_type->value,
+            'monthly_worked_hours' => $monthlyTotal['worked_hours'],
+            'available_worked_hours' => $available['worked_hours'],
+            'already_accounted_hours' => round($monthlyTotal['worked_hours'] - $available['worked_hours'], 2),
+        ]);
+    }
+
+    public function destroy(SalaryStatement $statement): RedirectResponse
+    {
+        if ($statement->payments()->exists() || (float) $statement->amount_paid > 0) {
+            throw ValidationException::withMessages(['statement' => 'Un bulletin payé, même partiellement, ne peut pas être supprimé.']);
+        }
+        $reference = $statement->reference;
+        $statement->delete();
+
+        return back()->with('success', "Calcul {$reference} supprimé. Ses pointages sont à nouveau disponibles.");
     }
 
     public function pay(Request $request, SalaryStatement $statement): RedirectResponse
@@ -103,5 +196,16 @@ class SalariesController extends Controller
     {
         $statement->load(['staff.employeeType','payments','adjustments','configuration','teacherAttendances.scheduledTeacher:id,name','teacherAttendances.actualTeacher:id,name','teacherAttendances.session.group.plan.course','teacherAttendances.session.group.plan.level']);
         return Pdf::loadView('admin.salaries.statement',['statement'=>$statement,'currency'=>config('app.currency_symbol')])->download($statement->reference.'.pdf');
+    }
+
+    public function paymentReceipt(SalaryPayment $payment): HttpResponse
+    {
+        $payment->load(['staff.employeeType', 'statement.configuration', 'statement.adjustments', 'creator:id,name']);
+
+        return Pdf::loadView('admin.salaries.payment-receipt', [
+            'payment' => $payment,
+            'school' => CompanySetting::current(),
+            'currency' => config('app.currency_symbol'),
+        ])->download('recu-salaire-'.$payment->paid_at->format('Ymd').'-'.$payment->id.'.pdf');
     }
 }

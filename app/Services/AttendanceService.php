@@ -23,7 +23,7 @@ class AttendanceService
         if ($session->attendance_locked_at && ! $canCorrectLocked) {
             throw ValidationException::withMessages(['attendance' => 'Cette feuille est validée et verrouillée.']);
         }
-        if ($session->attendance_locked_at && blank($correctionReason)) {
+        if (($session->attendance_status !== 'pending' || $session->attendances()->exists()) && blank($correctionReason)) {
             throw ValidationException::withMessages(['correction_reason' => 'Le motif de correction est obligatoire.']);
         }
         $allowed = $this->roster($session)->keyBy('student_id');
@@ -43,30 +43,36 @@ class AttendanceService
 
     public function validate(TrainingSession $session, int $userId): void
     {
-        if (! $session->attendances()->exists()) throw ValidationException::withMessages(['attendance'=>'Saisissez les présences avant validation.']);
         DB::transaction(function () use ($session, $userId) {
             $session = TrainingSession::lockForUpdate()->findOrFail($session->id);
-            $teacherAttendance = TeacherAttendance::firstOrNew(['training_session_id' => $session->id]);
-
-            if (! $teacherAttendance->exists) {
-                $teacherAttendance->fill([
-                    'scheduled_teacher_id' => $session->teacher_id,
-                    'actual_teacher_id' => $session->teacher_id,
-                    'status' => 'present',
-                    'worked_minutes' => $session->starts_at->diffInMinutes($session->ends_at),
-                    'recorded_by' => $userId,
-                    'validated_at' => now(),
-                    'validated_by' => $userId,
-                ])->save();
-                $teacherAttendance->histories()->create([
-                    'user_id' => $userId,
-                    'event' => 'created_on_session_validation',
-                    'new_values' => $teacherAttendance->getAttributes(),
-                    'occurred_at' => now(),
-                ]);
-            } elseif (! $teacherAttendance->validated_at) {
-                $teacherAttendance->update(['validated_at' => now(), 'validated_by' => $userId]);
+            if ($session->status === 'completed' || $session->attendance_locked_at) {
+                throw ValidationException::withMessages(['attendance' => 'Cette séance est déjà validée définitivement.']);
             }
+            if (! $session->attendances()->exists()) {
+                throw ValidationException::withMessages(['attendance' => 'Saisissez les présences avant validation.']);
+            }
+
+            $teacherAttendance = TeacherAttendance::firstOrNew(['training_session_id' => $session->id]);
+            $old = $teacherAttendance->exists ? $teacherAttendance->getAttributes() : null;
+            $teacherAttendance->fill([
+                'scheduled_teacher_id' => $session->teacher_id,
+                'actual_teacher_id' => $session->teacher_id,
+                'status' => 'present',
+                'worked_minutes' => $session->starts_at->diffInMinutes($session->ends_at),
+                'is_justified' => false,
+                'justification' => null,
+                'recorded_by' => $userId,
+                'validated_at' => now(),
+                'validated_by' => $userId,
+            ])->save();
+            $teacherAttendance->histories()->create([
+                'user_id' => $userId,
+                'event' => 'validated_with_session',
+                'old_values' => $old,
+                'new_values' => $teacherAttendance->getAttributes(),
+                'reason' => 'Validation définitive depuis la planification.',
+                'occurred_at' => now(),
+            ]);
 
             $session->update([
                 'status' => 'completed',
@@ -78,9 +84,4 @@ class AttendanceService
         });
     }
 
-    public function reopen(TrainingSession $session, int $userId, string $reason): void
-    {
-        $session->attendances->each(fn($attendance)=>$attendance->histories()->create(['user_id'=>$userId,'event'=>'reopened','reason'=>$reason,'occurred_at'=>now()]));
-        $session->update(['attendance_status'=>'completed','attendance_locked_at'=>null,'attendance_locked_by'=>null]);
-    }
 }
