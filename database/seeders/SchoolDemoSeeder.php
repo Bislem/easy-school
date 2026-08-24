@@ -7,9 +7,11 @@ use App\Models\Classroom;
 use App\Models\Course;
 use App\Models\CourseEnrollment;
 use App\Models\EnrollmentForm;
+use App\Models\SchoolSite;
 use App\Models\Student;
 use App\Models\TrainingPlan;
 use App\Models\User;
+use Faker\Factory as Faker;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -21,7 +23,8 @@ class SchoolDemoSeeder extends Seeder
     {
         DB::transaction(function () {
             $teachers = $this->seedStaff();
-            $rooms = $this->seedClassrooms();
+            $site = $this->seedSchoolSite();
+            $rooms = $this->seedClassrooms($site);
             $courses = $this->seedCourses();
             $students = $this->seedStudents();
 
@@ -108,7 +111,22 @@ class SchoolDemoSeeder extends Seeder
         return $result;
     }
 
-    private function seedClassrooms(): array
+    private function seedSchoolSite(): SchoolSite
+    {
+        return SchoolSite::updateOrCreate(
+            ['code' => 'PRINCIPAL'],
+            [
+                'name' => 'Site principal',
+                'wilaya' => 'Béjaïa',
+                'commune' => 'Béjaïa',
+                'address' => 'Centre-ville, Béjaïa',
+                'phone' => '034 00 00 00',
+                'is_active' => true,
+            ],
+        );
+    }
+
+    private function seedClassrooms(SchoolSite $site): array
     {
         $definitions = [
             ['INFO-A', 'Salle Informatique A', 18, '1er étage'], ['INFO-B', 'Salle Informatique B', 18, '1er étage'],
@@ -118,7 +136,7 @@ class SchoolDemoSeeder extends Seeder
         $rooms = [];
         foreach ($definitions as [$code, $name, $capacity, $location]) {
             $rooms[$code] = Classroom::updateOrCreate(['code' => $code], [
-                'name' => $name, 'capacity' => $capacity, 'location' => $location,
+                'school_site_id' => $site->id, 'name' => $name, 'capacity' => $capacity, 'location' => $location,
                 'description' => 'Salle équipée pour les activités pédagogiques.', 'is_active' => true,
             ]);
         }
@@ -148,23 +166,50 @@ class SchoolDemoSeeder extends Seeder
     private function seedStudents()
     {
         $firstNames = ['Lina', 'Amine', 'Sarah', 'Yanis', 'Inès', 'Rayan', 'Mélissa', 'Walid', 'Nour', 'Ilyes', 'Meriem', 'Samy', 'Lydia', 'Aymen', 'Nesrine', 'Farid', 'Kenza', 'Anis', 'Sabrina', 'Sofiane', 'Imane', 'Nassim', 'Yasmine', 'Massinissa', 'Aya', 'Islam', 'Célia', 'Mohamed', 'Lamia', 'Bilal', 'Tinhinane', 'Adel', 'Rima', 'Hakim', 'Manel', 'Zinedine', 'Naïma', 'Khaled', 'Selma', 'Lounès'];
-        $lastNames = ['Brahimi', 'Saadi', 'Mansouri', 'Bouzid', 'Hamidi', 'Mokrani', 'Ferhat', 'Dahmani', 'Ammar', 'Taleb'];
-        return collect($firstNames)->map(function (string $firstName, int $index) use ($lastNames) {
+        $lastNames = ['Brahimi', 'Saadi', 'Mansouri', 'Bouzid', 'Hamidi', 'Mokrani', 'Ferhat', 'Dahmani', 'Ammar', 'Taleb', 'Benali', 'Khelifi', 'Rahmani', 'Haddad', 'Bensalem', 'Meziane', 'Cherif', 'Aït Ali'];
+        $cities = ['Alger', 'Oran', 'Constantine', 'Béjaïa', 'Sétif', 'Tlemcen', 'Annaba', 'Blida', 'Boumerdès', 'Tizi Ouzou', 'Akbou', 'Batna'];
+        $levels = ['Collège', 'Lycée', 'Bac', 'Licence', 'Master', 'Formation professionnelle'];
+        $statuses = ['active', 'active', 'active', 'enrolled', 'waiting', 'completed', 'stopped'];
+        $faker = Faker::create('fr_FR');
+        $faker->seed(20260824);
+
+        return collect(range(1, 300))->map(function (int $number) use ($faker, $firstNames, $lastNames, $cities, $levels, $statuses) {
+            $index = $number - 1;
+            $firstName = $firstNames[$faker->numberBetween(0, count($firstNames) - 1)];
+            $status = $statuses[$faker->numberBetween(0, count($statuses) - 1)];
+
             $number = $index + 1;
             return Student::updateOrCreate(['email' => "apprenant{$number}@demo.ecole.test"], [
-                'first_name' => $firstName, 'last_name' => $lastNames[$index % count($lastNames)],
-                'phone' => '0551 '.str_pad((string) $number, 2, '0', STR_PAD_LEFT).' '.str_pad((string) (100 + $number), 3, '0', STR_PAD_LEFT),
-                'birth_date' => now()->subYears(18 + ($index % 17))->subDays($index * 7)->toDateString(),
-                'address' => ['Béjaïa', 'Akbou', 'Amizour', 'El Kseur'][$index % 4],
-                'notes' => $index % 9 === 0 ? 'Dossier administratif à compléter.' : null, 'is_active' => true,
+                'first_name' => $firstName,
+                'last_name' => $lastNames[$faker->numberBetween(0, count($lastNames) - 1)],
+                'phone' => '0'.$faker->randomElement(['5', '6', '7']).$faker->numerify('## ## ## ##'),
+                'parent_phone' => $faker->boolean(65) ? '0'.$faker->randomElement(['5', '6', '7']).$faker->numerify('## ## ## ##') : null,
+                'birth_date' => $faker->dateTimeBetween('-42 years', '-15 years')->format('Y-m-d'),
+                'registration_date' => $faker->dateTimeBetween('-3 years', 'now')->format('Y-m-d'),
+                'school_level' => $levels[$faker->numberBetween(0, count($levels) - 1)],
+                'address' => $cities[$faker->numberBetween(0, count($cities) - 1)],
+                'status' => $status,
+                'notes' => $faker->boolean(12) ? 'Dossier administratif à compléter.' : null,
+                'is_active' => ! in_array($status, ['stopped', 'completed'], true),
             ]);
         });
     }
 
     private function seedPlan(EnrollmentForm $form, Course $course, User $teacher, array $rooms, array $definition): void
     {
+        $level = $course->levels()->updateOrCreate(
+            ['code' => 'GENERAL'],
+            [
+                'name' => 'Niveau général',
+                'duration_hours' => $course->duration_hours,
+                'price' => $course->price,
+                'prerequisites' => $course->prerequisites,
+                'is_active' => $course->is_active,
+            ],
+        );
+
         $plan = TrainingPlan::updateOrCreate(['title' => 'Planification — '.$definition['title']], [
-            'course_id' => $course->id, 'enrollment_form_id' => $form->id, 'teacher_id' => $teacher->id,
+            'course_level_id' => $level->id, 'enrollment_form_id' => $form->id, 'teacher_id' => $teacher->id,
             'status' => $definition['start'] > today()->toDateString() ? 'scheduled' : 'in_progress',
             'notes' => 'Planification pédagogique de démonstration.',
         ]);

@@ -66,10 +66,22 @@ class DashboardController extends Controller
         $occupiedRoomIds = $todaySessions->pluck('classroom_id')->unique();
         $activeRooms = Classroom::where('is_active', true)->count();
         $attendanceTotal=SessionAttendance::count();$attendancePresent=SessionAttendance::whereIn('status',['present','late'])->count();
-        $repeatedAbsences=Student::whereHas('attendances',fn($q)=>$q->where('status','absent'),'>=',3)->withCount(['attendances as absences_count'=>fn($q)=>$q->where('status','absent')])->orderByDesc('absences_count')->limit(8)->get();
-        $groupAttendance=TrainingPlanGroup::with('plan.course')->withCount('sessions')->get()->map(function($group){$records=SessionAttendance::whereHas('session',fn($q)=>$q->where('training_plan_group_id',$group->id))->get();$rate=$records->count()?round($records->whereIn('status',['present','late'])->count()/$records->count()*100,1):null;return ['id'=>$group->id,'name'=>$group->name,'formation'=>$group->plan->course->title,'rate'=>$rate];})->filter(fn($g)=>$g['rate']!==null&&$g['rate']<75)->values();
-        $completedMinutes=TrainingSession::where('status','completed')->get()->sum(fn($s)=>$s->starts_at->diffInMinutes($s->ends_at));
-        $nearCompletionGroups=TrainingPlanGroup::with(['plan.course','sessions'])->get()->filter(function($group){$done=$group->sessions->where('status','completed')->sum(fn($s)=>$s->starts_at->diffInMinutes($s->ends_at))/60;return $group->plan->course->duration_hours>0&&$done/$group->plan->course->duration_hours>=.8&&$done<$group->plan->course->duration_hours;})->count();
+        // Filtering the withCount alias in SQL makes Laravel emit a HAVING
+        // clause without GROUP BY, which SQLite rejects. Keep the count in the
+        // query, then apply the small dashboard-only threshold portably.
+        $repeatedAbsences = Student::query()
+            ->whereHas('attendances', fn ($query) => $query->where('status', 'absent'))
+            ->withCount([
+                'attendances as absences_count' => fn ($query) => $query->where('status', 'absent'),
+            ])
+            ->get()
+            ->filter(fn (Student $student) => $student->absences_count >= 3)
+            ->sortByDesc('absences_count')
+            ->take(8)
+            ->values();
+        $groupAttendance=TrainingPlanGroup::with('plan.course')->withCount('sessions')->get()->map(function($group){$records=SessionAttendance::whereHas('session',fn($q)=>$q->where('training_plan_group_id',$group->id))->get();$rate=$records->count()?round($records->whereIn('status',['present','late'])->count()/$records->count()*100,1):null;return ['id'=>$group->id,'name'=>$group->name,'formation'=>$group->plan?->course?->title ?? 'Formation supprimée','rate'=>$rate];})->filter(fn($g)=>$g['rate']!==null&&$g['rate']<75)->values();
+        $completedMinutes=TrainingSession::where('status','completed')->get()->sum(fn($s)=>$s->starts_at && $s->ends_at ? $s->starts_at->diffInMinutes($s->ends_at) : 0);
+        $nearCompletionGroups=TrainingPlanGroup::with(['plan.course','sessions'])->get()->filter(function($group){$duration=(float)($group->plan?->course?->duration_hours ?? 0);$done=$group->sessions->where('status','completed')->sum(fn($s)=>$s->starts_at && $s->ends_at ? $s->starts_at->diffInMinutes($s->ends_at) : 0)/60;return $duration>0&&$done/$duration>=.8&&$done<$duration;})->count();
         $salariesDue=(float)SalaryStatement::whereIn('status',['pending','partially_paid'])->sum('remaining_amount');$salariesPaid=(float)SalaryStatement::sum('amount_paid');$expenses=(float)Expense::sum('amount');$collected=(float)CourseEnrollment::whereNotNull('student_id')->sum('total_paid');
 
         $activities = collect()
@@ -82,7 +94,7 @@ class DashboardController extends Controller
                 'date' => $expense->created_at,
             ]))
             ->merge(EnrollmentForm::with('course:id,title')->latest()->limit(3)->get()->map(fn ($form) => [
-                'type' => 'formation', 'title' => "Inscriptions ouvertes : {$form->course->title}", 'date' => $form->created_at,
+                'type' => 'formation', 'title' => 'Inscriptions ouvertes : '.($form->course?->title ?? 'Formation supprimée'), 'date' => $form->created_at,
             ]))
             ->sortByDesc('date')->take(7)->values();
 

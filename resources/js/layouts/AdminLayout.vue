@@ -1,14 +1,21 @@
 <script setup lang="ts">
 import AppSidebarLayout from '@/layouts/app/AppSidebarLayout.vue';
 import { usePage } from '@inertiajs/vue3';
-import { ref, watch } from 'vue';
+import { onErrorCaptured, ref, watch } from 'vue';
 
 const page = usePage();
-const message = ref(page.props.flash.restricted_action);
-const successMessage = ref(page.props.flash.success);
+const message = ref(page.props.flash?.restricted_action ?? null);
+const successMessage = ref(page.props.flash?.success ?? null);
+const renderError = ref(false);
+
+onErrorCaptured((error) => {
+    console.error('Admin page rendering failed:', error);
+    renderError.value = true;
+    return false;
+});
 
 watch(
-    () => page.props.flash.restricted_action,
+    () => page.props.flash?.restricted_action,
     (val) => {
         message.value = val;
         if (val) {
@@ -18,7 +25,7 @@ watch(
 );
 
 watch(
-    () => page.props.flash.success,
+    () => page.props.flash?.success,
     (val) => {
         successMessage.value = val;
         if (val) {
@@ -56,6 +63,16 @@ watch(
         >
             <span>{{ successMessage }}</span>
         </div>
-        <slot />
+        <div
+            v-if="renderError"
+            class="m-6 rounded-xl border border-red-200 bg-red-50 p-6 text-red-900"
+        >
+            <h1 class="font-semibold">Impossible d’afficher cette page</h1>
+            <p class="mt-1 text-sm">
+                Actualisez la page. Si le problème persiste, consultez la
+                console du navigateur pour identifier la donnée concernée.
+            </p>
+        </div>
+        <slot v-else />
     </AppSidebarLayout>
 </template>

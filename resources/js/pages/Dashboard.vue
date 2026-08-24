@@ -73,33 +73,57 @@ interface DashboardData {
 }
 const props = defineProps<{ dashboard: DashboardData | null }>();
 const page = usePage();
-const user = page.props.auth.user as { name: string; role: string };
-const isAdmin = computed(() => user.role === 'admin');
-const firstName = computed(() => user.name.split(' ')[0]);
+const user = computed(() =>
+    (page.props.auth?.user ?? { name: 'Utilisateur', role: '' }) as {
+        name?: string;
+        role?: string;
+    },
+);
+const isAdmin = computed(() => user.value.role === 'admin');
+const firstName = computed(() => user.value.name?.split(' ')[0] || '');
 const money = (value: number) =>
     `${Number(value).toLocaleString('fr-FR', { maximumFractionDigits: 0 })} ${props.dashboard?.currency.symbol ?? 'DZD'}`;
-const shortDate = (value: string) =>
-    new Date(`${value.slice(0, 10)}T00:00:00`).toLocaleDateString('fr-FR', {
+const validDate = (value?: string | null) => {
+    if (!value) return null;
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? null : date;
+};
+const shortDate = (value?: string | null) =>
+    (value
+        ? validDate(`${value.slice(0, 10)}T00:00:00`)
+        : null
+    )?.toLocaleDateString('fr-FR', {
         day: '2-digit',
         month: 'short',
-    });
-const relativeDate = (value: string) =>
-    new Intl.RelativeTimeFormat('fr', { numeric: 'auto' }).format(
-        Math.round((new Date(value).getTime() - Date.now()) / 86400000),
+    }) ?? '—';
+const relativeDate = (value?: string | null) => {
+    const date = validDate(value);
+    if (!date) return '—';
+
+    return new Intl.RelativeTimeFormat('fr', { numeric: 'auto' }).format(
+        Math.round((date.getTime() - Date.now()) / 86400000),
         'day',
     );
-const formatTime = (value: string) =>
-    new Date(value).toLocaleTimeString('fr-FR', {
+};
+const formatTime = (value?: string | null) =>
+    validDate(value)?.toLocaleTimeString('fr-FR', {
         hour: '2-digit',
         minute: '2-digit',
         hourCycle: 'h23',
-    });
+    }) ?? '—';
 const capacity = (form: any) =>
-    Math.min(100, Math.round((form.confirmed_count / form.max_students) * 100));
+    form?.max_students > 0
+        ? Math.min(
+              100,
+              Math.round(
+                  (Number(form.confirmed_count || 0) / form.max_students) * 100,
+              ),
+          )
+        : 0;
 const roleLabel = computed(() =>
-    user.role === 'admin'
+    user.value.role === 'admin'
         ? 'Administration'
-        : user.role === 'teacher'
+        : user.value.role === 'teacher'
           ? 'Espace enseignant'
           : 'Espace personnel',
 );
@@ -414,14 +438,14 @@ const roleLabel = computed(() =>
                                     >
                                         <div>
                                             <p class="font-medium">
-                                                {{ form.course.title }}
+                                                {{ form.course?.title ?? 'Formation supprimée' }}
                                             </p>
                                             <p
                                                 class="text-xs text-muted-foreground"
                                             >
                                                 {{ form.groups_count }}
                                                 groupe(s) ·
-                                                {{ form.teacher.name
+                                                {{ form.teacher?.name ?? 'Formateur non affecté'
                                                 }}<span v-if="form.classroom">
                                                     ·
                                                     {{
@@ -541,7 +565,7 @@ const roleLabel = computed(() =>
                                         v-for="session in dashboard.schedule
                                             .today"
                                         :key="session.id"
-                                        :href="`/admin/planifications/${session.group.training_plan_id}`"
+                                        :href="session.group?.training_plan_id ? `/admin/planifications/${session.group.training_plan_id}` : '/admin/planifications'"
                                         class="flex items-center gap-3 p-3 hover:bg-muted/40"
                                     >
                                         <span
@@ -556,9 +580,9 @@ const roleLabel = computed(() =>
                                                 >{{ session.title }}</span
                                             ><span
                                                 class="block truncate text-xs text-muted-foreground"
-                                                >{{ session.group.name }} ·
-                                                {{ session.classroom.name }} ·
-                                                {{ session.teacher.name }}</span
+                                                >{{ session.group?.name ?? 'Groupe non affecté' }} ·
+                                                {{ session.classroom?.name ?? 'Salle non affectée' }} ·
+                                                {{ session.teacher?.name ?? 'Formateur non affecté' }}</span
                                             ></span
                                         >
                                     </Link>
@@ -611,12 +635,12 @@ const roleLabel = computed(() =>
                                     </div>
                                     <div class="min-w-0 flex-1">
                                         <p class="truncate text-sm font-medium">
-                                            {{ form.course.title }}
+                                            {{ form.course?.title ?? 'Formation supprimée' }}
                                         </p>
                                         <p
                                             class="truncate text-xs text-muted-foreground"
                                         >
-                                            {{ form.teacher.name }} ·
+                                            {{ form.teacher?.name ?? 'Formateur non affecté' }} ·
                                             {{ form.confirmed_count }}/{{
                                                 form.max_students
                                             }}
@@ -653,7 +677,7 @@ const roleLabel = computed(() =>
                                     <div class="flex justify-between gap-3">
                                         <div>
                                             <p class="text-sm font-medium">
-                                                {{ form.course.title }}
+                                                {{ form.course?.title ?? 'Formation supprimée' }}
                                             </p>
                                             <p
                                                 class="text-xs text-muted-foreground"
@@ -792,8 +816,8 @@ const roleLabel = computed(() =>
                                     <div
                                         class="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary/10 font-semibold text-primary"
                                     >
-                                        {{ enrollment.first_name[0]
-                                        }}{{ enrollment.last_name[0] }}
+                                        {{ enrollment.first_name?.[0] ?? '?'
+                                        }}{{ enrollment.last_name?.[0] ?? '' }}
                                     </div>
                                     <div class="min-w-0 flex-1">
                                         <p class="truncate text-sm font-medium">
@@ -803,7 +827,7 @@ const roleLabel = computed(() =>
                                         <p
                                             class="truncate text-xs text-muted-foreground"
                                         >
-                                            {{ enrollment.form.course.title }} ·
+                                            {{ enrollment.form?.course?.title ?? 'Formation supprimée' }} ·
                                             Groupe {{ enrollment.group_number }}
                                         </p>
                                     </div>
@@ -811,7 +835,7 @@ const roleLabel = computed(() =>
                                         class="text-xs text-muted-foreground"
                                         >{{
                                             relativeDate(
-                                                enrollment.confirmed_at,
+                                                enrollment.registered_at,
                                             )
                                         }}</span
                                     >
