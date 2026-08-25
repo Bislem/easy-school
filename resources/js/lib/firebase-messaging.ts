@@ -66,11 +66,8 @@ function csrfToken(): string {
 }
 
 export async function enableFirebaseNotifications(): Promise<void> {
-    if (
-        Notification.permission !== 'granted' &&
-        (await Notification.requestPermission()) !== 'granted'
-    )
-        return;
+    if (Notification.permission !== 'granted')
+        throw new Error('Notification permission must be granted first.');
     const { messaging, firebaseConfig, serviceWorkerRegistration } =
         await messagingContext();
     const token = await getToken(messaging, {
@@ -138,30 +135,22 @@ export async function startFirebaseMessaging(): Promise<void> {
             body: JSON.stringify({ token }),
         }).catch(() => undefined);
     }
-    onMessage(messaging, (payload) => {
+    onMessage(messaging, async (payload) => {
         window.dispatchEvent(new CustomEvent('portal-notification-created'));
         const data = payload.data || {};
         if (Notification.permission === 'granted') {
-            const notification = new Notification(
-                data.title || 'Nouvelle notification',
-                {
-                    body: data.body || '',
-                    icon: '/favicon.ico',
-                    data: { url: data.url || '/dashboard' },
-                },
-            );
-            notification.onclick = () => {
-                const requested = new URL(
-                    String(notification.data?.url || '/dashboard'),
-                    window.location.origin,
+            try {
+                await serviceWorkerRegistration.showNotification(
+                    data.title || 'Nouvelle notification',
+                    {
+                        body: data.body || '',
+                        icon: '/favicon.ico',
+                        data: { url: data.url || '/dashboard' },
+                    },
                 );
-                window.location.assign(
-                    requested.origin === window.location.origin
-                        ? requested.href
-                        : '/dashboard',
-                );
-                notification.close();
-            };
+            } catch {
+                // A foreground display failure must not interrupt FCM updates.
+            }
         }
     });
 }

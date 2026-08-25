@@ -5,6 +5,8 @@ import {
     DropdownMenuContent,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { appAlert, appConfirm } from '@/composables/useAppDialog';
+import { requestNotificationPermission } from '@/composables/useBrowserPermissions';
 import {
     enableFirebaseNotifications,
     firebaseNotificationState,
@@ -40,10 +42,66 @@ async function refreshPushState() {
 }
 
 async function enablePush() {
+    if (pushBusy.value) return;
     pushBusy.value = true;
     try {
-        await enableFirebaseNotifications();
-        await refreshPushState();
+        let retry = true;
+
+        while (retry) {
+            retry = false;
+            const permission = await requestNotificationPermission();
+
+            if (permission.outcome === 'granted') {
+                await enableFirebaseNotifications();
+                await refreshPushState();
+                return;
+            }
+
+            if (permission.outcome === 'denied') {
+                pushState.value = 'denied';
+                await appAlert(
+                    'Les notifications sont désactivées pour ce site. Ouvrez les paramètres du site dans Chrome, puis activez l’autorisation « Notifications » manuellement.',
+                    {
+                        title: 'Autorisation refusée',
+                        confirmText: 'Compris',
+                        tone: 'warning',
+                    },
+                );
+                return;
+            }
+
+            if (permission.outcome === 'unsupported') {
+                pushState.value = 'unsupported';
+                await appAlert(
+                    'Ce navigateur ne prend pas en charge les notifications Web.',
+                    {
+                        title: 'Fonction non disponible',
+                        confirmText: 'Compris',
+                        tone: 'warning',
+                    },
+                );
+                return;
+            }
+
+            retry = await appConfirm(
+                'Impossible de demander l’autorisation.\nAndroid bloque actuellement la demande d’autorisation.\nFermez les bulles, fenêtres flottantes ou superpositions d’autres applications, puis réessayez.',
+                {
+                    title: 'Autorisation bloquée',
+                    confirmText: 'Réessayer',
+                    cancelText: 'Annuler',
+                    tone: 'warning',
+                },
+            );
+        }
+    } catch {
+        await appAlert(
+            'L’activation des notifications n’a pas pu être terminée. Vérifiez votre connexion, fermez les superpositions Android, puis réessayez.',
+            {
+                title: 'Activation impossible',
+                confirmText: 'Compris',
+                tone: 'warning',
+            },
+        );
     } finally {
         pushBusy.value = false;
     }

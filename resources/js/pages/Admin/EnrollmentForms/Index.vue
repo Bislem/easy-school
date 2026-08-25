@@ -4,6 +4,7 @@ import FileUpload from '@/components/ViltFilePond/FileUpload.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { appAlert } from '@/composables/useAppDialog';
 import AdminLayout from '@/layouts/AdminLayout.vue';
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
 import {
@@ -160,9 +161,22 @@ function publicUrl(item: EnrollmentForm) {
     return `${origin}/inscription/${item.public_token}`;
 }
 async function copyLink(item: EnrollmentForm) {
-    await navigator.clipboard.writeText(publicUrl(item));
-    copiedId.value = item.id;
-    setTimeout(() => (copiedId.value = null), 1800);
+    try {
+        if (!navigator.clipboard?.writeText)
+            throw new Error('Clipboard API unavailable');
+        await navigator.clipboard.writeText(publicUrl(item));
+        copiedId.value = item.id;
+        setTimeout(() => (copiedId.value = null), 1800);
+    } catch {
+        await appAlert(
+            'Le lien n’a pas pu être copié automatiquement. Vérifiez l’autorisation du presse-papiers dans les paramètres du site, puis réessayez.',
+            {
+                title: 'Copie impossible',
+                confirmText: 'Compris',
+                tone: 'warning',
+            },
+        );
+    }
 }
 const paginationLabel = (label: string) =>
     label
