@@ -33,7 +33,7 @@ class SchoolDemoSeeder extends Seeder
             $definitions = [
                 'WEB-FS' => [
                     'title' => 'Session Développement Web — Automne 2026',
-                    'teacher' => 'yacine.benali@easyschool.test',
+                    'teacher' => 'teacher@easyschool.test',
                     'start' => '2026-07-20', 'end' => '2026-10-30',
                     'rooms' => ['INFO-A', 'INFO-B'], 'dates' => ['2026-08-03', '2026-08-05', '2026-08-10', '2026-08-12'],
                     'times' => [['09:00', '12:00'], ['13:00', '16:00']],
@@ -80,6 +80,7 @@ class SchoolDemoSeeder extends Seeder
                     $enrollment->fill([
                         'student_id' => $student->id, 'first_name' => $student->first_name, 'last_name' => $student->last_name,
                         'phone' => $student->phone, 'birth_date' => $student->birth_date,
+                        'status' => 'registered', 'registered_at' => now()->subDays(35 - ($courseIndex * 6 + $index)),
                         'confirmed_at' => now()->subDays(35 - ($courseIndex * 6 + $index)),
                         'group_number' => ($index % 2) + 1,
                     ]);
@@ -97,7 +98,7 @@ class SchoolDemoSeeder extends Seeder
         $password = Hash::make('password');
         $employeeTypes = EmployeeType::query()->whereIn('slug', ['teacher', 'other'])->pluck('id', 'slug');
         $staff = [
-            ['Yacine Benali', 'yacine.benali@easyschool.test', '0550 10 10 01', UserRole::TEACHER, 'Formateur Développement Web', true],
+            ['Yacine Benali', 'teacher@easyschool.test', '0550 10 10 01', UserRole::TEACHER, 'Formateur Développement Web', true],
             ['Sonia Khelifi', 'sonia.khelifi@easyschool.test', '0550 10 10 02', UserRole::TEACHER, 'Formatrice Design Graphique', true],
             ['Mehdi Aït Ali', 'mehdi.aitali@easyschool.test', '0550 10 10 03', UserRole::TEACHER, 'Formateur Marketing Digital', true],
             ['Amel Rahmani', 'amel.rahmani@easyschool.test', '0550 10 10 04', UserRole::TEACHER, 'Formatrice Langues', true],
@@ -230,12 +231,13 @@ class SchoolDemoSeeder extends Seeder
             $group = $plan->groups()->updateOrCreate(['group_number' => $groupNumber], [
                 'name' => "Groupe {$groupNumber}", 'classroom_id' => $room->id, 'capacity' => min(8, $room->capacity),
             ]);
-            $group->sessions()->delete();
+            CourseEnrollment::where('enrollment_form_id', $form->id)
+                ->where('group_number', $groupNumber)
+                ->update(['training_plan_group_id' => $group->id, 'status' => 'registered']);
             foreach ($definition['dates'] as $sessionIndex => $date) {
                 [$start, $end] = $definition['times'][$groupNumber - 1];
-                $group->sessions()->create([
+                $group->sessions()->updateOrCreate(['title' => $course->title.' — Séance '.($sessionIndex + 1)], [
                     'classroom_id' => $room->id, 'teacher_id' => $teacher->id,
-                    'title' => $course->title.' — Séance '.($sessionIndex + 1),
                     'starts_at' => "{$date} {$start}:00", 'ends_at' => "{$date} {$end}:00",
                     'notes' => $sessionIndex === 0 ? 'Présentation du programme et objectifs.' : null,
                 ]);

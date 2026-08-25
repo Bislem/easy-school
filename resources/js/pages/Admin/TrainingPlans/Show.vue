@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import InputError from '@/components/InputError.vue';
+import { appAlert, appConfirm } from '@/composables/useAppDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -115,6 +116,7 @@ const props = defineProps<{
     teachers: Option[];
     classrooms: Option[];
     students: Student[];
+    access: { is_admin: boolean; manage_groups: boolean; add_sessions: boolean; record_attendance: boolean };
 }>();
 const groupModal = ref(false);
 const editingGroup = ref<Group | null>(null);
@@ -128,7 +130,7 @@ const editingEnrollment = ref<Enrollment | null>(null);
 const attendanceDialog = ref(false);
 const attendanceSession = ref<Session | null>(null);
 const attendanceReadOnly = computed(
-    () => attendanceSession.value?.attendance_status !== 'pending',
+    () => !props.access.record_attendance || attendanceSession.value?.attendance_status !== 'pending',
 );
 const studentSearch = ref('');
 const groupForm = useForm({ name: '', classroom_id: '', capacity: '' });
@@ -224,8 +226,8 @@ function submitGroup() {
             options,
         );
 }
-function deleteGroup(group: Group) {
-    if (window.confirm(`Supprimer ${group.name} et toutes ses séances ?`))
+async function deleteGroup(group: Group) {
+    if (await appConfirm(`Supprimer ${group.name} et toutes ses séances ?`, { title: 'Supprimer le groupe', tone: 'danger', confirmText: 'Supprimer' }))
         router.delete(
             `/admin/planifications/${props.plan.id}/groupes/${group.id}`,
         );
@@ -259,16 +261,17 @@ function submitSession() {
         sessionForm.put(`${base}/${editingSession.value.id}`, options);
     else sessionForm.post(base, options);
 }
-function deleteSession(group: Group, session: Session) {
-    if (window.confirm(`Supprimer la séance « ${session.title} » ?`))
+async function deleteSession(group: Group, session: Session) {
+    if (await appConfirm(`Supprimer la séance « ${session.title} » ?`, { title: 'Supprimer la séance', tone: 'danger', confirmText: 'Supprimer' }))
         router.delete(
             `/admin/planifications/${props.plan.id}/groupes/${group.id}/seances/${session.id}`,
         );
 }
-function completeSession(group: Group, session: Session) {
+async function completeSession(group: Group, session: Session) {
     if (
-        !window.confirm(
+        !await appConfirm(
             'Cette validation est définitive. Confirmer la séance et les présences ?',
+            { title: 'Valider définitivement la séance', tone: 'warning', confirmText: 'Valider la séance' },
         )
     )
         return;
@@ -278,11 +281,11 @@ function completeSession(group: Group, session: Session) {
         {
             preserveScroll: true,
             onError: (errors) =>
-                window.alert(
+                void appAlert(
                     String(
                         Object.values(errors)[0] ??
                             'La validation de la séance a échoué.',
-                    ),
+                    ), { title: 'Validation impossible', tone: 'danger' },
                 ),
         },
     );
@@ -365,10 +368,11 @@ function toggleAllAttendance() {
 function applyAttendanceStatus(status: string) {
     attendanceSelectedIds.value.forEach((studentId) => { attendanceForm.attendances[studentId] = status; });
 }
-function saveAttendance() {
+async function saveAttendance() {
     if (!rosterGroup.value || !attendanceSession.value) return;
-    attendanceForm.validate_session = window.confirm(
+    attendanceForm.validate_session = await appConfirm(
         'Voulez-vous aussi valider définitivement cette séance ? Le formateur sera marqué présent et les présences seront verrouillées.',
+        { title: 'Valider la séance ?', tone: 'warning', confirmText: 'Enregistrer et valider', cancelText: 'Présences uniquement' },
     );
     attendanceForm.put(`/admin/planifications/${props.plan.id}/groupes/${rosterGroup.value.id}/seances/${attendanceSession.value.id}/presences`, {
         preserveScroll: true,
@@ -388,7 +392,7 @@ watch(() => props.plan.groups, (groups) => {
 
 <template>
     <Head :title="plan.title" /><AdminLayout
-        ><main class="flex-1 space-y-6 p-4 sm:p-6 lg:p-8">
+        ><main class="min-w-0 flex-1 space-y-5 overflow-x-hidden p-3 sm:space-y-6 sm:p-6 lg:p-8">
             <div>
                 <Link
                     href="/admin/planifications"
@@ -397,7 +401,7 @@ watch(() => props.plan.groups, (groups) => {
                     planifications</Link
                 >
             </div>
-            <header class="rounded-2xl border bg-card p-5 shadow-sm sm:p-6">
+            <header class="rounded-2xl border bg-card p-4 shadow-sm sm:p-6">
                 <div
                     class="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between"
                 >
@@ -417,7 +421,7 @@ watch(() => props.plan.groups, (groups) => {
                                 >Formation libre</span
                             >
                         </div>
-                        <h1 class="mt-3 text-2xl font-bold">
+                        <h1 class="mt-3 break-words text-xl font-bold sm:text-2xl">
                             {{ plan.title }}
                         </h1>
                         <p class="mt-1 text-muted-foreground">
@@ -433,23 +437,23 @@ watch(() => props.plan.groups, (groups) => {
                             {{ plan.enrollment_form.end_date }}
                         </p>
                     </div>
-                    <Button variant="outline" @click="settingsModal = true"
-                        ><Settings class="mr-2 size-4" />Paramètres</Button
-                    >
+                    <Button v-if="access.is_admin" variant="outline" as-child>
+                        <Link :href="`/admin/planifications/${plan.id}/parametres`"><Settings class="mr-2 size-4" />Paramètres</Link>
+                    </Button>
                 </div>
-                <div class="mt-6 grid gap-3 sm:grid-cols-3">
-                    <div class="rounded-xl bg-muted/50 p-4">
+                <div class="mt-5 grid grid-cols-3 gap-2 sm:mt-6 sm:gap-3">
+                    <div class="min-w-0 rounded-xl bg-muted/50 p-3 sm:p-4">
                         <Users class="size-5 text-primary" />
-                        <p class="mt-2 text-2xl font-bold">
+                        <p class="mt-2 text-xl font-bold sm:text-2xl">
                             {{ plan.groups.length }}
                         </p>
                         <p class="text-xs text-muted-foreground">
                             Groupes planifiés
                         </p>
                     </div>
-                    <div class="rounded-xl bg-muted/50 p-4">
+                    <div class="min-w-0 rounded-xl bg-muted/50 p-3 sm:p-4">
                         <CalendarPlus class="size-5 text-primary" />
-                        <p class="mt-2 text-2xl font-bold">
+                        <p class="mt-2 text-xl font-bold sm:text-2xl">
                             {{
                                 plan.groups.reduce(
                                     (total, group) =>
@@ -462,9 +466,9 @@ watch(() => props.plan.groups, (groups) => {
                             Séances au total
                         </p>
                     </div>
-                    <div class="rounded-xl bg-muted/50 p-4">
+                    <div class="min-w-0 rounded-xl bg-muted/50 p-3 sm:p-4">
                         <Clock3 class="size-5 text-primary" />
-                        <p class="mt-2 text-2xl font-bold">
+                        <p class="mt-2 text-xl font-bold sm:text-2xl">
                             {{ plan.level.duration_hours }}h
                         </p>
                         <p class="text-xs text-muted-foreground">
@@ -479,14 +483,14 @@ watch(() => props.plan.groups, (groups) => {
             >
                 {{ $page.props.errors.group }}
             </div>
-            <div class="flex items-center justify-between">
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                     <h2 class="text-xl font-semibold">Groupes et séances</h2>
                     <p class="text-sm text-muted-foreground">
                         Chaque groupe possède son propre calendrier.
                     </p>
                 </div>
-                <Button variant="outline" @click="openGroup()"
+                <Button v-if="access.manage_groups" class="w-full sm:w-auto" variant="outline" @click="openGroup()"
                     ><Plus class="mr-2 size-4" />Ajouter un groupe</Button
                 >
             </div>
@@ -546,19 +550,22 @@ watch(() => props.plan.groups, (groups) => {
                                 />
                             </div>
                         </div>
-                        <div class="flex gap-2">
-                            <Button size="sm" variant="outline" @click="openRoster(group)"
+                        <div class="flex flex-wrap gap-2">
+                            <Button class="flex-1 sm:flex-none" size="sm" variant="outline" @click="openRoster(group)"
                                 ><Users class="mr-2 size-4" />Étudiants</Button
                             >
                             <Button
+                                v-if="access.manage_groups"
+                                class="flex-1 sm:flex-none"
                                 size="sm"
                                 variant="outline"
                                 @click="openGroup(group)"
                                 ><Pencil class="mr-2 size-4" />Modifier</Button
-                            ><Button size="sm" @click="openSession(group)"
+                            ><Button v-if="access.add_sessions" class="w-full sm:w-auto" size="sm" @click="openSession(group)"
                                 ><CalendarPlus class="mr-2 size-4" />Ajouter une
                                 séance</Button
                             ><Button
+                                v-if="access.manage_groups"
                                 size="icon"
                                 variant="ghost"
                                 class="text-destructive"
@@ -596,7 +603,7 @@ watch(() => props.plan.groups, (groups) => {
                                     {{ session.teacher.name }}
                                 </p>
                             </div>
-                            <div class="flex justify-end">
+                            <div class="flex justify-start border-t pt-2 sm:justify-end sm:border-0 sm:pt-0">
                                 <Button
                                     size="icon"
                                     variant="ghost"
@@ -606,7 +613,7 @@ watch(() => props.plan.groups, (groups) => {
                                 /></Button>
                                 <Button
                                     v-if="
-                                        session.status !== 'completed' &&
+                                        access.record_attendance && session.status !== 'completed' &&
                                         session.attendance_status === 'completed'
                                     "
                                     size="icon"
@@ -616,13 +623,13 @@ watch(() => props.plan.groups, (groups) => {
                                     ><CircleCheck class="size-4 text-green-600"
                                 /></Button>
                                 <Button
-                                    v-if="session.attendance_status !== 'validated' && session.status !== 'completed'"
+                                    v-if="access.is_admin && session.attendance_status !== 'validated' && session.status !== 'completed'"
                                     size="icon"
                                     variant="ghost"
                                     @click="openSession(group, session)"
                                     ><Pencil class="size-4" /></Button
                                 ><Button
-                                    v-if="session.attendance_status !== 'validated' && session.status !== 'completed'"
+                                    v-if="access.is_admin && session.attendance_status !== 'validated' && session.status !== 'completed'"
                                     size="icon"
                                     variant="ghost"
                                     class="text-destructive"
@@ -643,7 +650,7 @@ watch(() => props.plan.groups, (groups) => {
         </main>
 
         <div
-            v-if="groupModal"
+            v-if="groupModal && access.manage_groups"
             class="fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center sm:p-4"
             @click.self="groupModal = false"
         >
@@ -723,7 +730,7 @@ watch(() => props.plan.groups, (groups) => {
         </div>
 
         <div
-            v-if="sessionModal && sessionGroup"
+            v-if="sessionModal && sessionGroup && (access.add_sessions || access.is_admin)"
             class="fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center sm:p-4"
             @click.self="sessionModal = false"
         >
@@ -858,7 +865,7 @@ watch(() => props.plan.groups, (groups) => {
         </div>
 
         <div
-            v-if="settingsModal"
+            v-if="settingsModal && access.is_admin"
             class="fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center sm:p-4"
             @click.self="settingsModal = false"
         >
@@ -936,20 +943,20 @@ watch(() => props.plan.groups, (groups) => {
         </div>
 
         <Dialog v-model:open="rosterDialog">
-            <DialogScrollContent class="max-w-4xl">
+            <DialogScrollContent class="max-h-[92dvh] w-[calc(100vw-1rem)] max-w-4xl">
                 <DialogHeader>
                     <DialogTitle>Étudiants · {{ rosterGroup?.name }}</DialogTitle>
                     <DialogDescription>Ajoutez, consultez, modifiez ou déplacez les étudiants pendant toute la planification.</DialogDescription>
                 </DialogHeader>
                 <div v-if="rosterGroup" class="space-y-5">
-                    <form class="space-y-3 rounded-lg border bg-muted/20 p-3" @submit.prevent="addStudent">
+                    <form v-if="access.is_admin" class="space-y-3 rounded-lg border bg-muted/20 p-3" @submit.prevent="addStudent">
                         <div class="relative">
                             <Search class="absolute left-3 top-2.5 size-4 text-muted-foreground" />
                             <Input v-model="studentSearch" class="pl-9" placeholder="Rechercher par nom, e-mail, téléphone ou date de naissance…" autocomplete="off" />
                         </div>
-                        <div class="flex items-center justify-between gap-3 text-sm">
+                        <div class="flex flex-col gap-2 text-sm sm:flex-row sm:items-center sm:justify-between">
                             <span class="text-muted-foreground">{{ addStudentForm.student_ids.length }} étudiant(s) sélectionné(s)</span>
-                            <div class="flex gap-2"><Button type="button" size="sm" variant="ghost" @click="addStudentForm.student_ids=[]">Désélectionner</Button><Button type="button" size="sm" variant="outline" @click="selectAllAvailableStudents">Tout sélectionner</Button></div>
+                            <div class="flex flex-wrap gap-2"><Button type="button" size="sm" variant="ghost" @click="addStudentForm.student_ids=[]">Désélectionner</Button><Button type="button" size="sm" variant="outline" @click="selectAllAvailableStudents">Tout sélectionner</Button></div>
                         </div>
                         <div class="max-h-60 overflow-y-auto rounded-md border bg-background">
                             <button
@@ -970,14 +977,14 @@ watch(() => props.plan.groups, (groups) => {
                             </button>
                             <p v-if="!filteredStudents.length" class="p-6 text-center text-sm text-muted-foreground">Aucun étudiant disponible ne correspond à cette recherche.</p>
                         </div>
-                        <div class="flex items-center justify-between gap-3">
+                        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                             <InputError :message="addStudentForm.errors.student_ids" />
                             <Button :disabled="addStudentForm.processing || !addStudentForm.student_ids.length"><UserPlus class="mr-2 size-4" />Ajouter {{ addStudentForm.student_ids.length || '' }} étudiant(s)</Button>
                         </div>
                     </form>
 
                     <div v-if="!editingEnrollment" class="overflow-hidden rounded-lg border">
-                        <div v-for="enrollment in rosterGroup.enrollments" :key="enrollment.id" class="flex items-center justify-between gap-3 border-b p-3 last:border-0">
+                        <div v-for="enrollment in rosterGroup.enrollments" :key="enrollment.id" class="flex flex-col gap-3 border-b p-3 last:border-0 sm:flex-row sm:items-center sm:justify-between">
                             <div class="flex min-w-0 items-center gap-3">
                                 <img v-if="enrollment.student.photo_url" :src="enrollment.student.photo_url" :alt="studentName(enrollment.student)" class="size-10 shrink-0 rounded-full object-cover" />
                                 <span v-else class="grid size-10 shrink-0 place-items-center rounded-full bg-muted text-xs font-semibold">{{ enrollment.student.first_name[0] }}{{ enrollment.student.last_name[0] }}</span>
@@ -986,7 +993,7 @@ watch(() => props.plan.groups, (groups) => {
                                     <p class="truncate text-xs text-muted-foreground">{{ enrollment.student.email || 'Sans e-mail' }} · {{ enrollment.student.phone || 'Sans téléphone' }}</p>
                                 </div>
                             </div>
-                            <DropdownMenu>
+                            <DropdownMenu v-if="access.is_admin">
                                 <DropdownMenuTrigger as-child><Button size="sm" variant="outline">Actions<ChevronDown class="ml-2 size-4" /></Button></DropdownMenuTrigger>
                                 <DropdownMenuContent align="end" class="w-56">
                                     <DropdownMenuLabel>{{ studentName(enrollment.student) }}</DropdownMenuLabel>
@@ -1036,7 +1043,7 @@ watch(() => props.plan.groups, (groups) => {
         </Dialog>
 
         <Dialog v-model:open="attendanceDialog">
-            <DialogScrollContent class="max-w-2xl">
+            <DialogScrollContent class="max-h-[92dvh] w-[calc(100vw-1rem)] max-w-2xl">
                 <DialogHeader>
                     <DialogTitle>{{ attendanceReadOnly ? 'Présences enregistrées' : 'Saisir les présences' }} · {{ attendanceSession?.title }}</DialogTitle>
                     <DialogDescription>{{ rosterGroup?.name }} · {{ attendanceReadOnly ? 'consultation en lecture seule' : 'sélectionnez le statut de chaque étudiant' }}.</DialogDescription>
@@ -1051,10 +1058,10 @@ watch(() => props.plan.groups, (groups) => {
                         <Button type="button" size="sm" variant="outline" :disabled="!attendanceSelectedIds.length" @click="applyAttendanceStatus('excused')">Excusés</Button>
                     </div>
                     <div class="overflow-hidden rounded-lg border">
-                        <div v-for="enrollment in rosterGroup.enrollments" :key="enrollment.id" class="grid grid-cols-[32px_1fr_150px] items-center gap-3 border-b p-3 last:border-0" :class="attendanceSelectedIds.includes(enrollment.student_id)?'bg-primary/5':''">
+                        <div v-for="enrollment in rosterGroup.enrollments" :key="enrollment.id" class="grid grid-cols-[28px_1fr] items-center gap-3 border-b p-3 last:border-0 sm:grid-cols-[32px_1fr_150px]" :class="attendanceSelectedIds.includes(enrollment.student_id)?'bg-primary/5':''">
                             <input type="checkbox" :checked="attendanceSelectedIds.includes(enrollment.student_id)" :disabled="attendanceReadOnly" class="size-4 disabled:opacity-40" @change="toggleAttendanceStudent(enrollment.student_id)" />
                             <span class="flex items-center gap-2 font-medium"><img v-if="enrollment.student.photo_url" :src="enrollment.student.photo_url" class="size-8 rounded-full object-cover"/>{{ studentName(enrollment.student) }}</span>
-                            <select v-model="attendanceForm.attendances[enrollment.student_id]" :disabled="attendanceReadOnly" class="h-9 rounded-md border bg-background px-2 text-sm disabled:cursor-default disabled:opacity-100">
+                            <select v-model="attendanceForm.attendances[enrollment.student_id]" :disabled="attendanceReadOnly" class="col-span-2 h-10 w-full rounded-md border bg-background px-2 text-sm disabled:cursor-default disabled:opacity-100 sm:col-span-1 sm:h-9">
                                 <option value="present">Présent</option><option value="absent">Absent</option><option value="late">En retard</option><option value="excused">Excusé</option>
                             </select>
                         </div>

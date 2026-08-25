@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { appPrompt } from '@/composables/useAppDialog';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -151,8 +152,8 @@ function approveDriver(driverId: number) {
     router.patch(`/admin/clients/${props.client.id}/drivers/${driverId}/approve`, {}, { preserveScroll: true });
 }
 
-function rejectDriver(driverId: number) {
-    const reason = prompt('Motif du refus (optionnel) :') ?? undefined;
+async function rejectDriver(driverId: number) {
+    const reason = await appPrompt('Vous pouvez indiquer le motif du refus.', { title: 'Refuser le conducteur', tone: 'warning', inputLabel: 'Motif (facultatif)', confirmText: 'Refuser' }) ?? undefined;
     if (reason !== undefined) {
         router.patch(`/admin/clients/${props.client.id}/drivers/${driverId}/reject`, { reason }, { preserveScroll: true });
     }
@@ -175,8 +176,8 @@ function activateClient() {
     );
 }
 
-function rejectClient() {
-    const reason = window.prompt('Refuser cette demande de compte ? Indiquez éventuellement le motif :');
+async function rejectClient() {
+    const reason = await appPrompt('Refuser cette demande de compte ? Indiquez éventuellement le motif.', { title: 'Refuser le compte', tone: 'warning', inputLabel: 'Motif (facultatif)', confirmText: 'Refuser' });
     if (reason !== null) {
         router.patch(`/admin/clients/${props.client.id}/reject`, { reason }, { preserveScroll: true });
     }

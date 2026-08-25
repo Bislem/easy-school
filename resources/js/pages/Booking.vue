@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { appAlert } from '@/composables/useAppDialog';
 import HomeLayout from '@/layouts/HomeLayout.vue';
 import { login } from '@/routes';
 import { book } from '@/routes/fleet';
@@ -138,12 +139,12 @@ const submitBooking = () => {
 
     if (user.role === 'admin') {
         // Authenticated but role is "admin" → show alert
-        alert('Les administrateurs ne peuvent pas effectuer de réservation.');
+        void appAlert('Les administrateurs ne peuvent pas effectuer de réservation.', { title: 'Réservation indisponible', tone: 'warning' });
         return;
     }
 
     // fallback for any other role
-    alert('Votre rôle ne vous permet pas d’effectuer une réservation.');
+    void appAlert('Votre rôle ne vous permet pas d’effectuer une réservation.', { title: 'Accès non autorisé', tone: 'warning' });
 };
 
 function formatDate(date: string) {

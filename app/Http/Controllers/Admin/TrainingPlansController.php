@@ -9,6 +9,7 @@ use App\Models\Course;
 use App\Models\CourseLevel;
 use App\Models\EnrollmentForm;
 use App\Models\TrainingPlan;
+use App\Models\TrainingPlanTeacherAccess;
 use App\Models\TrainingPlanGroup;
 use App\Models\TrainingSession;
 use App\Models\User;
@@ -30,8 +31,12 @@ class TrainingPlansController extends Controller
 {
     public function index(Request $request): Response
     {
+        $isAdmin = $request->user()->role === UserRole::ADMIN;
         $plans = TrainingPlan::query()
             ->with(['level:id,course_id,name,code,duration_hours,price', 'level.course:id,title,code', 'teacher:id,name', 'enrollmentForm:id,title,start_date,end_date', 'groups.classroom:id,name,capacity', 'groups.sessions:id,training_plan_group_id,starts_at,ends_at'])
+            ->when(! $isAdmin, fn ($query) => $query->where(fn ($query) => $query
+                ->where('teacher_id', $request->user()->id)
+                ->orWhereHas('teacherAccesses', fn ($access) => $access->where('teacher_id', $request->user()->id))))
             ->when($request->string('search')->trim()->toString(), fn ($query, string $search) => $query
                 ->where(fn ($query) => $query->where('title', 'like', "%{$search}%")
                     ->orWhereHas('level.course', fn ($query) => $query->where('title', 'like', "%{$search}%"))
@@ -49,14 +54,16 @@ class TrainingPlansController extends Controller
             'plans' => $plans,
             'levels' => CourseLevel::with('course:id,title,code')->where('is_active', true)->whereHas('course', fn ($query) => $query->where('is_active', true))->orderBy('name')->get(['id', 'course_id', 'name', 'code', 'duration_hours', 'price']),
             'forms' => EnrollmentForm::with('course:id,title,code')->where('is_active', true)->orderBy('start_date')->get(['id', 'course_id', 'teacher_id', 'classroom_id', 'title', 'start_date', 'end_date', 'groups_count', 'students_per_group']),
-            'teachers' => User::where('role', UserRole::TEACHER->value)->where('is_active', true)->orderBy('name')->get(['id', 'name']),
+            'teachers' => User::where('role', UserRole::TEACHER->value)->where('is_active', true)->when($request->user()->role === UserRole::TEACHER, fn ($query) => $query->whereKey($request->user()->id))->orderBy('name')->get(['id', 'name']),
             'classrooms' => Classroom::where('is_active', true)->orderBy('name')->get(['id', 'name', 'code', 'capacity']),
             'filters' => $request->only(['search', 'status']),
+            'access' => ['is_admin' => $isAdmin],
         ]);
     }
 
     public function store(Request $request): RedirectResponse
     {
+        $this->authorizePlanning($request);
         $validated = $request->validate([
             'source_type' => ['required', Rule::in(['form', 'level'])],
             'enrollment_form_id' => ['nullable', 'required_if:source_type,form', 'exists:enrollment_forms,id'],
@@ -84,6 +91,7 @@ class TrainingPlansController extends Controller
                 'teacher_id' => $teacherId, 'title' => $validated['title'],
                 'status' => 'draft', 'notes' => $validated['notes'] ?? null,
             ]);
+            $plan->teacherAccesses()->create(['teacher_id' => $teacherId, 'is_main' => true]);
             foreach (range(1, $groupsCount) as $number) {
                 $group = $plan->groups()->create(['group_number' => $number, 'name' => "Groupe {$number}", 'classroom_id' => $classroomId, 'capacity' => $capacity]);
                 if ($form) {
@@ -97,8 +105,9 @@ class TrainingPlansController extends Controller
         return to_route('admin.training-plans.show', $plan)->with('success', 'Planification créée. Vous pouvez maintenant programmer les séances.');
     }
 
-    public function show(TrainingPlan $trainingPlan): Response
+    public function show(Request $request, TrainingPlan $trainingPlan): Response
     {
+        $this->authorizePlanning($request, $trainingPlan);
         $trainingPlan->load([
             'level.course', 'teacher:id,name,email,phone', 'enrollmentForm',
             'groups' => fn ($query) => $query->orderBy('group_number'),
@@ -117,27 +126,95 @@ class TrainingPlansController extends Controller
 
         return Inertia::render('Admin/TrainingPlans/Show', [
             'plan' => $trainingPlan,
-            'teachers' => User::where('role', UserRole::TEACHER->value)->where('is_active', true)->orderBy('name')->get(['id', 'name']),
+            'teachers' => User::where('role', UserRole::TEACHER->value)->where('is_active', true)->when($request->user()->role === UserRole::TEACHER, fn ($query) => $query->whereKey($request->user()->id))->orderBy('name')->get(['id', 'name']),
             'classrooms' => Classroom::where('is_active', true)->orderBy('name')->get(['id', 'name', 'code', 'capacity']),
-            'students' => Student::where('is_active', true)->orderBy('last_name')->orderBy('first_name')
-                ->get(['id', 'first_name', 'last_name', 'email', 'phone', 'birth_date', 'school_level', 'photo_path']),
+            'students' => $request->user()->role === UserRole::ADMIN ? Student::where('is_active', true)->orderBy('last_name')->orderBy('first_name')->get(['id', 'first_name', 'last_name', 'email', 'phone', 'birth_date', 'school_level', 'photo_path']) : [],
+            'access' => $this->planningAccess($request, $trainingPlan),
         ]);
     }
 
     public function update(Request $request, TrainingPlan $trainingPlan): RedirectResponse
     {
+        $this->authorizePlanning($request);
         $validated = $request->validate([
             'title' => ['required', 'string', 'max:255'],
             'teacher_id' => ['required', Rule::exists('users', 'id')->where('role', UserRole::TEACHER->value)],
             'status' => ['required', Rule::in(['draft', 'scheduled', 'in_progress', 'completed', 'cancelled'])],
             'notes' => ['nullable', 'string', 'max:5000'],
         ]);
-        $trainingPlan->update($validated);
+        DB::transaction(function () use ($trainingPlan, $validated) {
+            $teacherChanged = (int) $trainingPlan->teacher_id !== (int) $validated['teacher_id'];
+            $trainingPlan->update($validated);
+            if ($teacherChanged) {
+                $trainingPlan->teacherAccesses()->where('is_main', true)->delete();
+                $trainingPlan->teacherAccesses()->updateOrCreate(
+                    ['teacher_id' => $validated['teacher_id']],
+                    ['is_main' => true, 'can_manage_groups' => false, 'can_add_sessions' => false, 'can_record_attendance' => false],
+                );
+            }
+        });
         return back()->with('success', 'Planification mise à jour.');
+    }
+
+    public function settings(Request $request, TrainingPlan $trainingPlan): Response
+    {
+        $this->authorizeAdmin($request);
+        $trainingPlan->teacherAccesses()->updateOrCreate(
+            ['teacher_id' => $trainingPlan->teacher_id],
+            ['is_main' => true],
+        );
+        $trainingPlan->load(['level.course:id,title,code', 'teacher:id,name,email', 'teacherAccesses' => fn ($query) => $query->with('teacher:id,name,email')->orderByDesc('is_main')->orderBy('id')]);
+        $assignedIds = $trainingPlan->teacherAccesses->pluck('teacher_id');
+
+        return Inertia::render('Admin/TrainingPlans/Settings', [
+            'plan' => $trainingPlan,
+            'availableTeachers' => User::where('role', UserRole::TEACHER->value)->where('is_active', true)->whereNotIn('id', $assignedIds)->orderBy('name')->get(['id', 'name', 'email']),
+        ]);
+    }
+
+    public function updateMainAccess(Request $request, TrainingPlan $trainingPlan): RedirectResponse
+    {
+        $this->authorizeAdmin($request);
+        $access = $trainingPlan->teacherAccesses()->where('teacher_id', $trainingPlan->teacher_id)->firstOrFail();
+        $access->update($this->validateTeacherAccess($request));
+        return back()->with('success', 'Accès du formateur principal mis à jour.');
+    }
+
+    public function storeTeacherAccess(Request $request, TrainingPlan $trainingPlan): RedirectResponse
+    {
+        $this->authorizeAdmin($request);
+        $validated = $request->validate([
+            'teacher_id' => [
+                'required',
+                Rule::exists('users', 'id')->where('role', UserRole::TEACHER->value),
+                Rule::unique('training_plan_teacher_accesses', 'teacher_id')->where('training_plan_id', $trainingPlan->id),
+            ],
+            ...$this->teacherAccessRules(),
+        ]);
+        abort_if((int) $validated['teacher_id'] === (int) $trainingPlan->teacher_id, 422, 'Ce formateur est déjà le formateur principal.');
+        $trainingPlan->teacherAccesses()->create([...$validated, 'is_main' => false]);
+        return back()->with('success', 'Formateur ajouté à la planification.');
+    }
+
+    public function updateTeacherAccess(Request $request, TrainingPlan $trainingPlan, TrainingPlanTeacherAccess $access): RedirectResponse
+    {
+        $this->authorizeAdmin($request);
+        abort_unless($access->training_plan_id === $trainingPlan->id && ! $access->is_main, 404);
+        $access->update($this->validateTeacherAccess($request));
+        return back()->with('success', 'Accès du formateur mis à jour.');
+    }
+
+    public function destroyTeacherAccess(Request $request, TrainingPlan $trainingPlan, TrainingPlanTeacherAccess $access): RedirectResponse
+    {
+        $this->authorizeAdmin($request);
+        abort_unless($access->training_plan_id === $trainingPlan->id && ! $access->is_main, 404);
+        $access->delete();
+        return back()->with('success', 'Accès supplémentaire supprimé.');
     }
 
     public function storeGroup(Request $request, TrainingPlan $trainingPlan): RedirectResponse
     {
+        $this->authorizePlanning($request, $trainingPlan, 'groups');
         $validated = $this->validateGroup($request);
         $number = ((int) $trainingPlan->groups()->max('group_number')) + 1;
         $trainingPlan->groups()->create([...$validated, 'group_number' => $number]);
@@ -146,13 +223,15 @@ class TrainingPlansController extends Controller
 
     public function updateGroup(Request $request, TrainingPlan $trainingPlan, TrainingPlanGroup $group): RedirectResponse
     {
+        $this->authorizePlanning($request, $trainingPlan, 'groups');
         $this->ensureGroup($trainingPlan, $group);
         $group->update($this->validateGroup($request));
         return back()->with('success', 'Groupe mis à jour.');
     }
 
-    public function destroyGroup(TrainingPlan $trainingPlan, TrainingPlanGroup $group): RedirectResponse
+    public function destroyGroup(Request $request, TrainingPlan $trainingPlan, TrainingPlanGroup $group): RedirectResponse
     {
+        $this->authorizePlanning($request, $trainingPlan, 'groups');
         $this->ensureGroup($trainingPlan, $group);
         if ($trainingPlan->groups()->count() <= 1) {
             return back()->withErrors(['group' => 'Une planification doit conserver au moins un groupe.']);
@@ -166,6 +245,7 @@ class TrainingPlansController extends Controller
 
     public function storeSession(Request $request, TrainingPlan $trainingPlan, TrainingPlanGroup $group): RedirectResponse
     {
+        $this->authorizePlanning($request, $trainingPlan, 'sessions');
         $this->ensureGroup($trainingPlan, $group);
         $validated = $this->validateSession($request, $trainingPlan, $group);
         $this->assertNoConflict($validated);
@@ -176,6 +256,7 @@ class TrainingPlansController extends Controller
 
     public function updateSession(Request $request, TrainingPlan $trainingPlan, TrainingPlanGroup $group, TrainingSession $session): RedirectResponse
     {
+        $this->authorizePlanning($request);
         $this->ensureGroup($trainingPlan, $group);
         abort_unless($session->training_plan_group_id === $group->id, 404);
         abort_if($session->status === 'completed' || $session->attendance_locked_at || $session->attendance_status === 'validated', 422, 'Une séance validée définitivement ne peut plus être modifiée.');
@@ -188,8 +269,9 @@ class TrainingPlansController extends Controller
         return back()->with('success', 'Séance mise à jour.');
     }
 
-    public function destroySession(TrainingPlan $trainingPlan, TrainingPlanGroup $group, TrainingSession $session): RedirectResponse
+    public function destroySession(Request $request, TrainingPlan $trainingPlan, TrainingPlanGroup $group, TrainingSession $session): RedirectResponse
     {
+        $this->authorizePlanning($request);
         $this->ensureGroup($trainingPlan, $group);
         abort_unless($session->training_plan_group_id === $group->id, 404);
         abort_if($session->status === 'completed' || $session->attendance_locked_at || $session->attendance_status === 'validated', 422, 'Une séance validée définitivement ne peut plus être supprimée.');
@@ -199,6 +281,7 @@ class TrainingPlansController extends Controller
 
     public function completeSession(Request $request, TrainingPlan $trainingPlan, TrainingPlanGroup $group, TrainingSession $session): RedirectResponse
     {
+        $this->authorizePlanning($request, $trainingPlan, 'attendance');
         $this->ensureGroup($trainingPlan,$group); abort_unless($session->training_plan_group_id===$group->id,404);
         abort_if($session->status==='cancelled',422,'Une séance annulée ne peut pas être terminée.');
         app(AttendanceService::class)->validate($session, $request->user()->id);
@@ -207,6 +290,7 @@ class TrainingPlansController extends Controller
 
     public function addStudent(Request $request, TrainingPlan $trainingPlan, TrainingPlanGroup $group): RedirectResponse
     {
+        $this->authorizePlanning($request);
         $this->ensureGroup($trainingPlan, $group);
         $validated = $request->validate([
             'student_ids' => ['required', 'array', 'min:1'],
@@ -249,6 +333,7 @@ class TrainingPlansController extends Controller
 
     public function moveStudent(Request $request, TrainingPlan $trainingPlan, TrainingPlanGroup $group, CourseEnrollment $enrollment): RedirectResponse
     {
+        $this->authorizePlanning($request);
         $this->ensureGroup($trainingPlan, $group);
         abort_unless($enrollment->training_plan_group_id === $group->id, 404);
         $validated = $request->validate(['training_plan_group_id' => ['required', 'integer']]);
@@ -262,6 +347,7 @@ class TrainingPlansController extends Controller
 
     public function updateStudent(Request $request, TrainingPlan $trainingPlan, TrainingPlanGroup $group, CourseEnrollment $enrollment): RedirectResponse
     {
+        $this->authorizePlanning($request);
         $this->ensureGroup($trainingPlan, $group);
         abort_unless($enrollment->training_plan_group_id === $group->id && $enrollment->student_id, 404);
         $student = $enrollment->student;
@@ -279,6 +365,7 @@ class TrainingPlansController extends Controller
 
     public function recordAttendance(Request $request, TrainingPlan $trainingPlan, TrainingPlanGroup $group, TrainingSession $session): RedirectResponse
     {
+        $this->authorizePlanning($request, $trainingPlan, 'attendance');
         $this->ensureGroup($trainingPlan, $group);
         abort_unless($session->training_plan_group_id === $group->id, 404);
         if ($session->attendance_status !== 'pending' || $session->attendances()->exists()) {
@@ -322,6 +409,9 @@ class TrainingPlansController extends Controller
             'teacher_id' => ['required', Rule::exists('users', 'id')->where('role', UserRole::TEACHER->value)],
             'starts_at' => ['required', 'date'], 'ends_at' => ['required', 'date', 'after:starts_at'], 'notes' => ['nullable', 'string', 'max:5000'],
         ]);
+        if ($request->user()->role === UserRole::TEACHER) {
+            $validated['teacher_id'] = $request->user()->id;
+        }
         if ($plan->enrollmentForm && ($request->date('starts_at')->toDateString() < $plan->enrollmentForm->start_date->toDateString() || $request->date('ends_at')->toDateString() > $plan->enrollmentForm->end_date->toDateString())) {
             throw ValidationException::withMessages(['starts_at' => 'La séance doit être comprise dans les dates du formulaire d’inscription.']);
         }
@@ -358,5 +448,50 @@ class TrainingPlansController extends Controller
         if ($group->capacity && $group->enrollments()->count() >= $group->capacity) {
             throw ValidationException::withMessages(['student_id' => 'Ce groupe a atteint sa capacité maximale.']);
         }
+    }
+
+    private function planningAccess(Request $request, TrainingPlan $plan): array
+    {
+        $admin = $request->user()->role === UserRole::ADMIN;
+        $access = $admin ? null : $plan->teacherAccesses()->where('teacher_id', $request->user()->id)->first();
+
+        return [
+            'is_admin' => $admin,
+            'manage_groups' => $admin || (bool) $access?->can_manage_groups,
+            'add_sessions' => $admin || (bool) $access?->can_add_sessions,
+            'record_attendance' => $admin || (bool) $access?->can_record_attendance,
+        ];
+    }
+
+    private function authorizePlanning(Request $request, ?TrainingPlan $plan = null, ?string $ability = null): void
+    {
+        if ($request->user()->role === UserRole::ADMIN) return;
+        abort_unless($request->user()->role === UserRole::TEACHER, 403);
+        abort_unless($plan, 403);
+        $access = $plan->teacherAccesses()->where('teacher_id', $request->user()->id)->first();
+        abort_unless($access || $plan->teacher_id === $request->user()->id, 403, 'Vous n’avez pas accès à cette planification.');
+        if ($ability !== null) {
+            $key = match ($ability) { 'groups' => 'manage_groups', 'sessions' => 'add_sessions', 'attendance' => 'record_attendance' };
+            abort_unless($this->planningAccess($request, $plan)[$key], 403, 'Cette action n’est pas autorisée pour les enseignants.');
+        }
+    }
+
+    private function authorizeAdmin(Request $request): void
+    {
+        abort_unless($request->user()->role === UserRole::ADMIN, 403);
+    }
+
+    private function teacherAccessRules(): array
+    {
+        return [
+            'can_manage_groups' => ['required', 'boolean'],
+            'can_add_sessions' => ['required', 'boolean'],
+            'can_record_attendance' => ['required', 'boolean'],
+        ];
+    }
+
+    private function validateTeacherAccess(Request $request): array
+    {
+        return $request->validate($this->teacherAccessRules());
     }
 }

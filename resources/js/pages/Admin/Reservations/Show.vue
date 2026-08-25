@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Button } from '@/components/ui/button';
+import { appConfirm, appPrompt } from '@/composables/useAppDialog';
 import {
     Dialog,
     DialogContent,
@@ -87,7 +88,7 @@ function formatPaymentMethod(method: string) {
     return labels[method] || method;
 }
 
-function approveReservation() {
+async function approveReservation() {
     if (
         Number(props.reservation.required_advance_amount) > 0 &&
         props.paidAmount < Number(props.reservation.required_advance_amount)
@@ -96,8 +97,9 @@ function approveReservation() {
         return;
     }
     if (
-        window.confirm(
+        await appConfirm(
             `Approuver la réservation ${props.reservation.reservation_number} ?`,
+            { title: 'Approuver la réservation', confirmText: 'Approuver' },
         )
     ) {
         router.patch(
@@ -131,8 +133,8 @@ function focusPaymentReview() {
     }, 8000);
 }
 
-function approvePayment(payment: any) {
-    if (window.confirm(`Approuver le paiement ${payment.payment_number} ?`)) {
+async function approvePayment(payment: any) {
+    if (await appConfirm(`Approuver le paiement ${payment.payment_number} ?`, { title: 'Approuver le paiement', confirmText: 'Approuver' })) {
         router.patch(`/admin/payments/${payment.id}/approve`, {}, {
             preserveScroll: true,
             onSuccess: () => { highlightedPaymentId.value = null; paymentReviewMessage.value = ''; },
@@ -140,8 +142,8 @@ function approvePayment(payment: any) {
     }
 }
 
-function refusePayment(payment: any) {
-    const notes = window.prompt('Refuser cette preuve de paiement ? Ajoutez éventuellement un motif pour le client :');
+async function refusePayment(payment: any) {
+    const notes = await appPrompt('Refuser cette preuve de paiement ? Ajoutez éventuellement un motif pour le client.', { title: 'Refuser le paiement', tone: 'warning', inputLabel: 'Motif (facultatif)', confirmText: 'Refuser' });
     if (notes !== null) {
         router.patch(`/admin/payments/${payment.id}/disapprove`, { notes }, {
             preserveScroll: true,
@@ -150,9 +152,10 @@ function refusePayment(payment: any) {
     }
 }
 
-function rejectReservation() {
-    const reason = window.prompt(
+async function rejectReservation() {
+    const reason = await appPrompt(
         'Rejeter cette réservation ? Ajoutez un motif facultatif pour le client :',
+        { title: 'Rejeter la réservation', tone: 'warning', inputLabel: 'Motif (facultatif)', confirmText: 'Rejeter' },
     );
     if (reason !== null) {
         router.patch(
@@ -163,9 +166,10 @@ function rejectReservation() {
     }
 }
 
-function cancelReservation() {
-    const reason = window.prompt(
+async function cancelReservation() {
+    const reason = await appPrompt(
         'Annuler cette réservation ? Ajoutez un motif facultatif :',
+        { title: 'Annuler la réservation', tone: 'danger', inputLabel: 'Motif (facultatif)', confirmText: 'Annuler la réservation' },
     );
     if (reason !== null) {
         router.patch(
@@ -176,10 +180,11 @@ function cancelReservation() {
     }
 }
 
-function markPaid() {
+async function markPaid() {
     if (
-        window.confirm(
+        await appConfirm(
             'Enregistrer le solde restant comme paiement en espèces terminé ?',
+            { title: 'Marquer comme payé', confirmText: 'Enregistrer le paiement' },
         )
     ) {
         router.post(
@@ -190,11 +195,11 @@ function markPaid() {
     }
 }
 
-function changeStatus(
+async function changeStatus(
     action: 'start' | 'complete' | 'no-show',
     message: string,
 ) {
-    if (window.confirm(message)) {
+    if (await appConfirm(message, { title: 'Changer le statut', tone: 'warning', confirmText: 'Confirmer' })) {
         router.patch(
             `/admin/reservations/${props.reservation.id}/${action}`,
             {},

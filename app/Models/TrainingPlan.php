@@ -19,4 +19,5 @@ class TrainingPlan extends Model
     public function enrollmentForm(): BelongsTo { return $this->belongsTo(EnrollmentForm::class); }
     public function teacher(): BelongsTo { return $this->belongsTo(User::class, 'teacher_id'); }
     public function groups(): HasMany { return $this->hasMany(TrainingPlanGroup::class); }
+    public function teacherAccesses(): HasMany { return $this->hasMany(TrainingPlanTeacherAccess::class); }
 }

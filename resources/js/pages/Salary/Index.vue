@@ -1,63 +1,32 @@
 <script setup lang="ts">
+import { Button } from '@/components/ui/button';
 import AdminLayout from '@/layouts/AdminLayout.vue';
-import { Head } from '@inertiajs/vue3';
-const props = defineProps({
-    employee: { type: Object, required: true },
-    statements: { type: Array, required: true },
-    payments: { type: Array, required: true },
-    currency: { type: Object, required: true },
-});
-const money = (v: any) =>
-    `${Number(v).toLocaleString('fr-FR', { minimumFractionDigits: 2 })} ${props.currency}`;
+import { Head, Link, router } from '@inertiajs/vue3';
+import { Banknote, CalendarDays, CheckCircle2, ChevronDown, Clock3, Download, FileText, ReceiptText, RotateCcw, WalletCards } from 'lucide-vue-next';
+import { ref } from 'vue';
+const props=defineProps<{employee:any;statements:{data:any[];links:any[]};summary:any;availableMonths:string[];filters:{period?:string};currency:string}>();
+const period=ref(props.filters.period??'');const opened=ref<number|null>(props.statements.data[0]?.id??null);
+const labels:any={monthly:'Mensuel fixe',hourly:'Horaire',per_session:'Par séance',daily:'Journalier',custom:'Manuel'};
+const statuses:any={pending:'À payer',partially_paid:'Partiellement payé',paid:'Payé'};
+const money=(v:any)=>`${Number(v||0).toLocaleString('fr-DZ',{minimumFractionDigits:2,maximumFractionDigits:2})} ${props.currency}`;
+const hours=(s:any)=>Number(s.calculation_details?.attendance_worked_hours??0);
+const monthLabel=(v:string)=>new Intl.DateTimeFormat('fr-FR',{month:'long',year:'numeric'}).format(new Date(`${v}-01T00:00:00`));
+const date=(v:string)=>new Date(v).toLocaleDateString('fr-FR');
+const method=(v:string)=>({cash:'Espèces',bank_transfer:'Virement bancaire',cheque:'Chèque',card:'Carte',other:'Autre'} as any)[v]??v;
+function filter(){router.get('/my/salary',{period:period.value},{preserveState:true,replace:true})}function clear(){period.value='';filter()}
 </script>
-<template>
-    <Head title="Ma paie" /><AdminLayout
-        ><main class="flex-1 p-4 sm:p-6 lg:p-8">
-            <div class="mx-auto max-w-5xl space-y-6">
-                <header>
-                    <h1 class="text-2xl font-semibold">Ma paie</h1>
-                    <p class="text-muted-foreground">
-                        {{ employee.name }} · historique personnel
-                    </p>
-                </header>
-                <section class="space-y-3">
-                    <article
-                        v-for="s in statements.data"
-                        :key="s.id"
-                        class="rounded-xl border bg-card p-5"
-                    >
-                        <div class="flex flex-wrap justify-between gap-3">
-                            <div>
-                                <b>{{ s.reference }}</b>
-                                <p class="text-sm text-muted-foreground">
-                                    {{ s.period_start }} → {{ s.period_end }}
-                                </p>
-                            </div>
-                            <div class="text-right">
-                                <p class="font-semibold">
-                                    Net {{ money(s.net_salary) }}
-                                </p>
-                                <p class="text-sm">
-                                    Payé {{ money(s.amount_paid) }} · Reste
-                                    {{ money(s.remaining_amount) }}
-                                </p>
-                            </div>
-                        </div>
-                        <div class="mt-3 border-t pt-3 text-sm">
-                            <p v-for="p in s.payments" :key="p.id">
-                                {{ p.paid_at }} · {{ p.reference }} ·
-                                {{ money(p.amount) }}
-                            </p>
-                        </div>
-                    </article>
-                    <p
-                        v-if="!statements.data.length"
-                        class="rounded-xl border border-dashed p-10 text-center text-muted-foreground"
-                    >
-                        Aucun bulletin disponible.
-                    </p>
-                </section>
-            </div>
-        </main></AdminLayout
-    >
-</template>
+<template><Head title="Ma paie"/><AdminLayout><main class="min-w-0 flex-1 p-4 sm:p-6 lg:p-8"><div class="mx-auto max-w-6xl space-y-6">
+<header class="rounded-2xl border bg-card p-5 shadow-sm sm:p-6"><div class="flex items-center justify-between gap-4"><div><p class="text-sm font-medium text-primary">Espace personnel</p><h1 class="mt-1 text-2xl font-bold">Ma paie</h1><p class="mt-1 text-sm text-muted-foreground">{{employee.name}} · {{employee.employee_type?.name}} · {{employee.employee_code}}</p></div><span class="rounded-xl bg-primary/10 p-3 text-primary"><WalletCards class="size-7"/></span></div></header>
+<section class="grid grid-cols-2 gap-3 lg:grid-cols-5"><article v-for="x in [{l:'Heures',v:`${summary.hours} h`,i:Clock3,c:'text-blue-600 bg-blue-100'},{l:'Brut',v:money(summary.gross),i:FileText,c:'text-slate-600 bg-slate-100'},{l:'Net',v:money(summary.net),i:WalletCards,c:'text-primary bg-primary/10'},{l:'Payé',v:money(summary.paid),i:CheckCircle2,c:'text-emerald-600 bg-emerald-100'},{l:'Reste',v:money(summary.remaining),i:Banknote,c:'text-amber-600 bg-amber-100'}]" :key="x.l" class="rounded-xl border bg-card p-4 shadow-sm last:col-span-2 lg:last:col-span-1"><span class="inline-grid rounded-lg p-2" :class="x.c"><component :is="x.i" class="size-4"/></span><p class="mt-3 text-xs text-muted-foreground">{{x.l}}</p><b class="mt-1 block break-words text-lg">{{x.v}}</b></article></section>
+<section class="rounded-xl border bg-card p-4 shadow-sm"><div class="flex flex-col gap-3 sm:flex-row sm:items-end"><label class="flex-1"><span class="mb-1 block text-sm font-medium">Filtrer par mois</span><select v-model="period" class="h-10 w-full rounded-md border bg-background px-3 text-sm"><option value="">Toutes les périodes</option><option v-for="m in availableMonths" :key="m" :value="m">{{monthLabel(m)}}</option></select></label><Button @click="filter"><CalendarDays class="mr-2 size-4"/>Afficher</Button><Button v-if="period" variant="ghost" @click="clear"><RotateCcw class="mr-2 size-4"/>Réinitialiser</Button></div></section>
+<section class="space-y-4"><article v-for="s in statements.data" :key="s.id" class="overflow-hidden rounded-2xl border bg-card shadow-sm"><button class="flex w-full flex-col gap-4 p-5 text-left sm:flex-row sm:items-center sm:justify-between" @click="opened=opened===s.id?null:s.id"><div><div class="flex flex-wrap items-center gap-2"><h2 class="font-semibold capitalize">{{monthLabel(s.period_start.slice(0,7))}}</h2><span class="rounded-full px-2.5 py-1 text-xs font-medium" :class="s.status==='paid'?'bg-emerald-100 text-emerald-700':s.status==='partially_paid'?'bg-blue-100 text-blue-700':'bg-amber-100 text-amber-700'">{{statuses[s.status]}}</span></div><p class="mt-1 text-xs text-muted-foreground">{{s.reference}} · {{labels[s.salary_type]}}</p></div><div class="flex w-full items-center justify-between gap-4 sm:w-auto"><div class="sm:text-right"><p class="text-xs text-muted-foreground">Net du bulletin</p><b class="text-xl">{{money(s.net_salary)}}</b></div><ChevronDown class="size-5 transition" :class="opened===s.id?'rotate-180':''"/></div></button>
+<div v-if="opened===s.id" class="border-t bg-muted/10 p-4 sm:p-5"><div class="grid gap-4 lg:grid-cols-3">
+<div class="rounded-xl border bg-background p-4"><p class="text-xs font-semibold uppercase text-muted-foreground">Calcul</p><dl class="mt-3 space-y-2 text-sm"><div class="flex justify-between gap-3"><dt>Configuration</dt><dd class="text-right font-medium">{{s.configuration?.name||'Archivée'}}</dd></div><div class="flex justify-between"><dt>Taux de base</dt><dd>{{money(s.base_rate)}}</dd></div><div class="flex justify-between"><dt>Unités</dt><dd>{{s.units}}</dd></div><div class="flex justify-between"><dt>Heures tracées</dt><dd class="font-semibold text-primary">{{hours(s)}} h</dd></div><div class="flex justify-between"><dt>Séances</dt><dd>{{s.calculation_details?.session_count||0}}</dd></div></dl></div>
+<div class="rounded-xl border bg-background p-4"><p class="text-xs font-semibold uppercase text-muted-foreground">Composition</p><dl class="mt-3 space-y-2 text-sm"><div class="flex justify-between"><dt>Brut</dt><dd>{{money(s.gross_salary)}}</dd></div><div class="flex justify-between text-emerald-700"><dt>Primes</dt><dd>+ {{money(Number(s.bonuses)+Number(s.exceptional_payments)+Number(s.reimbursements))}}</dd></div><div class="flex justify-between text-red-600"><dt>Retenues</dt><dd>- {{money(Number(s.deductions)+Number(s.advances))}}</dd></div><div class="flex justify-between border-t pt-2 font-semibold"><dt>Net</dt><dd>{{money(s.net_salary)}}</dd></div></dl></div>
+<div class="rounded-xl border bg-background p-4"><p class="text-xs font-semibold uppercase text-muted-foreground">Règlement</p><dl class="mt-3 space-y-2 text-sm"><div class="flex justify-between text-emerald-700"><dt>Payé</dt><dd>{{money(s.amount_paid)}}</dd></div><div class="flex justify-between text-amber-700"><dt>Reste</dt><dd>{{money(s.remaining_amount)}}</dd></div></dl><Button as-child variant="outline" class="mt-4 w-full"><a :href="`/my/salary/statements/${s.id}/download`"><Download class="mr-2 size-4"/>Bulletin PDF</a></Button></div></div>
+<div v-if="s.teacher_attendances?.length" class="mt-4 rounded-xl border bg-background p-4"><p class="font-semibold">Séances incluses</p><div class="mt-2 divide-y"><div v-for="a in s.teacher_attendances" :key="a.id" class="grid gap-1 py-3 text-sm sm:grid-cols-[110px_1fr_auto]"><span>{{date(a.session.starts_at)}}</span><span><b>{{a.session.title}}</b><small class="block text-muted-foreground">{{a.session.group?.plan?.level?.course?.title}} · {{a.session.group?.name}}</small></span><span class="font-medium">{{Number(a.worked_minutes)/60}} h</span></div></div></div>
+<div v-if="s.adjustments?.length" class="mt-4 rounded-xl border bg-background p-4"><p class="font-semibold">Primes et retenues détaillées</p><div v-for="a in s.adjustments" :key="a.id" class="mt-2 flex justify-between gap-3 text-sm"><span>{{a.label}}<small v-if="a.notes" class="block text-muted-foreground">{{a.notes}}</small></span><b>{{money(a.amount)}}</b></div></div>
+<div class="mt-4 rounded-xl border bg-background p-4"><p class="font-semibold">Paiements et reçus</p><div v-if="s.payments?.length" class="mt-3 grid gap-3 md:grid-cols-2"><div v-for="p in s.payments" :key="p.id" class="flex items-center justify-between gap-3 rounded-lg border p-3"><div><b>{{money(p.amount)}}</b><p class="text-xs text-muted-foreground">{{date(p.paid_at)}} · {{method(p.payment_method)}}<br>{{p.reference}}</p></div><Button as-child size="sm" variant="outline"><a :href="`/my/salary/payments/${p.id}/receipt`"><ReceiptText class="mr-2 size-4"/>Reçu</a></Button></div></div><p v-else class="mt-3 text-sm text-muted-foreground">Aucun paiement enregistré.</p></div></div></article>
+<div v-if="!statements.data.length" class="rounded-2xl border border-dashed p-12 text-center text-muted-foreground"><FileText class="mx-auto mb-3 size-8"/><p class="font-medium">Aucun bulletin pour cette période</p></div></section>
+<nav v-if="statements.links?.length>3" class="flex max-w-full gap-1 overflow-x-auto"><Link v-for="l in statements.links" :key="l.label" :href="l.url||'#'" class="rounded-md border px-3 py-2 text-sm" :class="{'bg-primary text-primary-foreground':l.active,'pointer-events-none opacity-40':!l.url}" v-html="l.label"/></nav>
+</div></main></AdminLayout></template>

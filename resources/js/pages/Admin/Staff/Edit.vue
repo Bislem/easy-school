@@ -28,6 +28,7 @@ const form = useForm({
     identification_expires_at: props.employee.identification_expires_at ?? '',
     identification_notes: props.employee.identification_notes ?? '',
     can_login: props.employee.user?.can_login ?? false,
+    can_view_student_folders: props.employee.can_view_student_folders ?? true,
     password: '',
     password_confirmation: '',
     photo: null as File | null,
@@ -165,6 +166,7 @@ function photo(e: Event) {
                         <label class="flex items-center gap-2 sm:col-span-2"
                             ><input v-model="form.can_login" type="checkbox" />
                             Autoriser la connexion</label
+                        ><label v-if="employee.employee_type?.is_teacher" class="flex items-start gap-3 rounded-lg border p-4 sm:col-span-2"><input v-model="form.can_view_student_folders" type="checkbox" class="mt-1"/><span><b class="block">Avoir accès aux dossiers étudiants</b><small class="text-muted-foreground">Autorise la consultation en lecture seule des étudiants appartenant à ses planifications actives. Les paiements et documents restent masqués.</small></span></label
                         ><template v-if="form.can_login"
                             ><div>
                                 <Label>Nouveau mot de passe (facultatif)</Label

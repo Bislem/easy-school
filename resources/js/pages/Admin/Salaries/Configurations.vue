@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { appConfirm } from '@/composables/useAppDialog';
 import InputError from '@/components/InputError.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -41,8 +42,8 @@ function save() {
     if (editingId.value) form.put(`/admin/salaries/configurations/${editingId.value}`, options);
     else form.post('/admin/salaries/configurations', options);
 }
-function remove(configuration: any) {
-    if (window.confirm(`Supprimer la configuration « ${configuration.name} » ?`)) router.delete(`/admin/salaries/configurations/${configuration.id}`, { preserveScroll: true });
+async function remove(configuration: any) {
+    if (await appConfirm(`Supprimer la configuration « ${configuration.name} » ?`, { title: 'Supprimer la configuration', tone: 'danger', confirmText: 'Supprimer' })) router.delete(`/admin/salaries/configurations/${configuration.id}`, { preserveScroll: true });
 }
 </script>
 

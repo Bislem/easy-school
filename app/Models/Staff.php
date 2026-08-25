@@ -16,11 +16,13 @@ class Staff extends Model
         'phone', 'email', 'address', 'birth_date', 'hire_date', 'employment_status',
         'notes', 'employee_code', 'identification_type', 'identification_number',
         'identification_expires_at', 'identification_notes',
+        'can_view_student_folders',
     ];
 
     protected $casts = [
         'birth_date' => 'date:Y-m-d', 'hire_date' => 'date:Y-m-d',
         'identification_expires_at' => 'date:Y-m-d', 'employment_status' => EmploymentStatus::class,
+        'can_view_student_folders' => 'boolean',
     ];
 
     protected $appends = ['name', 'photo_url', 'is_teacher'];

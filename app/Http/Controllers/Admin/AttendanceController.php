@@ -93,10 +93,12 @@ class AttendanceController extends Controller
         $records = $records->filter(fn ($record) => filled($record['date']))
             ->sortByDesc(fn ($record) => $record['starts_at'] ?? $record['date'])->values();
         $present = $records->whereIn('status', ['present', 'late', 'replaced'])->count();
+        $recordsPage=max(1,$request->integer('page',1));
+        $paginatedRecords=new \Illuminate\Pagination\LengthAwarePaginator($records->forPage($recordsPage,42)->values(),$records->count(),42,$recordsPage,['path'=>$request->url(),'query'=>$request->query()]);
 
         return Inertia::render('Admin/Attendance/Index', [
             'personType' => $type, 'selectedPerson' => $selectedPerson, 'students' => $students, 'employees' => $employees,
-            'records' => $records, 'teachers' => User::where('role', 'teacher')->where('is_active', true)->orderBy('name')->get(['id', 'name']),
+            'records' => $paginatedRecords, 'teachers' => User::where('role', 'teacher')->where('is_active', true)->orderBy('name')->get(['id', 'name']),
             'filters' => ['person_type' => $type, 'person_id' => $personId, 'date_from' => $request->input('date_from'), 'date_to' => $request->input('date_to'), 'status' => $status],
             'stats' => ['total' => $records->count(), 'present' => $present, 'absent' => $records->whereIn('status', ['absent', 'excused', 'leave'])->count(),
                 'late' => $records->where('status', 'late')->count(), 'rate' => $records->count() ? round($present / $records->count() * 100, 1) : null,

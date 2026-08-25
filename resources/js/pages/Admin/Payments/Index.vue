@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { appConfirm, appPrompt } from '@/composables/useAppDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import AdminLayout from '@/layouts/AdminLayout.vue';
@@ -98,8 +99,8 @@ function recordPayment() {
     });
 }
 
-function approve(payment: Payment) {
-    if (window.confirm(`Approuver le paiement ${payment.payment_number} ?`)) {
+async function approve(payment: Payment) {
+    if (await appConfirm(`Approuver le paiement ${payment.payment_number} ?`, { title: 'Approuver le paiement', confirmText: 'Approuver' })) {
         router.patch(
             `/admin/payments/${payment.id}/approve`,
             {},
@@ -108,9 +109,10 @@ function approve(payment: Payment) {
     }
 }
 
-function disapprove(payment: Payment) {
-    const notes = window.prompt(
+async function disapprove(payment: Payment) {
+    const notes = await appPrompt(
         `Refuser le paiement ${payment.payment_number} ? Ajoutez éventuellement un motif pour le client :`,
+        { title: 'Refuser le paiement', tone: 'warning', inputLabel: 'Motif (facultatif)', confirmText: 'Refuser' },
     );
     if (notes !== null) {
         router.patch(

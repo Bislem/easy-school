@@ -96,6 +96,7 @@ class StaffController extends Controller
             'identification_type' => ['nullable', 'string', 'max:100'], 'identification_number' => ['nullable', 'string', 'max:150'],
             'identification_expires_at' => ['nullable', 'date'], 'identification_notes' => ['nullable', 'string', 'max:2000'],
             'can_login' => ['required', 'boolean'],
+            'can_view_student_folders' => ['required', 'boolean'],
             'password' => [Rule::requiredIf($request->boolean('can_login') && ! $staff?->user_id), 'nullable', 'confirmed', Password::defaults()],
         ]);
     }

@@ -40,6 +40,7 @@ class SchoolUsersSeeder extends Seeder
                     ...$user,
                     'password' => $password,
                     'is_active' => true,
+                    'can_login' => true,
                     'email_verified_at' => now(),
                 ],
             );

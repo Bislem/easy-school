@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import InputError from '@/components/InputError.vue';
+import { appConfirm } from '@/composables/useAppDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -78,6 +79,8 @@ const filteredEmployees = computed(() => {
     );
 });
 const selectedEmployee = computed(() => props.employees.find((employee: any) => String(employee.id) === statement.staff_id));
+const attendanceBased = computed(() => ['hourly', 'daily', 'per_session'].includes(selected.value?.salary_type));
+const canGenerate = computed(() => !previewLoading.value && (!attendanceBased.value || (availableHours.value ?? 0) > 0));
 const selectedFilterEmployee = computed(() => props.employees.find((employee: any) => String(employee.id) === listFilters.staff_id));
 const filteredFilterEmployees = computed(() => {
     const query = filterEmployeeSearch.value.trim().toLowerCase();
@@ -176,8 +179,8 @@ function pay() {
         onSuccess: () => (paying.value = null),
     });
 }
-function dismissStatement(statementToDelete: any) {
-    if (window.confirm(`Supprimer le calcul ${statementToDelete.reference} ? Les pointages associés redeviendront disponibles.`)) {
+async function dismissStatement(statementToDelete: any) {
+    if (await appConfirm(`Supprimer le calcul ${statementToDelete.reference} ? Les pointages associés redeviendront disponibles.`, { title: 'Supprimer le calcul', tone: 'danger', confirmText: 'Supprimer' })) {
         router.delete(`/admin/salaries/${statementToDelete.id}`, { preserveScroll: true });
     }
 }
@@ -310,6 +313,7 @@ function dismissStatement(statementToDelete: any) {
                     <div v-else-if="monthlyHours !== null" class="mt-3 grid grid-cols-3 gap-2 text-center"><div class="rounded-lg bg-background p-2"><b class="block text-lg">{{monthlyHours}} h</b><small class="text-muted-foreground">Total du mois</small></div><div class="rounded-lg bg-background p-2"><b class="block text-lg text-emerald-700">{{availableHours}} h</b><small class="text-muted-foreground">Disponibles</small></div><div class="rounded-lg bg-background p-2"><b class="block text-lg text-slate-600">{{accountedHours}} h</b><small class="text-muted-foreground">Déjà calculées/payées</small></div></div>
                     <p v-if="selected.salary_type==='hourly'&&availableHours!==null" class="mt-3 text-xs font-medium text-primary">Ce bulletin utilisera strictement {{availableHours}} heure(s) × {{money(selected.base_rate)}}.</p>
                     <p v-if="previewError" class="mt-2 text-xs text-red-600">{{ previewError }}</p>
+                    <p v-else-if="attendanceBased && availableHours === 0" class="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">Aucune heure disponible pour cet employé. Enregistrez d’abord ses présences dans le module Présences, ou choisissez une configuration mensuelle fixe.</p>
                 </div>
                 <label v-if="selected?.salary_type === 'daily'"
                     ><Label>Jours travaillés</Label
@@ -336,7 +340,7 @@ function dismissStatement(statementToDelete: any) {
                     </div>
                     <button v-if="!statement.adjustments.length" type="button" class="w-full rounded-lg border border-dashed p-5 text-sm text-muted-foreground hover:bg-background" @click="addAdjustment">+ Ajouter la première prime ou retenue</button>
                 </section>
-                <Button class="w-full">Générer</Button>
+                <Button class="w-full" :disabled="!canGenerate">Générer</Button>
             </form>
         </div>
         <div v-if="paying" class="fixed inset-0 z-50 bg-black/50 p-4">

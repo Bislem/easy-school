@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { appConfirm } from '@/composables/useAppDialog';
 import InputError from '@/components/InputError.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -120,8 +121,8 @@ function addMaintenance() {
     });
 }
 
-function deleteMaintenance(expense: any) {
-    if (window.confirm(`Supprimer l'entretien « ${expense.title} » ?`)) {
+async function deleteMaintenance(expense: any) {
+    if (await appConfirm(`Supprimer l'entretien « ${expense.title} » ?`, { title: 'Supprimer l’entretien', tone: 'danger', confirmText: 'Supprimer' })) {
         router.delete(`/admin/expenses/${expense.id}`, { preserveScroll: true });
     }
 }

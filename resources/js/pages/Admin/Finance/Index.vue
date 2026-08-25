@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { appPrompt } from '@/composables/useAppDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import AdminLayout from '@/layouts/AdminLayout.vue';
@@ -66,8 +67,8 @@ function saveAdjustment() {
         },
     );
 }
-function reverse(p: any) {
-    const reason = prompt(`Motif de contrepassation de ${p.reference}`);
+async function reverse(p: any) {
+    const reason = await appPrompt(`Indiquez le motif de contrepassation de ${p.reference}.`, { title: 'Contrepasser le paiement', tone: 'danger', inputLabel: 'Motif', inputRequired: true, confirmText: 'Contrepasser' });
     if (reason)
         router.post(`/admin/finance/payments/${p.id}/reverse`, { reason });
 }

@@ -17,9 +17,9 @@ import {
     ReceiptText,
     UserRound,
 } from 'lucide-vue-next';
-import { ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 
-const props = defineProps<{ student: any; statuses: string[] }>();
+const props = withDefaults(defineProps<{ student: any; statuses: string[]; readOnly?: boolean; teacherView?: boolean }>(), { readOnly: false, teacherView: false });
 const page = usePage();
 const activeTab = ref('general');
 const statusForm = useForm({ status: props.student.status, observation: '' });
@@ -41,7 +41,7 @@ const profileForm = useForm({
 });
 const documentTempFolders = ref<string[]>([]);
 const documentFiles = ref(
-    props.student.files
+    (props.student.files ?? [])
         .filter((file: any) => file.collection === 'documents')
         .map((file: any) => ({ id: file.id, url: file.url })),
 );
@@ -74,7 +74,7 @@ const paymentLabels: Record<string, string> = {
 };
 const money = (value: string | number) =>
     `${Number(value ?? 0).toLocaleString('fr-DZ', { minimumFractionDigits: 2 })} DA`;
-const tabs = [
+const tabs = computed(() => [
     { id: 'general', label: 'Informations', icon: UserRound },
     { id: 'enrollments', label: 'Formations', icon: BookOpen },
     { id: 'attendance', label: 'Présences', icon: CalendarCheck },
@@ -84,13 +84,15 @@ const tabs = [
     { id: 'badge', label: 'Badge', icon: CreditCard },
     { id: 'observations', label: 'Observations', icon: NotebookPen },
     { id: 'history', label: 'Historique', icon: History },
-];
+].filter((tab) => !props.teacherView || !['payments', 'documents'].includes(tab.id)));
 function updateStatus() {
+    if (props.readOnly) return;
     statusForm.patch(`/admin/students/${props.student.id}/status`, {
         preserveScroll: true,
     });
 }
 function updateProfile() {
+    if (props.readOnly) return;
     profileForm.post(`/admin/students/${props.student.id}`, {
         forceFormData: true,
         preserveScroll: true,
@@ -106,6 +108,7 @@ function removeDocument(data: { type: string; fileId?: number }) {
     }
 }
 function saveDocuments() {
+    if (props.readOnly) return;
     documentForm.put(`/admin/students/${props.student.id}/documents`, {
         preserveScroll: true,
     });
@@ -118,7 +121,7 @@ function saveDocuments() {
             <div class="mx-auto max-w-6xl space-y-6">
                 <div class="flex items-center justify-between">
                     <Button as-child variant="ghost"
-                        ><Link href="/admin/students"
+                        ><Link :href="teacherView ? '/portal/students' : '/admin/students'"
                             ><ArrowLeft class="mr-2 size-4" />Étudiants</Link
                         ></Button
                     >
@@ -145,7 +148,7 @@ function saveDocuments() {
                                 Dossier étudiant nº {{ student.id }} · Inscrit
                                 le {{ student.registration_date || '—' }}
                             </p>
-                            <div class="mt-4 flex flex-wrap items-end gap-2">
+                            <div v-if="!readOnly" class="mt-4 flex flex-wrap items-end gap-2">
                                 <label class="text-sm"
                                     ><span
                                         class="mb-1 block text-muted-foreground"
@@ -200,6 +203,7 @@ function saveDocuments() {
                     <form
                         v-if="activeTab === 'general'"
                         class="grid gap-4 sm:grid-cols-2"
+                        :inert="readOnly || undefined"
                         @submit.prevent="updateProfile"
                     >
                         <div>
@@ -244,7 +248,7 @@ function saveDocuments() {
                             <Label>Adresse</Label
                             ><Input v-model="profileForm.address" />
                         </div>
-                        <div class="sm:col-span-2">
+                        <div v-if="!readOnly" class="sm:col-span-2">
                             <Label>Photo</Label
                             ><Input
                                 type="file"
@@ -252,7 +256,7 @@ function saveDocuments() {
                                 @change="selectPhoto"
                             />
                         </div>
-                        <div class="flex justify-end sm:col-span-2">
+                        <div v-if="!readOnly" class="flex justify-end sm:col-span-2">
                             <Button :disabled="profileForm.processing"
                                 >Enregistrer les informations</Button
                             >
@@ -375,7 +379,7 @@ function saveDocuments() {
                                 Aucun paiement pour cette inscription.
                             </p>
                         </article>
-                        <Button as-child variant="outline"
+                        <Button v-if="!readOnly" as-child variant="outline"
                             ><Link href="/admin/finance"
                                 >Ouvrir la gestion financière</Link
                             ></Button
@@ -405,7 +409,7 @@ function saveDocuments() {
                                 ><span>{{ badge.display_status }}</span>
                             </div>
                         </div>
-                        <Button as-child variant="outline"
+                        <Button v-if="!readOnly" as-child variant="outline"
                             ><Link href="/admin/badges"
                                 >Gérer les badges</Link
                             ></Button

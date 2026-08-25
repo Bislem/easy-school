@@ -41,9 +41,12 @@ Route::get('certificats/verifier/{token}', CertificateVerificationController::cl
 
 Route::middleware(['auth', 'verified', 'active'])->get('/dashboard', DashboardController::class)->name('dashboard');
 Route::middleware(['auth','verified','active'])->get('/my/salary', SalaryPortalController::class)->name('salary.mine');
+Route::middleware(['auth','verified','active'])->get('/my/salary/statements/{statement}/download', [SalaryPortalController::class, 'statement'])->name('salary.mine.statement');
+Route::middleware(['auth','verified','active'])->get('/my/salary/payments/{payment}/receipt', [SalaryPortalController::class, 'receipt'])->name('salary.mine.receipt');
 Route::middleware(['auth','verified','active'])->get('/my/card', [BadgePortalController::class, 'mine'])->name('badges.mine');
 Route::middleware(['auth','verified','active'])->group(function(){
     Route::get('/portal',[PortalController::class,'dashboard'])->name('portal.dashboard');
+    Route::get('/portal/students/{student}',[PortalController::class,'studentFolder'])->name('portal.students.show');
     Route::get('/portal/{section}',[PortalController::class,'section'])->name('portal.section');
     Route::put('/portal/sessions/{session}/attendance',[PortalController::class,'attendance'])->name('portal.attendance');
     Route::patch('/portal/notifications/{notification}/read',[PortalController::class,'read'])->name('portal.notifications.read');
@@ -150,6 +153,11 @@ Route::middleware(['auth', 'verified', 'active', 'admin'])
         Route::get('salaries/{statement}/print', [SalariesController::class, 'print'])->name('salaries.print');
         Route::get('planifications', [TrainingPlansController::class, 'index'])->name('training-plans.index');
         Route::post('planifications', [TrainingPlansController::class, 'store'])->name('training-plans.store');
+        Route::get('planifications/{trainingPlan}/parametres', [TrainingPlansController::class, 'settings'])->name('training-plans.settings');
+        Route::put('planifications/{trainingPlan}/parametres/principal', [TrainingPlansController::class, 'updateMainAccess'])->name('training-plans.settings.main');
+        Route::post('planifications/{trainingPlan}/parametres/enseignants', [TrainingPlansController::class, 'storeTeacherAccess'])->name('training-plans.settings.teachers.store');
+        Route::put('planifications/{trainingPlan}/parametres/enseignants/{access}', [TrainingPlansController::class, 'updateTeacherAccess'])->name('training-plans.settings.teachers.update');
+        Route::delete('planifications/{trainingPlan}/parametres/enseignants/{access}', [TrainingPlansController::class, 'destroyTeacherAccess'])->name('training-plans.settings.teachers.destroy');
         Route::get('planifications/{trainingPlan}', [TrainingPlansController::class, 'show'])->name('training-plans.show');
         Route::put('planifications/{trainingPlan}', [TrainingPlansController::class, 'update'])->name('training-plans.update');
         Route::post('planifications/{trainingPlan}/groupes', [TrainingPlansController::class, 'storeGroup'])->name('training-plans.groups.store');

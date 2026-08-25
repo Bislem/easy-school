@@ -66,6 +66,7 @@ const props = defineProps<{
     teachers: Option[];
     classrooms: Option[];
     filters: { search?: string; status?: string };
+    access: { is_admin: boolean };
 }>();
 const modalOpen = ref(false);
 const search = ref(props.filters.search ?? '');
@@ -157,7 +158,7 @@ const statusTone: Record<string, string> = {
                         chaque formation.
                     </p>
                 </div>
-                <Button @click="openCreate"
+                <Button v-if="access.is_admin" class="w-full sm:w-auto" @click="openCreate"
                     ><Plus class="mr-2 size-4" />Nouvelle planification</Button
                 >
             </header>
@@ -193,7 +194,7 @@ const statusTone: Record<string, string> = {
                     v-for="plan in plans.data"
                     :key="plan.id"
                     :href="`/admin/planifications/${plan.id}`"
-                    class="group rounded-2xl border bg-card p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md"
+                    class="group min-w-0 rounded-2xl border bg-card p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md sm:p-5"
                     ><div class="flex items-start justify-between gap-3">
                         <div class="min-w-0">
                             <span
@@ -216,7 +217,7 @@ const statusTone: Record<string, string> = {
                         </div>
                     </div>
                     <div class="mt-5 grid grid-cols-3 gap-2">
-                        <div class="rounded-lg bg-muted/50 p-3 text-center">
+                        <div class="min-w-0 rounded-lg bg-muted/50 p-2 text-center sm:p-3">
                             <Layers3
                                 class="mx-auto size-4 text-muted-foreground"
                             />
@@ -227,7 +228,7 @@ const statusTone: Record<string, string> = {
                                 Groupes
                             </p>
                         </div>
-                        <div class="rounded-lg bg-muted/50 p-3 text-center">
+                        <div class="min-w-0 rounded-lg bg-muted/50 p-2 text-center sm:p-3">
                             <CalendarDays
                                 class="mx-auto size-4 text-muted-foreground"
                             />
@@ -238,7 +239,7 @@ const statusTone: Record<string, string> = {
                                 Séances
                             </p>
                         </div>
-                        <div class="rounded-lg bg-muted/50 p-3 text-center">
+                        <div class="min-w-0 rounded-lg bg-muted/50 p-2 text-center sm:p-3">
                             <Clock3
                                 class="mx-auto size-4 text-muted-foreground"
                             />
@@ -259,7 +260,7 @@ const statusTone: Record<string, string> = {
                                 plan.teacher.name
                             }}</span
                         ><span class="font-medium text-primary"
-                            >Configurer →</span
+                            >{{ access.is_admin ? 'Configurer' : 'Voir' }} →</span
                         >
                     </div></Link
                 >
@@ -270,7 +271,7 @@ const statusTone: Record<string, string> = {
                     Aucune planification trouvée.
                 </div>
             </section>
-            <nav v-if="plans.links.length > 3" class="flex flex-wrap gap-1">
+            <nav v-if="plans.links.length > 3" class="flex max-w-full gap-1 overflow-x-auto pb-1">
                 <Link
                     v-for="link in plans.links"
                     :key="link.label"
@@ -285,7 +286,7 @@ const statusTone: Record<string, string> = {
             </nav>
         </main>
         <div
-            v-if="modalOpen"
+            v-if="modalOpen && access.is_admin"
             class="fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center sm:p-4"
             @click.self="closeModal"
         >

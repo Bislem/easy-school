@@ -21,6 +21,10 @@ class AdminMiddleware
             return $next($request);
         }
 
+        if (Auth::check() && Auth::user()->role === UserRole::TEACHER && $request->is('admin/planifications*')) {
+            return $next($request);
+        }
+
         abort(403, 'Unauthorized action.');
     }
 }

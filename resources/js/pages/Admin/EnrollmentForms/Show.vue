@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { appConfirm } from '@/composables/useAppDialog';
 import InputError from '@/components/InputError.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -100,10 +101,11 @@ function addStudent() {
         { preserveScroll: true, onSuccess: closeAddModal },
     );
 }
-function removeStudent(enrollment: Enrollment) {
+async function removeStudent(enrollment: Enrollment) {
     if (
-        window.confirm(
+        await appConfirm(
             `Annuler l'inscription de ${enrollment.first_name} ${enrollment.last_name} ?`,
+            { title: 'Annuler l’inscription', tone: 'danger', confirmText: 'Annuler l’inscription' },
         )
     ) {
         router.delete(

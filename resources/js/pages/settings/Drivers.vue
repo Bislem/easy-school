@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { appConfirm } from '@/composables/useAppDialog';
 import HeadingSmall from '@/components/HeadingSmall.vue';
 import InputError from '@/components/InputError.vue';
 import { Button } from '@/components/ui/button';
@@ -52,8 +53,8 @@ function submit() {
     form.post(url, { forceFormData: true, preserveScroll: true, onSuccess: reset });
 }
 
-function remove(driver: Driver) {
-    if (confirm(`Supprimer ${driver.full_name} de vos conducteurs ?`)) {
+async function remove(driver: Driver) {
+    if (await appConfirm(`Supprimer ${driver.full_name} de vos conducteurs ?`, { title: 'Supprimer le conducteur', tone: 'danger', confirmText: 'Supprimer' })) {
         useForm({}).delete(`/settings/drivers/${driver.id}`, { preserveScroll: true });
     }
 }

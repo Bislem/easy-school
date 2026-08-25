@@ -4,6 +4,7 @@ import { createInertiaApp, router } from '@inertiajs/vue3';
 import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
 import type { DefineComponent } from 'vue';
 import { createApp, h } from 'vue';
+import AppDialogs from './components/AppDialogs.vue';
 import { initializeTheme } from './composables/useAppearance';
 
 const appName = import.meta.env.VITE_APP_NAME || 'Gestion scolaire';
@@ -101,7 +102,7 @@ createInertiaApp({
     resolve: (name) => resolvePageComponent(`./pages/${name}.vue`, pages),
     setup({ el, App, props, plugin }) {
         applySchoolBrand(props.initialPage.props.school as SchoolBrand);
-        createApp({ render: () => h(App, props) })
+        createApp({ render: () => h('div', { class: 'contents' }, [h(App, props), h(AppDialogs)]) })
             .use(plugin)
             .mount(el);
     },

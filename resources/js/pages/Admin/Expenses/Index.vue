@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { appConfirm } from '@/composables/useAppDialog';
 import InputError from '@/components/InputError.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -168,10 +169,11 @@ function submit() {
         form.post('/admin/expenses', options);
     }
 }
-function remove(expense: Expense) {
+async function remove(expense: Expense) {
     if (
-        window.confirm(
+        await appConfirm(
             `Supprimer définitivement la dépense « ${expense.title} » ?`,
+            { title: 'Supprimer la dépense', tone: 'danger', confirmText: 'Supprimer' },
         )
     )
         router.delete(`/admin/expenses/${expense.id}`, {

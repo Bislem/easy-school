@@ -26,7 +26,7 @@ class BadgesController extends Controller
         Gate::authorize(BadgePermission::VIEW->value);
         Badge::where('status','active')->whereDate('expiration_date','<',today())->update(['status'=>'expired','status_changed_at'=>now(),'status_reason'=>'Expiration automatique.']);
         $badges=Badge::with(['template','issuer:id,name'])->when($request->filled('type'),fn($q)=>$q->where('person_type',$request->string('type')))->when($request->filled('status'),fn($q)=>$q->where('status',$request->string('status')))->when($request->filled('search'),function($q)use($request){$s=$request->string('search');$q->where(fn($q)=>$q->where('card_number','like',"%{$s}%")->orWhere('first_name','like',"%{$s}%")->orWhere('last_name','like',"%{$s}%"));})->latest('issue_date')->paginate(20)->withQueryString();
-        return Inertia::render('Admin/Badges/Index',['badges'=>$badges,'students'=>Student::orderBy('last_name')->get(['id','first_name','last_name']),'staff'=>Staff::with('employeeType:id,name')->orderBy('last_name')->get(),'templates'=>BadgeTemplate::orderByDesc('is_default')->get(),'statuses'=>collect(BadgeStatus::cases())->map(fn($s)=>$s->value),'filters'=>$request->only(['search','type','status'])]);
+        return Inertia::render('Admin/Badges/Index',['badges'=>$badges,'students'=>Student::orderBy('last_name')->get(['id','first_name','last_name','email']),'staff'=>Staff::with(['employeeType:id,name','user:id,email'])->orderBy('last_name')->get(),'templates'=>BadgeTemplate::orderByDesc('is_default')->get(),'statuses'=>collect(BadgeStatus::cases())->map(fn($s)=>$s->value),'filters'=>$request->only(['search','type','status'])]);
     }
 
     public function store(Request $request): RedirectResponse

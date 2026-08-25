@@ -120,7 +120,7 @@ const mainNavItems: NavItem[] = [
         : []),
     ...(role === 'teacher'
         ? [
-              { title: 'Mes groupes', href: '/portal/groups', icon: Users },
+              { title: 'Mes planifications', href: '/admin/planifications', icon: CalendarRange },
               {
                   title: 'Mes étudiants',
                   href: '/portal/students',
