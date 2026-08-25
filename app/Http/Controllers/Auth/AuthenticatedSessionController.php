@@ -35,7 +35,7 @@ class AuthenticatedSessionController extends Controller
         $user = $request->validateCredentials();
         $role = $user->getRawOriginal('role');
 
-        if (! in_array($role, [UserRole::ADMIN->value, UserRole::TEACHER->value, UserRole::EMPLOYEE->value], true) || ! $user->can_login) {
+        if (! in_array($role, [UserRole::ADMIN->value, UserRole::TEACHER->value, UserRole::EMPLOYEE->value, UserRole::STUDENT->value, UserRole::PARENT->value], true) || ! $user->can_login) {
             Auth::logout();
 
             return back()->withErrors([

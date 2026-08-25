@@ -6,6 +6,7 @@ import type { DefineComponent } from 'vue';
 import { createApp, h } from 'vue';
 import AppDialogs from './components/AppDialogs.vue';
 import { initializeTheme } from './composables/useAppearance';
+import { startFirebaseMessaging } from './lib/firebase-messaging';
 
 const appName = import.meta.env.VITE_APP_NAME || 'Gestion scolaire';
 
@@ -21,6 +22,7 @@ const pages = import.meta.glob<DefineComponent>([
     './pages/Admin/SchoolSites/**/*.vue',
     './pages/Admin/Courses/**/*.vue',
     './pages/Admin/Students/**/*.vue',
+    './pages/Admin/Parents/**/*.vue',
     './pages/Admin/EnrollmentForms/**/*.vue',
     './pages/Admin/Expenses/**/*.vue',
     './pages/Admin/Salaries/**/*.vue',
@@ -102,7 +104,15 @@ createInertiaApp({
     resolve: (name) => resolvePageComponent(`./pages/${name}.vue`, pages),
     setup({ el, App, props, plugin }) {
         applySchoolBrand(props.initialPage.props.school as SchoolBrand);
-        createApp({ render: () => h('div', { class: 'contents' }, [h(App, props), h(AppDialogs)]) })
+        const userId = Number(
+            (props.initialPage.props.auth as { user?: { id?: number } })?.user
+                ?.id || 0,
+        );
+        if (userId) startFirebaseMessaging().catch(() => undefined);
+        createApp({
+            render: () =>
+                h('div', { class: 'contents' }, [h(App, props), h(AppDialogs)]),
+        })
             .use(plugin)
             .mount(el);
     },

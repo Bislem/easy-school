@@ -53,6 +53,10 @@ class HandleInertiaRequests extends Middleware
             'auth' => [
                 'user' => $request->user(),
             ],
+            'unread_notifications_count' => fn () => $request->user()?->portalNotifications()->whereNull('read_at')->count() ?? 0,
+            'auth_notifications' => fn () => $request->user()?->portalNotifications()
+                ->limit(10)
+                ->get(['id', 'type', 'title', 'message', 'data', 'read_at', 'occurred_at']) ?? [],
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
             'csrf_token' => csrf_token(),
             'fileUploadConfig' => [

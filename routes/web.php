@@ -1,33 +1,34 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
-use Inertia\Inertia;
-use App\Http\Controllers\Admin\CompanySettingsController;
-use App\Http\Controllers\Admin\UsersController;
+use App\Http\Controllers\Admin\AnnouncementsController;
+use App\Http\Controllers\Admin\AttendanceController;
+use App\Http\Controllers\Admin\AuditController;
+use App\Http\Controllers\Admin\BadgesController;
+use App\Http\Controllers\Admin\CertificatesController;
 use App\Http\Controllers\Admin\ClassroomsController;
-use App\Http\Controllers\Admin\SchoolSitesController;
+use App\Http\Controllers\Admin\CompanySettingsController;
 use App\Http\Controllers\Admin\CoursesController;
-use App\Http\Controllers\Admin\StudentsController;
+use App\Http\Controllers\Admin\EmployeeTypesController;
 use App\Http\Controllers\Admin\EnrollmentFormsController;
 use App\Http\Controllers\Admin\ExpensesController;
-use App\Http\Controllers\Admin\SalariesController;
-use App\Http\Controllers\PublicEnrollmentController;
-use App\Http\Controllers\DashboardController;
-use App\Http\Controllers\Admin\TrainingPlansController;
-use App\Http\Controllers\Admin\StaffController;
-use App\Http\Controllers\Admin\EmployeeTypesController;
-use App\Http\Controllers\SalaryPortalController;
-use App\Http\Controllers\Admin\StudentFinanceController;
-use App\Http\Controllers\Admin\BadgesController;
-use App\Http\Controllers\BadgePortalController;
-use App\Http\Controllers\PortalController;
+use App\Http\Controllers\Admin\ParentsController;
 use App\Http\Controllers\Admin\PortalAccountsController;
-use App\Http\Controllers\Admin\AnnouncementsController;
-use App\Http\Controllers\Admin\CertificatesController;
-use App\Http\Controllers\CertificateVerificationController;
 use App\Http\Controllers\Admin\ReportsController;
-use App\Http\Controllers\Admin\AuditController;
-use App\Http\Controllers\Admin\AttendanceController;
+use App\Http\Controllers\Admin\SalariesController;
+use App\Http\Controllers\Admin\SchoolSitesController;
+use App\Http\Controllers\Admin\StaffController;
+use App\Http\Controllers\Admin\StudentFinanceController;
+use App\Http\Controllers\Admin\StudentsController;
+use App\Http\Controllers\Admin\TrainingPlansController;
+use App\Http\Controllers\Admin\UsersController;
+use App\Http\Controllers\BadgePortalController;
+use App\Http\Controllers\CertificateVerificationController;
+use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\FcmTokenController;
+use App\Http\Controllers\PortalController;
+use App\Http\Controllers\PublicEnrollmentController;
+use App\Http\Controllers\SalaryPortalController;
+use Illuminate\Support\Facades\Route;
 
 Route::redirect('/', '/login')->name('home');
 
@@ -38,32 +39,38 @@ Route::get('carte/verifier/{token}', [BadgePortalController::class, 'verify'])->
 Route::get('carte/qr/{token}', [BadgePortalController::class, 'qr'])->name('badges.qr');
 Route::get('carte/barcode/{token}', [BadgePortalController::class, 'barcode'])->name('badges.barcode');
 Route::get('certificats/verifier/{token}', CertificateVerificationController::class)->name('certificates.verify');
+Route::get('/firebase/config', [FcmTokenController::class, 'configuration'])->name('firebase.configuration');
+Route::get('/firebase-messaging-sw.js', [FcmTokenController::class, 'serviceWorker'])->name('firebase.service-worker');
 
 Route::middleware(['auth', 'verified', 'active'])->get('/dashboard', DashboardController::class)->name('dashboard');
-Route::middleware(['auth','verified','active'])->get('/my/salary', SalaryPortalController::class)->name('salary.mine');
-Route::middleware(['auth','verified','active'])->get('/my/salary/statements/{statement}/download', [SalaryPortalController::class, 'statement'])->name('salary.mine.statement');
-Route::middleware(['auth','verified','active'])->get('/my/salary/payments/{payment}/receipt', [SalaryPortalController::class, 'receipt'])->name('salary.mine.receipt');
-Route::middleware(['auth','verified','active'])->get('/my/card', [BadgePortalController::class, 'mine'])->name('badges.mine');
-Route::middleware(['auth','verified','active'])->group(function(){
-    Route::get('/portal',[PortalController::class,'dashboard'])->name('portal.dashboard');
-    Route::get('/portal/students/{student}',[PortalController::class,'studentFolder'])->name('portal.students.show');
-    Route::get('/portal/{section}',[PortalController::class,'section'])->name('portal.section');
-    Route::put('/portal/sessions/{session}/attendance',[PortalController::class,'attendance'])->name('portal.attendance');
-    Route::patch('/portal/notifications/{notification}/read',[PortalController::class,'read'])->name('portal.notifications.read');
-    Route::patch('/portal/notifications/read-all',[PortalController::class,'readAll'])->name('portal.notifications.read-all');
-    Route::get('/portal/payments/{payment}/receipt',[PortalController::class,'receipt'])->name('portal.payments.receipt');
+Route::middleware(['auth', 'verified', 'active'])->get('/my/salary', SalaryPortalController::class)->name('salary.mine');
+Route::middleware(['auth', 'verified', 'active'])->get('/my/salary/statements/{statement}/download', [SalaryPortalController::class, 'statement'])->name('salary.mine.statement');
+Route::middleware(['auth', 'verified', 'active'])->get('/my/salary/payments/{payment}/receipt', [SalaryPortalController::class, 'receipt'])->name('salary.mine.receipt');
+Route::middleware(['auth', 'verified', 'active'])->get('/my/card', [BadgePortalController::class, 'mine'])->name('badges.mine');
+Route::middleware(['auth', 'verified', 'active'])->group(function () {
+    Route::post('/fcm/tokens', [FcmTokenController::class, 'store'])->name('fcm.tokens.store');
+    Route::delete('/fcm/tokens', [FcmTokenController::class, 'destroy'])->name('fcm.tokens.destroy');
+    Route::get('/portal', [PortalController::class, 'dashboard'])->name('portal.dashboard');
+    Route::get('/portal/students/{student}', [PortalController::class, 'studentFolder'])->name('portal.students.show');
+    Route::get('/portal/children/{student}', [PortalController::class, 'childFolder'])->name('portal.children.show');
+    Route::post('/portal/students/{student}/observations', [PortalController::class, 'storeObservation'])->name('portal.students.observations.store');
+    Route::get('/portal/{section}', [PortalController::class, 'section'])->name('portal.section');
+    Route::put('/portal/sessions/{session}/attendance', [PortalController::class, 'attendance'])->name('portal.attendance');
+    Route::patch('/portal/notifications/{notification}/read', [PortalController::class, 'read'])->name('portal.notifications.read');
+    Route::patch('/portal/notifications/read-all', [PortalController::class, 'readAll'])->name('portal.notifications.read-all');
+    Route::get('/portal/payments/{payment}/receipt', [PortalController::class, 'receipt'])->name('portal.payments.receipt');
 });
 
 Route::middleware(['auth', 'verified', 'active', 'admin'])
     ->prefix('admin')
     ->as('admin.')
     ->group(function () {
-        Route::get('attendance',[AttendanceController::class,'index'])->name('attendance.index');
-        Route::put('attendance/sessions/{session}/students',[AttendanceController::class,'students'])->name('attendance.students');
-        Route::patch('attendance/sessions/{session}/validate',[AttendanceController::class,'validateSheet'])->name('attendance.validate');
-        Route::put('attendance/sessions/{session}/teacher',[AttendanceController::class,'teacher'])->name('attendance.teacher');
-        Route::put('attendance/teachers/bulk',[AttendanceController::class,'teachersBulk'])->name('attendance.teachers.bulk');
-        Route::put('attendance/employees',[AttendanceController::class,'employee'])->name('attendance.employee');
+        Route::get('attendance', [AttendanceController::class, 'index'])->name('attendance.index');
+        Route::put('attendance/sessions/{session}/students', [AttendanceController::class, 'students'])->name('attendance.students');
+        Route::patch('attendance/sessions/{session}/validate', [AttendanceController::class, 'validateSheet'])->name('attendance.validate');
+        Route::put('attendance/sessions/{session}/teacher', [AttendanceController::class, 'teacher'])->name('attendance.teacher');
+        Route::put('attendance/teachers/bulk', [AttendanceController::class, 'teachersBulk'])->name('attendance.teachers.bulk');
+        Route::put('attendance/employees', [AttendanceController::class, 'employee'])->name('attendance.employee');
         Route::get('staff/types', [StaffController::class, 'types'])->name('staff.types');
         Route::post('staff/types', [EmployeeTypesController::class, 'store'])->name('staff.types.store');
         Route::put('staff/types/{employeeType}', [EmployeeTypesController::class, 'update'])->name('staff.types.update');
@@ -95,23 +102,25 @@ Route::middleware(['auth', 'verified', 'active', 'admin'])
         Route::put('courses/{course}/levels/{level}', [CoursesController::class, 'updateLevel'])->name('courses.levels.update');
         Route::patch('courses/{course}/levels/{level}/toggle-active', [CoursesController::class, 'toggleLevel'])->name('courses.levels.toggle-active');
         Route::get('students', [StudentsController::class, 'index'])->name('students.index');
+        Route::get('parents', [ParentsController::class, 'index'])->name('parents.index');
+        Route::post('parents', [ParentsController::class, 'store'])->name('parents.store');
+        Route::put('parents/{parent}', [ParentsController::class, 'update'])->name('parents.update');
+        Route::patch('parents/{parent}/toggle', [ParentsController::class, 'toggle'])->name('parents.toggle');
         Route::post('students', [StudentsController::class, 'store'])->name('students.store');
         Route::get('students/{student}', [StudentsController::class, 'show'])->name('students.show');
         Route::put('students/{student}', [StudentsController::class, 'update'])->name('students.update');
         Route::patch('students/{student}/status', [StudentsController::class, 'updateStatus'])->name('students.status');
         Route::put('students/{student}/documents', [StudentsController::class, 'updateDocuments'])->name('students.documents');
         Route::patch('students/{student}/toggle-active', [StudentsController::class, 'toggleActive'])->name('students.toggle-active');
-        Route::post('students/{student}/portal-account',[PortalAccountsController::class,'student'])->name('students.portal-account');
-        Route::post('parents',[PortalAccountsController::class,'parent'])->name('parents.store');
-        Route::put('parents/{parent}/children',[PortalAccountsController::class,'children'])->name('parents.children');
-        Route::post('notifications/announcements',[AnnouncementsController::class,'store'])->name('notifications.announcements.store');
-        Route::get('certificates',[CertificatesController::class,'index'])->name('certificates.index');
-        Route::post('certificates',[CertificatesController::class,'store'])->name('certificates.store');
-        Route::post('certificates/bulk',[CertificatesController::class,'storeBulk'])->name('certificates.bulk.store');
-        Route::get('certificates/{certificate}/print',[CertificatesController::class,'print'])->name('certificates.print');
-        Route::get('reports',[ReportsController::class,'index'])->name('reports.index');
-        Route::get('reports/export/{format}',[ReportsController::class,'export'])->whereIn('format',['csv','pdf'])->name('reports.export');
-        Route::get('audit',AuditController::class)->name('audit.index');
+        Route::post('students/{student}/portal-account', [PortalAccountsController::class, 'student'])->name('students.portal-account');
+        Route::post('notifications/announcements', [AnnouncementsController::class, 'store'])->name('notifications.announcements.store');
+        Route::get('certificates', [CertificatesController::class, 'index'])->name('certificates.index');
+        Route::post('certificates', [CertificatesController::class, 'store'])->name('certificates.store');
+        Route::post('certificates/bulk', [CertificatesController::class, 'storeBulk'])->name('certificates.bulk.store');
+        Route::get('certificates/{certificate}/print', [CertificatesController::class, 'print'])->name('certificates.print');
+        Route::get('reports', [ReportsController::class, 'index'])->name('reports.index');
+        Route::get('reports/export/{format}', [ReportsController::class, 'export'])->whereIn('format', ['csv', 'pdf'])->name('reports.export');
+        Route::get('audit', AuditController::class)->name('audit.index');
         Route::get('finance', [StudentFinanceController::class, 'index'])->name('finance.index');
         Route::get('finance/settings', [StudentFinanceController::class, 'settings'])->name('finance.settings');
         Route::get('badges', [BadgesController::class, 'index'])->name('badges.index');
@@ -172,5 +181,5 @@ Route::middleware(['auth', 'verified', 'active', 'admin'])
         Route::patch('planifications/{trainingPlan}/groupes/{group}/seances/{session}/complete', [TrainingPlansController::class, 'completeSession'])->name('training-plans.sessions.complete');
         Route::put('planifications/{trainingPlan}/groupes/{group}/seances/{session}/presences', [TrainingPlansController::class, 'recordAttendance'])->name('training-plans.sessions.attendance');
     });
-require __DIR__ . '/settings.php';
-require __DIR__ . '/auth.php';
+require __DIR__.'/settings.php';
+require __DIR__.'/auth.php';

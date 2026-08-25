@@ -10,6 +10,7 @@ use App\Models\StudentPayment;
 use App\Models\CompanySetting;
 use App\Models\Badge;
 use App\Models\StudentInstallment;
+use App\Models\StudentObservation;
 use App\Enums\StudentStatus;
 use App\Enums\UserRole;
 use App\Services\NotificationDispatcher;
@@ -27,7 +28,11 @@ class PortalController extends Controller
  public function dashboard(Request $request): Response
  {
   $user=$request->user();$this->ensureReminders($user);$notifications=$user->portalNotifications()->limit(8)->get();
-  if($user->schoolParent)return Inertia::render('Portal/Dashboard',['kind'=>'parent','profile'=>$user->schoolParent->load('students'),'today'=>[],'upcoming'=>[],'groups'=>[],'students'=>[],'notifications'=>$notifications,'summary'=>[]]);
+  if($user->schoolParent){
+   $profile=$user->schoolParent->load(['students.enrollments'=>fn($query)=>$query->with(['form.course','trainingPlanGroup.plan.course','payments','installments'])]);$allUpcoming=collect();$paid=0;$due=0;$recorded=0;$present=0;
+   foreach($profile->students as $child){$enrollments=$child->enrollments;$sessions=$this->sessionsForEnrollments($enrollments);$upcoming=$sessions->where('starts_at','>',now())->take(3)->values();$attendance=$child->attendances()->get();$childPaid=(float)$enrollments->sum('total_paid');$childBalance=(float)$enrollments->sum('remaining_balance');$childPresent=$attendance->whereIn('status',['present','late'])->count();$child->setAttribute('portal_summary',['formations'=>$enrollments->where('status','registered')->count(),'paid'=>$childPaid,'balance'=>max(0,$childBalance),'attendance_rate'=>$attendance->count()?round($childPresent/$attendance->count()*100,1):null,'upcoming'=>$upcoming]);$paid+=$childPaid;$due+=$childPaid+$childBalance;$recorded+=$attendance->count();$present+=$childPresent;$allUpcoming=$allUpcoming->concat($upcoming);}
+   return Inertia::render('Portal/Dashboard',['kind'=>'parent','profile'=>$profile,'today'=>[],'upcoming'=>$allUpcoming->sortBy('starts_at')->unique('id')->take(8)->values(),'groups'=>[],'students'=>[],'notifications'=>$notifications,'summary'=>['children'=>$profile->students->count(),'paid'=>$paid,'balance'=>max(0,$due-$paid),'attendance_rate'=>$recorded?round($present/$recorded*100,1):null]]);
+  }
   if($user->student)return $this->studentPage($user->student,'dashboard',$notifications);
   $sessions=$this->teacherSessions($user->id);$students=$this->enrollmentsForGroups($this->activeTeacherGroups($user->id))->pluck('student')->filter()->unique('id')->values();
   $hours=(float)TrainingSession::where('teacher_id',$user->id)->where('status','completed')->get()->sum(fn($s)=>$s->starts_at->diffInMinutes($s->ends_at))/60;
@@ -64,11 +69,35 @@ class PortalController extends Controller
   $user=$request->user();abort_unless($user->role===UserRole::TEACHER&&$user->staff?->can_view_student_folders,403,'La consultation des dossiers étudiants n’est pas autorisée.');
   $activePlan=fn($query)=>$query->whereIn('status',['scheduled','in_progress'])->where(fn($query)=>$query->where('teacher_id',$user->id)->orWhereHas('teacherAccesses',fn($access)=>$access->where('teacher_id',$user->id)));
   abort_unless($student->enrollments()->where('status','registered')->whereHas('trainingPlanGroup.plan',$activePlan)->exists(),403,'Cet étudiant ne fait pas partie de vos planifications actives.');
-  $student->load(['enrollments'=>fn($query)=>$query->where('status','registered')->whereHas('trainingPlanGroup.plan',$activePlan)->with(['form.course','trainingPlanGroup.plan.level.course']),'badges.template','certificates.enrollment.form.course','histories.user:id,name','user:id,email,is_active','attendances'=>fn($query)=>$query->whereHas('session.group.plan',$activePlan)->with(['session.group.plan.level.course','session.teacher:id,name'])]);
+  $student->load(['enrollments'=>fn($query)=>$query->where('status','registered')->whereHas('trainingPlanGroup.plan',$activePlan)->with(['form.course','trainingPlanGroup.plan.level.course']),'badges.template','certificates.enrollment.form.course','histories.user:id,name','user:id,email,is_active','observations'=>fn($query)=>$query->whereNull('parent_id')->with(['author:id,name,role','replies.author:id,name,role']),'attendances'=>fn($query)=>$query->whereHas('session.group.plan',$activePlan)->with(['session.group.plan.level.course','session.teacher:id,name'])]);
   $expected=TrainingSession::whereHas('group.enrollments',fn($query)=>$query->where('student_id',$student->id)->where('status','registered'))->whereHas('group.plan',$activePlan)->count();$records=$student->attendances;$present=$records->whereIn('status',['present','late'])->count();$consecutive=0;
   foreach($records->sortByDesc(fn($attendance)=>$attendance->session?->starts_at) as $record){if($record->status!=='absent')break;$consecutive++;}
   $rate=$expected?round($present/$expected*100,1):null;$student->setAttribute('attendance_stats',['expected'=>$expected,'recorded'=>$records->count(),'present'=>$present,'absent'=>$records->where('status','absent')->count(),'late'=>$records->where('status','late')->count(),'excused'=>$records->where('status','excused')->count(),'rate'=>$rate,'consecutive_absences'=>$consecutive,'warning'=>$consecutive>=config('attendance.consecutive_absence_warning',2)||($rate!==null&&$rate<config('attendance.warning_threshold',75))]);
   return Inertia::render('Admin/Students/Show',['student'=>$student,'statuses'=>collect(StudentStatus::cases())->map(fn($status)=>$status->value),'readOnly'=>true,'teacherView'=>true]);
+ }
+
+ public function childFolder(Request $request,Student $student): Response
+ {
+  $parent=$request->user()->schoolParent;abort_unless($request->user()->role===UserRole::PARENT&&$parent&&$parent->students()->whereKey($student->id)->exists(),403,'Cet enfant n’est pas associé à votre compte.');
+  $student->load(['enrollments.form.course','enrollments.trainingPlanGroup.plan.level.course','enrollments.installments','enrollments.payments.recorder:id,name','badges.template','certificates.enrollment.form.course','histories.user:id,name','files','user:id,email,is_active','observations'=>fn($query)=>$query->whereNull('parent_id')->with(['author:id,name,role','replies.author:id,name,role']),'attendances.session.group.plan.level.course','attendances.session.teacher:id,name']);
+  $expected=TrainingSession::whereHas('group.enrollments',fn($query)=>$query->where('student_id',$student->id)->where('status','registered'))->count();$records=$student->attendances;$present=$records->whereIn('status',['present','late'])->count();$consecutive=0;
+  foreach($records->sortByDesc(fn($attendance)=>$attendance->session?->starts_at) as $record){if($record->status!=='absent')break;$consecutive++;}
+  $rate=$expected?round($present/$expected*100,1):null;$student->setAttribute('attendance_stats',['expected'=>$expected,'recorded'=>$records->count(),'present'=>$present,'absent'=>$records->where('status','absent')->count(),'late'=>$records->where('status','late')->count(),'excused'=>$records->where('status','excused')->count(),'rate'=>$rate,'consecutive_absences'=>$consecutive,'warning'=>$consecutive>=config('attendance.consecutive_absence_warning',2)||($rate!==null&&$rate<config('attendance.warning_threshold',75))]);
+  return Inertia::render('Admin/Students/Show',['student'=>$student,'statuses'=>collect(StudentStatus::cases())->map(fn($status)=>$status->value),'readOnly'=>true,'parentView'=>true]);
+ }
+
+ public function storeObservation(Request $request,Student $student,NotificationDispatcher $notifications): RedirectResponse
+ {
+  $user=$request->user();$parent=$user->schoolParent;$admin=$user->role===UserRole::ADMIN;$teacher=$user->role===UserRole::TEACHER&&$user->staff?->can_view_student_folders;
+  $parentOwns=$parent?->students()->whereKey($student->id)->exists()??false;
+  $teacherHasStudent=$teacher&&$student->enrollments()->where('status','registered')->whereHas('trainingPlanGroup.plan',fn($plan)=>$plan->whereIn('status',['scheduled','in_progress'])->where(fn($plan)=>$plan->where('teacher_id',$user->id)->orWhereHas('teacherAccesses',fn($access)=>$access->where('teacher_id',$user->id))))->exists();
+  abort_unless($admin||$parentOwns||$teacherHasStudent,403);
+  $data=$request->validate(['message'=>['required','string','max:5000'],'parent_id'=>['nullable','integer','exists:student_observations,id']]);
+  $thread=null;if($data['parent_id']??null){$thread=StudentObservation::where('student_id',$student->id)->whereNull('parent_id')->findOrFail($data['parent_id']);}else abort_unless($admin||$teacherHasStudent,403,'Seul un enseignant ou un administrateur peut ouvrir une observation.');
+  $observation=$student->observations()->create(['author_id'=>$user->id,'parent_id'=>$thread?->id,'message'=>$data['message']]);
+  if($parentOwns){$author=$thread?->author;if($author){$url=$author->role===UserRole::ADMIN?'/admin/students/'.$student->id:'/portal/students/'.$student->id;$notifications->send($author,'observation.parent_replied','Réponse d’un parent',$user->name.' a répondu à une observation concernant '.$student->full_name.'.',$observation,['url'=>$url]);}}
+  else foreach($student->parents()->with('user')->get()->pluck('user')->filter()->unique('id') as $recipient)$notifications->send($recipient,$admin?'observation.admin_added':'observation.teacher_added','Nouvelle observation','Une observation a été ajoutée au dossier de '.$student->full_name.' par '.$user->name.'.',$observation,['url'=>'/portal/children/'.$student->id]);
+  return back()->with('success',$thread?'Réponse envoyée.':'Observation ajoutée et parents notifiés.');
  }
 
  private function teacherSessions(int $userId){$sessions=TrainingSession::with(['group.plan.level.course','group.enrollments.student','classroom.site','attendances','teacherAttendance.salaryStatements:id,status,period_end,amount_paid,remaining_amount'])->where(fn($query)=>$query->where('teacher_id',$userId)->orWhereHas('teacherAttendance',fn($attendance)=>$attendance->where('actual_teacher_id',$userId)))->orderBy('starts_at')->get();return $sessions->each(function($session)use($userId){$attendance=$session->teacherAttendance;$statement=$attendance?->salaryStatements?->sortByDesc('period_end')->first();$session->setAttribute('portal_details',['student_count'=>$session->group?->enrollments?->count()??0,'attendance_status'=>$attendance?->status??'not_recorded','attendance_validated'=>(bool)$attendance?->validated_at,'worked_minutes'=>(int)($attendance?->worked_minutes??0),'is_replacement'=>$attendance&&$attendance->actual_teacher_id===$userId&&$attendance->scheduled_teacher_id!==$userId,'salary_status'=>!$statement?'not_calculated':((float)$statement->remaining_amount<=0?'paid':((float)$statement->amount_paid>0?'partially_paid':'unpaid')),'salary_statement_id'=>$statement?->id]);});}

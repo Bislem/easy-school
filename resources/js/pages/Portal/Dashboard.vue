@@ -18,7 +18,14 @@ const time = (v: string) =>
         minute: '2-digit',
     });
 function read(n: any) {
-    if (!n.read_at) router.patch(`/portal/notifications/${n.id}/read`);
+    const visit = () => n.data?.url && router.visit(n.data.url);
+    if (!n.read_at)
+        router.patch(
+            `/portal/notifications/${n.id}/read`,
+            {},
+            { onSuccess: visit },
+        );
+    else visit();
 }
 </script>
 <template>
@@ -41,27 +48,158 @@ function read(n: any) {
                         Informations personnelles et activités utiles.
                     </p>
                 </header>
-                <section
-                    v-if="kind === 'parent'"
-                    class="grid gap-4 md:grid-cols-2"
-                >
-                    <article
-                        v-for="child in profile.students"
-                        :key="child.id"
-                        class="rounded-xl border bg-card p-5"
-                    >
-                        <h2 class="font-semibold">
-                            {{ child.first_name }} {{ child.last_name }}
-                        </h2>
-                        <p class="text-sm text-muted-foreground">
-                            {{ child.school_level || 'Niveau non renseigné' }}
-                        </p>
-                        <Button as-child class="mt-4" variant="outline"
-                            ><Link href="/portal/formation"
-                                >Consulter le dossier familial</Link
-                            ></Button
+                <section v-if="kind === 'parent'" class="space-y-5">
+                    <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                        <div class="rounded-xl border bg-card p-4">
+                            <p class="text-sm text-muted-foreground">
+                                Enfants associés
+                            </p>
+                            <p class="mt-1 text-2xl font-semibold">
+                                {{ summary.children || 0 }}
+                            </p>
+                        </div>
+                        <div class="rounded-xl border bg-card p-4">
+                            <p class="text-sm text-muted-foreground">
+                                Assiduité globale
+                            </p>
+                            <p class="mt-1 text-2xl font-semibold">
+                                {{
+                                    summary.attendance_rate === null
+                                        ? '—'
+                                        : `${summary.attendance_rate}%`
+                                }}
+                            </p>
+                        </div>
+                        <div class="rounded-xl border bg-card p-4">
+                            <p class="text-sm text-muted-foreground">
+                                Total réglé
+                            </p>
+                            <p class="mt-1 text-2xl font-semibold">
+                                {{
+                                    Number(summary.paid || 0).toLocaleString(
+                                        'fr-DZ',
+                                    )
+                                }}
+                                DA
+                            </p>
+                        </div>
+                        <div class="rounded-xl border bg-card p-4">
+                            <p class="text-sm text-muted-foreground">
+                                Reste à payer
+                            </p>
+                            <p
+                                class="mt-1 text-2xl font-semibold"
+                                :class="
+                                    summary.balance > 0
+                                        ? 'text-amber-600'
+                                        : 'text-emerald-600'
+                                "
+                            >
+                                {{
+                                    Number(summary.balance || 0).toLocaleString(
+                                        'fr-DZ',
+                                    )
+                                }}
+                                DA
+                            </p>
+                        </div>
+                    </div>
+                    <div class="grid gap-4 md:grid-cols-2">
+                        <article
+                            v-for="child in profile.students"
+                            :key="child.id"
+                            class="overflow-hidden rounded-2xl border bg-card shadow-sm"
                         >
-                    </article>
+                            <div class="flex items-center gap-4 p-5">
+                                <img
+                                    v-if="child.photo_url"
+                                    :src="child.photo_url"
+                                    class="size-16 rounded-xl object-cover"
+                                />
+                                <div
+                                    v-else
+                                    class="grid size-16 shrink-0 place-items-center rounded-xl bg-primary/10 text-lg font-semibold text-primary"
+                                >
+                                    {{ child.first_name?.[0]
+                                    }}{{ child.last_name?.[0] }}
+                                </div>
+                                <div class="min-w-0">
+                                    <h2 class="truncate font-semibold">
+                                        {{ child.first_name }}
+                                        {{ child.last_name }}
+                                    </h2>
+                                    <p class="text-sm text-muted-foreground">
+                                        {{
+                                            child.school_level ||
+                                            'Niveau non renseigné'
+                                        }}
+                                    </p>
+                                    <p
+                                        class="mt-1 text-xs text-muted-foreground"
+                                    >
+                                        {{
+                                            child.portal_summary?.formations ||
+                                            0
+                                        }}
+                                        formation(s) active(s)
+                                    </p>
+                                </div>
+                            </div>
+                            <div
+                                class="grid grid-cols-3 border-y bg-muted/20 text-center text-sm"
+                            >
+                                <div class="p-3">
+                                    <b>{{
+                                        child.portal_summary
+                                            ?.attendance_rate === null
+                                            ? '—'
+                                            : `${child.portal_summary?.attendance_rate}%`
+                                    }}</b
+                                    ><small class="block text-muted-foreground"
+                                        >Assiduité</small
+                                    >
+                                </div>
+                                <div class="border-x p-3">
+                                    <b>{{
+                                        Number(
+                                            child.portal_summary?.paid || 0,
+                                        ).toLocaleString('fr-DZ')
+                                    }}</b
+                                    ><small class="block text-muted-foreground"
+                                        >Payé (DA)</small
+                                    >
+                                </div>
+                                <div class="p-3">
+                                    <b>{{
+                                        Number(
+                                            child.portal_summary?.balance || 0,
+                                        ).toLocaleString('fr-DZ')
+                                    }}</b
+                                    ><small class="block text-muted-foreground"
+                                        >Reste (DA)</small
+                                    >
+                                </div>
+                            </div>
+                            <div class="p-4">
+                                <Button
+                                    as-child
+                                    class="w-full"
+                                    variant="outline"
+                                    ><Link
+                                        :href="`/portal/children/${child.id}`"
+                                        >Ouvrir le dossier complet</Link
+                                    ></Button
+                                >
+                            </div>
+                        </article>
+                        <div
+                            v-if="!profile.students?.length"
+                            class="col-span-full rounded-xl border border-dashed p-10 text-center text-muted-foreground"
+                        >
+                            Aucun enfant n’est encore associé à ce compte.
+                            Contactez l’administration.
+                        </div>
+                    </div>
                 </section>
                 <section v-else class="grid gap-3 sm:grid-cols-3">
                     <div class="rounded-xl border bg-card p-4">

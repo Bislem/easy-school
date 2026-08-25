@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import Breadcrumbs from '@/components/Breadcrumbs.vue';
+import NotificationBell from '@/components/NotificationBell.vue';
 import UserInfo from '@/components/UserInfo.vue';
 import UserMenuContent from '@/components/UserMenuContent.vue';
 import {
@@ -52,7 +53,11 @@ const roleLabel = computed(() =>
         ? 'Administrateur'
         : user.value.role === 'teacher'
           ? 'Enseignant'
-          : 'Employé',
+          : user.value.role === 'parent'
+            ? 'Parent'
+            : user.value.role === 'student'
+              ? 'Étudiant'
+              : 'Employé',
 );
 </script>
 
@@ -74,25 +79,28 @@ const roleLabel = computed(() =>
                 </p>
             </div>
         </div>
-        <DropdownMenu>
-            <DropdownMenuTrigger as-child>
-                <button
-                    type="button"
-                    class="flex min-w-0 shrink-0 items-center gap-2 rounded-xl border bg-card px-2 py-1.5 text-left shadow-sm transition hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none sm:px-3"
-                    aria-label="Ouvrir le menu du profil"
-                >
-                    <UserInfo
-                        :user="user"
-                        class="[&>div:last-child]:hidden sm:[&>div:last-child]:grid"
-                    />
-                    <ChevronDown
-                        class="hidden size-4 text-muted-foreground sm:block"
-                    />
-                </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" class="w-64 rounded-xl p-2">
-                <UserMenuContent :user="user" />
-            </DropdownMenuContent>
-        </DropdownMenu>
+        <div class="flex items-center gap-2">
+            <NotificationBell />
+            <DropdownMenu>
+                <DropdownMenuTrigger as-child>
+                    <button
+                        type="button"
+                        class="flex min-w-0 shrink-0 items-center gap-2 rounded-xl border bg-card px-2 py-1.5 text-left shadow-sm transition hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none sm:px-3"
+                        aria-label="Ouvrir le menu du profil"
+                    >
+                        <UserInfo
+                            :user="user"
+                            class="[&>div:last-child]:hidden sm:[&>div:last-child]:grid"
+                        />
+                        <ChevronDown
+                            class="hidden size-4 text-muted-foreground sm:block"
+                        />
+                    </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" class="w-64 rounded-xl p-2">
+                    <UserMenuContent :user="user" />
+                </DropdownMenuContent>
+            </DropdownMenu>
+        </div>
     </header>
 </template>

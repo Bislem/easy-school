@@ -12,6 +12,7 @@ import { home } from '@/routes';
 import { type NavItem } from '@/types';
 import { Link, usePage } from '@inertiajs/vue3';
 import {
+    Bell,
     BookOpen,
     Building2,
     CalendarRange,
@@ -29,6 +30,10 @@ import AppLogo from './AppLogo.vue';
 
 const page = usePage();
 const role = page.props.auth.user.role;
+const unreadNotifications = Number(page.props.unread_notifications_count ?? 0);
+const notificationsTitle = unreadNotifications
+    ? `Notifications (${unreadNotifications})`
+    : 'Notifications';
 
 const mainNavItems: NavItem[] = [
     {
@@ -53,6 +58,7 @@ const mainNavItems: NavItem[] = [
                   href: '/admin/students',
                   icon: GraduationCap,
               },
+              { title: 'Parents', href: '/admin/parents', icon: Users },
               { title: 'Formations', href: '/admin/courses', icon: BookOpen },
               { title: 'Sites', href: '/admin/sites', icon: Building2 },
               {
@@ -116,11 +122,22 @@ const mainNavItems: NavItem[] = [
           ]
         : []),
     ...(role === 'parent'
-        ? [{ title: 'Espace parent', href: '/portal', icon: Users }]
+        ? [
+              { title: 'Espace parent', href: '/portal', icon: Users },
+              {
+                  title: notificationsTitle,
+                  href: '/portal/notifications',
+                  icon: Bell,
+              },
+          ]
         : []),
     ...(role === 'teacher'
         ? [
-              { title: 'Mes planifications', href: '/admin/planifications', icon: CalendarRange },
+              {
+                  title: 'Mes planifications',
+                  href: '/admin/planifications',
+                  icon: CalendarRange,
+              },
               {
                   title: 'Mes étudiants',
                   href: '/portal/students',
@@ -130,6 +147,11 @@ const mainNavItems: NavItem[] = [
                   title: 'Mon planning',
                   href: '/portal/planning',
                   icon: CalendarRange,
+              },
+              {
+                  title: notificationsTitle,
+                  href: '/portal/notifications',
+                  icon: Bell,
               },
           ]
         : []),

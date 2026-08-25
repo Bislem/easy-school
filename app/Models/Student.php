@@ -45,6 +45,7 @@ class Student extends Model
     public function badges(): \Illuminate\Database\Eloquent\Relations\MorphMany { return $this->morphMany(Badge::class, 'badgeable')->latest('issue_date'); }
     public function parents(): \Illuminate\Database\Eloquent\Relations\BelongsToMany { return $this->belongsToMany(SchoolParent::class,'parent_student','student_id','parent_id')->withPivot('is_primary')->withTimestamps(); }
     public function attendances(): HasMany { return $this->hasMany(SessionAttendance::class); }
+    public function observations(): HasMany { return $this->hasMany(StudentObservation::class)->latest(); }
     public function certificates(): HasMany { return $this->hasMany(Certificate::class)->latest('issue_date'); }
     public function user(): BelongsTo { return $this->belongsTo(User::class); }
     public function getPhotoUrlAttribute(): ?string { return $this->photo_path ? asset('storage/'.$this->photo_path) : null; }

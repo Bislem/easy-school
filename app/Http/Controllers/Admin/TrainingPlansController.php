@@ -102,6 +102,14 @@ class TrainingPlansController extends Controller
             return $plan;
         });
 
+        CourseEnrollment::with(['student.parents.user', 'trainingPlanGroup'])
+            ->whereIn('training_plan_group_id', $plan->groups()->pluck('id'))
+            ->whereNotNull('student_id')->get()->each(function (CourseEnrollment $enrollment) use ($plan) {
+                foreach ($enrollment->student?->parents?->pluck('user')->filter()->unique('id') ?? [] as $parent) {
+                    app(NotificationDispatcher::class)->send($parent, 'student.plan_assigned', 'Nouvelle planification', $enrollment->student->full_name.' a été affecté(e) à la planification « '.$plan->title.' », groupe « '.$enrollment->trainingPlanGroup?->name.' ».', $enrollment, ['url'=>'/portal/children/'.$enrollment->student_id]);
+                }
+            });
+
         return to_route('admin.training-plans.show', $plan)->with('success', 'Planification créée. Vous pouvez maintenant programmer les séances.');
     }
 

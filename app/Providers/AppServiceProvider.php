@@ -15,6 +15,13 @@ use App\Models\SalaryPayment;
 use App\Models\StudentHistory;
 use App\Models\StudentPayment;
 use App\Models\TrainingSession;
+use App\Models\TrainingPlan;
+use App\Models\TrainingPlanTeacherAccess;
+use App\Models\SessionAttendance;
+use App\Models\TeacherAttendance;
+use App\Models\SalaryStatement;
+use App\Models\CourseEnrollment;
+use App\Observers\PortalNotificationObserver;
 use App\Models\Staff;
 use App\Models\User;
 use App\Policies\StaffPolicy;
@@ -49,6 +56,9 @@ class AppServiceProvider extends ServiceProvider
         foreach($created as $model=>$event)$model::created(fn($item)=>self::audit($event,$item,null,$item->getAttributes()));
         TrainingSession::updated(fn($item)=>self::audit('session.changed',$item,$item->getOriginal(),$item->getChanges()));
         Badge::updated(fn($item)=>self::audit('badge.changed',$item,$item->getOriginal(),$item->getChanges()));
+        foreach ([TrainingPlan::class, TrainingPlanTeacherAccess::class, TrainingSession::class, SessionAttendance::class, TeacherAttendance::class, StudentPayment::class, SalaryStatement::class, SalaryPayment::class, CourseEnrollment::class] as $model) {
+            $model::observe(PortalNotificationObserver::class);
+        }
     }
 
     private static function audit(string $event,$related,?array $old,?array $new): void

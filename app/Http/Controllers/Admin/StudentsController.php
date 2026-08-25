@@ -96,7 +96,7 @@ class StudentsController extends Controller
 
     public function show(Student $student): Response
     {
-        $student->load(['enrollments.form.course', 'enrollments.trainingPlanGroup.plan.level.course', 'enrollments.installments', 'enrollments.payments.recorder:id,name', 'badges.template', 'certificates.enrollment.form.course', 'histories.user:id,name', 'files', 'user:id,email,is_active', 'attendances.session.group.plan.level.course', 'attendances.session.teacher:id,name']);
+        $student->load(['enrollments.form.course', 'enrollments.trainingPlanGroup.plan.level.course', 'enrollments.installments', 'enrollments.payments.recorder:id,name', 'badges.template', 'certificates.enrollment.form.course', 'histories.user:id,name', 'files', 'user:id,email,is_active', 'observations'=>fn($query)=>$query->whereNull('parent_id')->with(['author:id,name,role','replies.author:id,name,role']), 'attendances.session.group.plan.level.course', 'attendances.session.teacher:id,name']);
         $expected=\App\Models\TrainingSession::whereHas('group.enrollments',fn($q)=>$q->where('student_id',$student->id)->where('status','registered'))->count();
         $records=$student->attendances;$present=$records->whereIn('status',['present','late'])->count();$consecutive=0;
         foreach($records->sortByDesc(fn($a)=>$a->session?->starts_at) as $record){if($record->status!=='absent')break;$consecutive++;}

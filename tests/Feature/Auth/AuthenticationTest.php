@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\UserRole;
 use App\Models\User;
 use Illuminate\Support\Facades\RateLimiter;
 use Laravel\Fortify\Features;
@@ -19,6 +20,23 @@ test('users can authenticate using the login screen', function () {
     ]);
 
     $this->assertAuthenticated();
+    $response->assertRedirect(route('dashboard', absolute: false));
+});
+
+test('parents can authenticate using the shared login portal', function () {
+    $parent = User::factory()->create([
+        'role' => UserRole::PARENT,
+        'is_active' => true,
+        'can_login' => true,
+        'email_verified_at' => now(),
+    ]);
+
+    $response = $this->post(route('login.store'), [
+        'email' => $parent->email,
+        'password' => 'password',
+    ]);
+
+    $this->assertAuthenticatedAs($parent);
     $response->assertRedirect(route('dashboard', absolute: false));
 });
 
