@@ -3,16 +3,264 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import AdminLayout from '@/layouts/AdminLayout.vue';
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
-import { ArrowLeft, Pencil, Plus, Search, Settings, Trash2, X } from 'lucide-vue-next';
+import {
+    ArrowLeft,
+    Pencil,
+    Plus,
+    Search,
+    Settings,
+    Trash2,
+    X,
+} from 'lucide-vue-next';
 import { ref } from 'vue';
-const props=defineProps({enrollments:{type:Object,required:true},filters:{type:Object,required:true},currency:{type:Object,required:true}});
-const search=ref(props.filters.search??''),selected=ref<any>(null);
-const form=useForm({formation_price:'',discount_amount:'0',installments:[] as any[]});
-const money=(v:any)=>`${Number(v??0).toLocaleString('fr-DZ',{minimumFractionDigits:2})} ${props.currency.symbol}`;
-function filter(){router.get('/admin/finance/settings',{search:search.value||undefined},{preserveState:true,replace:true});}
-function edit(e:any){selected.value=e;form.formation_price=String(e.formation_price??e.form?.course?.price??e.training_plan_group?.plan?.course?.price??0);form.discount_amount=String(e.discount_amount??0);form.installments=[];form.clearErrors();}
-function add(){form.installments.push({amount:'',due_date:'',notes:''});}
-function removeInstallment(index:number){form.installments.splice(index,1);}
-function save(){form.put(`/admin/finance/enrollments/${selected.value.id}`,{preserveScroll:true,onSuccess:()=>selected.value=null});}
+const props = defineProps({
+    enrollments: { type: Object, required: true },
+    filters: { type: Object, required: true },
+    currency: { type: Object, required: true },
+});
+const search = ref(props.filters.search ?? ''),
+    selected = ref<any>(null);
+const form = useForm({
+    formation_price: '',
+    discount_amount: '0',
+    installments: [] as any[],
+});
+const money = (v: any) =>
+    `${Number(v ?? 0).toLocaleString('fr-DZ', { minimumFractionDigits: 2 })} ${props.currency.symbol}`;
+function filter() {
+    router.get(
+        '/admin/finance/settings',
+        { search: search.value || undefined },
+        { preserveState: true, replace: true },
+    );
+}
+function edit(e: any) {
+    selected.value = e;
+    form.formation_price = String(
+        e.formation_price ??
+            e.form?.course?.price ??
+            e.training_plan_group?.plan?.course?.price ??
+            0,
+    );
+    form.discount_amount = String(e.discount_amount ?? 0);
+    form.installments = [];
+    form.clearErrors();
+}
+function add() {
+    form.installments.push({ amount: '', due_date: '', notes: '' });
+}
+function removeInstallment(index: number) {
+    form.installments.splice(index, 1);
+}
+function save() {
+    form.put(`/admin/finance/enrollments/${selected.value.id}`, {
+        preserveScroll: true,
+        onSuccess: () => (selected.value = null),
+    });
+}
 </script>
-<template><Head title="Paramètres des paiements étudiants"/><AdminLayout><main class="flex-1 p-4 sm:p-6 lg:p-8"><div class="mx-auto max-w-6xl space-y-6"><header><Button as-child size="sm" variant="ghost" class="mb-2 -ml-3"><Link href="/admin/finance"><ArrowLeft class="mr-2 size-4"/>Retour aux paiements</Link></Button><h1 class="flex items-center gap-2 text-2xl font-semibold"><Settings class="size-6"/>Paramètres financiers étudiants</h1><p class="text-sm text-muted-foreground">Prix, remises et échéanciers propres à chaque inscription.</p></header><form class="flex gap-2 rounded-xl border bg-card p-4" @submit.prevent="filter"><div class="relative flex-1"><Search class="absolute left-3 top-2.5 size-4 text-muted-foreground"/><Input v-model="search" class="pl-9" placeholder="Rechercher un étudiant…"/></div><Button>Rechercher</Button></form><section class="grid gap-4 md:grid-cols-2 xl:grid-cols-3"><article v-for="e in enrollments.data" :key="e.id" class="rounded-xl border bg-card p-5 shadow-sm"><div class="flex justify-between gap-3"><div><b>{{e.student.first_name}} {{e.student.last_name}}</b><p class="text-sm text-muted-foreground">{{e.form?.course?.title||e.training_plan_group?.plan?.course?.title||'Formation'}}</p></div><span class="rounded-lg bg-primary/10 p-2 text-primary"><Settings class="size-5"/></span></div><div class="mt-4 grid grid-cols-2 gap-2 text-sm"><div class="rounded-lg bg-muted/40 p-2"><small class="text-muted-foreground">Prix</small><b class="block">{{money(e.formation_price)}}</b></div><div class="rounded-lg bg-muted/40 p-2"><small class="text-muted-foreground">Remise</small><b class="block">{{money(e.discount_amount)}}</b></div></div><p class="mt-3 text-xs text-muted-foreground">{{e.installments.length}} échéance(s) configurée(s)</p><Button class="mt-4 w-full" variant="outline" @click="edit(e)"><Pencil class="mr-2 size-4"/>Gérer les conditions</Button></article></section><div v-if="enrollments.links?.length>3" class="flex justify-center gap-1"><Link v-for="link in enrollments.links" :key="link.label" :href="link.url||'#'" class="rounded-md border px-3 py-2 text-sm" :class="{'bg-primary text-primary-foreground':link.active}" v-html="link.label"/></div></div></main><div v-if="selected" class="fixed inset-0 z-50 overflow-y-auto bg-black/50 p-4"><form class="mx-auto my-10 max-w-xl space-y-4 rounded-xl bg-background p-6" @submit.prevent="save"><div class="flex justify-between"><div><h2 class="text-xl font-semibold">Conditions financières</h2><p class="text-sm text-muted-foreground">{{selected.student.first_name}} {{selected.student.last_name}}</p></div><Button type="button" size="icon" variant="ghost" @click="selected=null"><X/></Button></div><Input v-model="form.formation_price" type="number" min="0" step="0.01" required placeholder="Prix formation"/><Input v-model="form.discount_amount" type="number" min="0" step="0.01" placeholder="Remise"/><div class="rounded-xl border p-4"><div class="mb-3 flex justify-between"><b>Nouvelles échéances</b><Button type="button" size="sm" variant="outline" @click="add"><Plus class="mr-1 size-4"/>Ajouter</Button></div><div v-for="(item,index) in form.installments" :key="index" class="mb-2 grid grid-cols-[1fr_1fr_auto] gap-2"><Input v-model="item.amount" type="number" min="0.01" step="0.01" required placeholder="Montant"/><Input v-model="item.due_date" type="date" required/><Button type="button" size="icon" variant="ghost" class="text-destructive" @click="removeInstallment(index)"><Trash2 class="size-4"/></Button></div><p v-if="!form.installments.length" class="text-sm text-muted-foreground">Ajoutez seulement les nouvelles échéances nécessaires.</p></div><div class="flex justify-end gap-2"><Button type="button" variant="outline" @click="selected=null">Annuler</Button><Button :disabled="form.processing">Enregistrer</Button></div></form></div></AdminLayout></template>
+<template>
+    <Head title="Paramètres des paiements étudiants" /><AdminLayout
+        ><main class="flex-1 p-4 sm:p-6 lg:p-8">
+            <div class="mx-auto max-w-6xl space-y-6">
+                <header>
+                    <Button
+                        as-child
+                        size="sm"
+                        variant="ghost"
+                        class="mb-2 -ml-3"
+                        ><Link href="/admin/finance"
+                            ><ArrowLeft class="mr-2 size-4" />Retour aux
+                            paiements</Link
+                        ></Button
+                    >
+                    <h1 class="flex items-center gap-2 text-2xl font-semibold">
+                        <Settings class="size-6" />Paramètres financiers
+                        étudiants
+                    </h1>
+                    <p class="text-sm text-muted-foreground">
+                        Prix, remises et échéanciers propres à chaque
+                        inscription.
+                    </p>
+                </header>
+                <form
+                    class="flex gap-2 rounded-xl border bg-card p-4"
+                    @submit.prevent="filter"
+                >
+                    <div class="relative flex-1">
+                        <Search
+                            class="absolute top-2.5 left-3 size-4 text-muted-foreground"
+                        /><Input
+                            v-model="search"
+                            class="pl-9"
+                            placeholder="Rechercher un étudiant…"
+                        />
+                    </div>
+                    <Button>Rechercher</Button>
+                </form>
+                <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                    <article
+                        v-for="e in enrollments.data"
+                        :key="e.id"
+                        class="rounded-xl border bg-card p-5 shadow-sm"
+                    >
+                        <div class="flex justify-between gap-3">
+                            <div>
+                                <b
+                                    >{{ e.student.first_name }}
+                                    {{ e.student.last_name }}</b
+                                >
+                                <p class="text-sm text-muted-foreground">
+                                    {{
+                                        e.form?.course?.title ||
+                                        e.training_plan_group?.plan?.course
+                                            ?.title ||
+                                        'Formation'
+                                    }}
+                                </p>
+                            </div>
+                            <span
+                                class="rounded-lg bg-primary/10 p-2 text-primary"
+                                ><Settings class="size-5"
+                            /></span>
+                        </div>
+                        <div class="mt-4 grid grid-cols-2 gap-2 text-sm">
+                            <div class="rounded-lg bg-muted/40 p-2">
+                                <small class="text-muted-foreground">Prix</small
+                                ><b class="block">{{
+                                    money(e.formation_price)
+                                }}</b>
+                            </div>
+                            <div class="rounded-lg bg-muted/40 p-2">
+                                <small class="text-muted-foreground"
+                                    >Remise</small
+                                ><b class="block">{{
+                                    money(e.discount_amount)
+                                }}</b>
+                            </div>
+                        </div>
+                        <p class="mt-3 text-xs text-muted-foreground">
+                            {{ e.installments.length }} échéance(s)
+                            configurée(s)
+                        </p>
+                        <Button
+                            class="mt-4 w-full"
+                            variant="outline"
+                            @click="edit(e)"
+                            ><Pencil class="mr-2 size-4" />Gérer les
+                            conditions</Button
+                        >
+                    </article>
+                </section>
+                <div
+                    v-if="enrollments.links?.length > 3"
+                    class="flex justify-center gap-1"
+                >
+                    <Link
+                        v-for="link in enrollments.links"
+                        :key="link.label"
+                        :href="link.url || '#'"
+                        class="rounded-md border px-3 py-2 text-sm"
+                        :class="{
+                            'bg-primary text-primary-foreground': link.active,
+                        }"
+                        v-html="link.label"
+                    />
+                </div>
+            </div>
+        </main>
+        <div
+            v-if="selected"
+            class="fixed inset-0 z-50 overflow-y-auto bg-black/50 p-4"
+        >
+            <form
+                class="mx-auto my-10 max-w-xl space-y-4 rounded-xl bg-background p-6"
+                @submit.prevent="save"
+            >
+                <div class="flex justify-between">
+                    <div>
+                        <h2 class="text-xl font-semibold">
+                            Conditions financières
+                        </h2>
+                        <p class="text-sm text-muted-foreground">
+                            {{ selected.student.first_name }}
+                            {{ selected.student.last_name }}
+                        </p>
+                    </div>
+                    <Button
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        @click="selected = null"
+                        ><X
+                    /></Button>
+                </div>
+                <Input
+                    v-model="form.formation_price"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    required
+                    placeholder="Prix formation"
+                /><Input
+                    v-model="form.discount_amount"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="Remise"
+                />
+                <div class="rounded-xl border p-4">
+                    <div class="mb-3 flex justify-between">
+                        <b>Nouvelles échéances</b
+                        ><Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            @click="add"
+                            ><Plus class="mr-1 size-4" />Ajouter</Button
+                        >
+                    </div>
+                    <div
+                        v-for="(item, index) in form.installments"
+                        :key="index"
+                        class="mb-2 grid grid-cols-[1fr_1fr_auto] gap-2"
+                    >
+                        <Input
+                            v-model="item.amount"
+                            type="number"
+                            min="0.01"
+                            step="0.01"
+                            required
+                            placeholder="Montant"
+                        /><Input
+                            v-model="item.due_date"
+                            type="date"
+                            required
+                        /><Button
+                            type="button"
+                            size="icon"
+                            variant="ghost"
+                            class="text-destructive"
+                            @click="removeInstallment(index)"
+                            ><Trash2 class="size-4"
+                        /></Button>
+                    </div>
+                    <p
+                        v-if="!form.installments.length"
+                        class="text-sm text-muted-foreground"
+                    >
+                        Ajoutez seulement les nouvelles échéances nécessaires.
+                    </p>
+                </div>
+                <div class="flex justify-end gap-2">
+                    <Button
+                        type="button"
+                        variant="outline"
+                        @click="selected = null"
+                        >Annuler</Button
+                    ><Button :disabled="form.processing">Enregistrer</Button>
+                </div>
+            </form>
+        </div></AdminLayout
+    >
+</template>

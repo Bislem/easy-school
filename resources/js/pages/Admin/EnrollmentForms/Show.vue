@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { appConfirm } from '@/composables/useAppDialog';
 import InputError from '@/components/InputError.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { appConfirm } from '@/composables/useAppDialog';
 import AdminLayout from '@/layouts/AdminLayout.vue';
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
 import {
@@ -105,7 +105,11 @@ async function removeStudent(enrollment: Enrollment) {
     if (
         await appConfirm(
             `Annuler l'inscription de ${enrollment.first_name} ${enrollment.last_name} ?`,
-            { title: 'Annuler l’inscription', tone: 'danger', confirmText: 'Annuler l’inscription' },
+            {
+                title: 'Annuler l’inscription',
+                tone: 'danger',
+                confirmText: 'Annuler l’inscription',
+            },
         )
     ) {
         router.delete(

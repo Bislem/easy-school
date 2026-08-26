@@ -1,8 +1,8 @@
 <script setup lang="ts">
+import { Button } from '@/components/ui/button';
 import ClientLayout from '@/layouts/ClientLayout.vue';
 import { create, show } from '@/routes/client/support';
 import { Head, router } from '@inertiajs/vue3';
-import { Button } from '@/components/ui/button';
 
 const props = defineProps<{
     tickets: {

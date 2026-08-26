@@ -1,9 +1,6 @@
 <script setup lang="ts">
 import InputError from '@/components/InputError.vue';
-import { appAlert, appConfirm } from '@/composables/useAppDialog';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
     Dialog,
     DialogDescription,
@@ -23,26 +20,29 @@ import {
     DropdownMenuSubTrigger,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { appAlert, appConfirm } from '@/composables/useAppDialog';
 import AdminLayout from '@/layouts/AdminLayout.vue';
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
 import {
     ArrowLeft,
+    ArrowRightLeft,
     CalendarPlus,
     Check,
+    ChevronDown,
     CircleCheck,
+    ClipboardCheck,
     Clock3,
     DoorOpen,
+    FolderOpen,
     Pencil,
     Plus,
+    Search,
     Settings,
     Trash2,
-    Users,
     UserPlus,
-    ClipboardCheck,
-    ArrowRightLeft,
-    ChevronDown,
-    FolderOpen,
-    Search,
+    Users,
     X,
 } from 'lucide-vue-next';
 import { computed, ref, watch } from 'vue';
@@ -65,7 +65,11 @@ interface Session {
     attendance_status: 'pending' | 'completed' | 'validated';
     classroom: Option;
     teacher: Option;
-    attendances: { student_id: number; status: string; notes?: string | null }[];
+    attendances: {
+        student_id: number;
+        status: string;
+        notes?: string | null;
+    }[];
 }
 interface Student {
     id: number;
@@ -94,7 +98,11 @@ interface Group {
     planned_hours: number;
     sessions: Session[];
     enrollments: Enrollment[];
-    attendance_stats: { rate: number | null; repeated_absences: number; missing_sessions: number };
+    attendance_stats: {
+        rate: number | null;
+        repeated_absences: number;
+        missing_sessions: number;
+    };
 }
 interface Plan {
     id: number;
@@ -102,7 +110,12 @@ interface Plan {
     status: string;
     teacher_id: number;
     notes?: string | null;
-    level: { name: string; code: string; duration_hours: number; course: { title: string; code: string } };
+    level: {
+        name: string;
+        code: string;
+        duration_hours: number;
+        course: { title: string; code: string };
+    };
     teacher: Option;
     enrollment_form?: {
         title: string;
@@ -116,7 +129,12 @@ const props = defineProps<{
     teachers: Option[];
     classrooms: Option[];
     students: Student[];
-    access: { is_admin: boolean; manage_groups: boolean; add_sessions: boolean; record_attendance: boolean };
+    access: {
+        is_admin: boolean;
+        manage_groups: boolean;
+        add_sessions: boolean;
+        record_attendance: boolean;
+    };
 }>();
 const groupModal = ref(false);
 const editingGroup = ref<Group | null>(null);
@@ -130,7 +148,9 @@ const editingEnrollment = ref<Enrollment | null>(null);
 const attendanceDialog = ref(false);
 const attendanceSession = ref<Session | null>(null);
 const attendanceReadOnly = computed(
-    () => !props.access.record_attendance || attendanceSession.value?.attendance_status !== 'pending',
+    () =>
+        !props.access.record_attendance ||
+        attendanceSession.value?.attendance_status !== 'pending',
 );
 const studentSearch = ref('');
 const groupForm = useForm({ name: '', classroom_id: '', capacity: '' });
@@ -149,7 +169,15 @@ const settingsForm = useForm({
     notes: props.plan.notes ?? '',
 });
 const addStudentForm = useForm<{ student_ids: number[] }>({ student_ids: [] });
-const studentForm = useForm({ first_name: '', last_name: '', email: '', phone: '', parent_phone: '', school_level: '', notes: '' });
+const studentForm = useForm({
+    first_name: '',
+    last_name: '',
+    email: '',
+    phone: '',
+    parent_phone: '',
+    school_level: '',
+    notes: '',
+});
 const moveForm = useForm({ training_plan_group_id: '' });
 const attendanceForm = useForm<{
     attendances: Record<number, string>;
@@ -158,12 +186,23 @@ const attendanceForm = useForm<{
 const attendanceSelectedIds = ref<number[]>([]);
 const filteredStudents = computed(() => {
     const search = studentSearch.value.trim().toLocaleLowerCase('fr');
-    return props.students.filter((student) => {
-        if (isInPlan(student.id)) return false;
-        if (!search) return true;
-        return [student.first_name, student.last_name, student.email, student.phone, student.birth_date]
-            .filter(Boolean).join(' ').toLocaleLowerCase('fr').includes(search);
-    }).slice(0, 50);
+    return props.students
+        .filter((student) => {
+            if (isInPlan(student.id)) return false;
+            if (!search) return true;
+            return [
+                student.first_name,
+                student.last_name,
+                student.email,
+                student.phone,
+                student.birth_date,
+            ]
+                .filter(Boolean)
+                .join(' ')
+                .toLocaleLowerCase('fr')
+                .includes(search);
+        })
+        .slice(0, 50);
 });
 const statusLabels: Record<string, string> = {
     draft: 'Brouillon',
@@ -227,7 +266,13 @@ function submitGroup() {
         );
 }
 async function deleteGroup(group: Group) {
-    if (await appConfirm(`Supprimer ${group.name} et toutes ses séances ?`, { title: 'Supprimer le groupe', tone: 'danger', confirmText: 'Supprimer' }))
+    if (
+        await appConfirm(`Supprimer ${group.name} et toutes ses séances ?`, {
+            title: 'Supprimer le groupe',
+            tone: 'danger',
+            confirmText: 'Supprimer',
+        })
+    )
         router.delete(
             `/admin/planifications/${props.plan.id}/groupes/${group.id}`,
         );
@@ -262,17 +307,27 @@ function submitSession() {
     else sessionForm.post(base, options);
 }
 async function deleteSession(group: Group, session: Session) {
-    if (await appConfirm(`Supprimer la séance « ${session.title} » ?`, { title: 'Supprimer la séance', tone: 'danger', confirmText: 'Supprimer' }))
+    if (
+        await appConfirm(`Supprimer la séance « ${session.title} » ?`, {
+            title: 'Supprimer la séance',
+            tone: 'danger',
+            confirmText: 'Supprimer',
+        })
+    )
         router.delete(
             `/admin/planifications/${props.plan.id}/groupes/${group.id}/seances/${session.id}`,
         );
 }
 async function completeSession(group: Group, session: Session) {
     if (
-        !await appConfirm(
+        !(await appConfirm(
             'Cette validation est définitive. Confirmer la séance et les présences ?',
-            { title: 'Valider définitivement la séance', tone: 'warning', confirmText: 'Valider la séance' },
-        )
+            {
+                title: 'Valider définitivement la séance',
+                tone: 'warning',
+                confirmText: 'Valider la séance',
+            },
+        ))
     )
         return;
     router.patch(
@@ -285,7 +340,8 @@ async function completeSession(group: Group, session: Session) {
                     String(
                         Object.values(errors)[0] ??
                             'La validation de la séance a échoué.',
-                    ), { title: 'Validation impossible', tone: 'danger' },
+                    ),
+                    { title: 'Validation impossible', tone: 'danger' },
                 ),
         },
     );
@@ -305,10 +361,16 @@ function openRoster(group: Group) {
 }
 function addStudent() {
     if (!rosterGroup.value) return;
-    addStudentForm.post(`/admin/planifications/${props.plan.id}/groupes/${rosterGroup.value.id}/etudiants`, {
-        preserveScroll: true,
-        onSuccess: () => { addStudentForm.reset(); studentSearch.value = ''; },
-    });
+    addStudentForm.post(
+        `/admin/planifications/${props.plan.id}/groupes/${rosterGroup.value.id}/etudiants`,
+        {
+            preserveScroll: true,
+            onSuccess: () => {
+                addStudentForm.reset();
+                studentSearch.value = '';
+            },
+        },
+    );
 }
 function toggleStudentSelection(studentId: number) {
     addStudentForm.student_ids = addStudentForm.student_ids.includes(studentId)
@@ -317,82 +379,154 @@ function toggleStudentSelection(studentId: number) {
 }
 function selectAllAvailableStudents() {
     if (!rosterGroup.value) return;
-    const remaining = rosterGroup.value.capacity ? Math.max(0, rosterGroup.value.capacity - rosterGroup.value.enrollments.length) : filteredStudents.value.length;
-    addStudentForm.student_ids = filteredStudents.value.slice(0, remaining).map((student) => student.id);
+    const remaining = rosterGroup.value.capacity
+        ? Math.max(
+              0,
+              rosterGroup.value.capacity - rosterGroup.value.enrollments.length,
+          )
+        : filteredStudents.value.length;
+    addStudentForm.student_ids = filteredStudents.value
+        .slice(0, remaining)
+        .map((student) => student.id);
 }
 function editStudent(enrollment: Enrollment) {
     editingEnrollment.value = enrollment;
     const student = enrollment.student;
-    studentForm.defaults({ first_name: student.first_name, last_name: student.last_name, email: student.email ?? '', phone: student.phone ?? '', parent_phone: student.parent_phone ?? '', school_level: student.school_level ?? '', notes: student.notes ?? '' });
+    studentForm.defaults({
+        first_name: student.first_name,
+        last_name: student.last_name,
+        email: student.email ?? '',
+        phone: student.phone ?? '',
+        parent_phone: student.parent_phone ?? '',
+        school_level: student.school_level ?? '',
+        notes: student.notes ?? '',
+    });
     studentForm.reset();
     moveForm.training_plan_group_id = String(rosterGroup.value?.id ?? '');
 }
 function saveStudent() {
     if (!rosterGroup.value || !editingEnrollment.value) return;
-    studentForm.put(`/admin/planifications/${props.plan.id}/groupes/${rosterGroup.value.id}/inscriptions/${editingEnrollment.value.id}/etudiant`, {
-        preserveScroll: true,
-        onSuccess: () => (editingEnrollment.value = null),
-    });
+    studentForm.put(
+        `/admin/planifications/${props.plan.id}/groupes/${rosterGroup.value.id}/inscriptions/${editingEnrollment.value.id}/etudiant`,
+        {
+            preserveScroll: true,
+            onSuccess: () => (editingEnrollment.value = null),
+        },
+    );
 }
 function moveStudent() {
     if (!rosterGroup.value || !editingEnrollment.value) return;
-    moveForm.patch(`/admin/planifications/${props.plan.id}/groupes/${rosterGroup.value.id}/inscriptions/${editingEnrollment.value.id}/deplacer`, {
-        preserveScroll: true,
-        onSuccess: () => { editingEnrollment.value = null; rosterDialog.value = false; },
-    });
+    moveForm.patch(
+        `/admin/planifications/${props.plan.id}/groupes/${rosterGroup.value.id}/inscriptions/${editingEnrollment.value.id}/deplacer`,
+        {
+            preserveScroll: true,
+            onSuccess: () => {
+                editingEnrollment.value = null;
+                rosterDialog.value = false;
+            },
+        },
+    );
 }
 function quickMove(enrollment: Enrollment, target: Group) {
     if (!rosterGroup.value || target.id === rosterGroup.value.id) return;
-    router.patch(`/admin/planifications/${props.plan.id}/groupes/${rosterGroup.value.id}/inscriptions/${enrollment.id}/deplacer`, {
-        training_plan_group_id: target.id,
-    }, { preserveScroll: true });
+    router.patch(
+        `/admin/planifications/${props.plan.id}/groupes/${rosterGroup.value.id}/inscriptions/${enrollment.id}/deplacer`,
+        {
+            training_plan_group_id: target.id,
+        },
+        { preserveScroll: true },
+    );
 }
 function openAttendance(group: Group, session: Session) {
     rosterGroup.value = group;
     attendanceSession.value = session;
-    const existing = Object.fromEntries(session.attendances.map((item) => [item.student_id, item.status]));
-    attendanceForm.attendances = Object.fromEntries(group.enrollments.map((item) => [item.student_id, existing[item.student_id] ?? 'present']));
-    attendanceSelectedIds.value = group.enrollments.map((item) => item.student_id);
+    const existing = Object.fromEntries(
+        session.attendances.map((item) => [item.student_id, item.status]),
+    );
+    attendanceForm.attendances = Object.fromEntries(
+        group.enrollments.map((item) => [
+            item.student_id,
+            existing[item.student_id] ?? 'present',
+        ]),
+    );
+    attendanceSelectedIds.value = group.enrollments.map(
+        (item) => item.student_id,
+    );
     attendanceDialog.value = true;
 }
 function toggleAttendanceStudent(studentId: number) {
-    attendanceSelectedIds.value = attendanceSelectedIds.value.includes(studentId)
+    attendanceSelectedIds.value = attendanceSelectedIds.value.includes(
+        studentId,
+    )
         ? attendanceSelectedIds.value.filter((id) => id !== studentId)
         : [...attendanceSelectedIds.value, studentId];
 }
 function toggleAllAttendance() {
     if (!rosterGroup.value) return;
-    attendanceSelectedIds.value = attendanceSelectedIds.value.length === rosterGroup.value.enrollments.length
-        ? [] : rosterGroup.value.enrollments.map((item) => item.student_id);
+    attendanceSelectedIds.value =
+        attendanceSelectedIds.value.length ===
+        rosterGroup.value.enrollments.length
+            ? []
+            : rosterGroup.value.enrollments.map((item) => item.student_id);
 }
 function applyAttendanceStatus(status: string) {
-    attendanceSelectedIds.value.forEach((studentId) => { attendanceForm.attendances[studentId] = status; });
+    attendanceSelectedIds.value.forEach((studentId) => {
+        attendanceForm.attendances[studentId] = status;
+    });
 }
 async function saveAttendance() {
     if (!rosterGroup.value || !attendanceSession.value) return;
     attendanceForm.validate_session = await appConfirm(
         'Voulez-vous aussi valider définitivement cette séance ? Le formateur sera marqué présent et les présences seront verrouillées.',
-        { title: 'Valider la séance ?', tone: 'warning', confirmText: 'Enregistrer et valider', cancelText: 'Présences uniquement' },
+        {
+            title: 'Valider la séance ?',
+            tone: 'warning',
+            confirmText: 'Enregistrer et valider',
+            cancelText: 'Présences uniquement',
+        },
     );
-    attendanceForm.put(`/admin/planifications/${props.plan.id}/groupes/${rosterGroup.value.id}/seances/${attendanceSession.value.id}/presences`, {
-        preserveScroll: true,
-        onSuccess: () => (attendanceDialog.value = false),
-    });
+    attendanceForm.put(
+        `/admin/planifications/${props.plan.id}/groupes/${rosterGroup.value.id}/seances/${attendanceSession.value.id}/presences`,
+        {
+            preserveScroll: true,
+            onSuccess: () => (attendanceDialog.value = false),
+        },
+    );
 }
-function studentName(student: Student) { return `${student.first_name} ${student.last_name}`; }
-function isInPlan(studentId: number) { return props.plan.groups.some((group) => group.enrollments.some((item) => item.student_id === studentId)); }
+function studentName(student: Student) {
+    return `${student.first_name} ${student.last_name}`;
+}
+function isInPlan(studentId: number) {
+    return props.plan.groups.some((group) =>
+        group.enrollments.some((item) => item.student_id === studentId),
+    );
+}
 function formatBirthDate(value?: string | null) {
-    return value ? new Date(`${value}T00:00:00`).toLocaleDateString('fr-FR') : 'Date de naissance inconnue';
+    return value
+        ? new Date(`${value}T00:00:00`).toLocaleDateString('fr-FR')
+        : 'Date de naissance inconnue';
 }
-watch(() => props.plan.groups, (groups) => {
-    if (rosterGroup.value) rosterGroup.value = groups.find((group) => group.id === rosterGroup.value?.id) ?? null;
-    if (sessionGroup.value) sessionGroup.value = groups.find((group) => group.id === sessionGroup.value?.id) ?? null;
-}, { deep: true });
+watch(
+    () => props.plan.groups,
+    (groups) => {
+        if (rosterGroup.value)
+            rosterGroup.value =
+                groups.find((group) => group.id === rosterGroup.value?.id) ??
+                null;
+        if (sessionGroup.value)
+            sessionGroup.value =
+                groups.find((group) => group.id === sessionGroup.value?.id) ??
+                null;
+    },
+    { deep: true },
+);
 </script>
 
 <template>
     <Head :title="plan.title" /><AdminLayout
-        ><main class="min-w-0 flex-1 space-y-5 overflow-x-hidden p-3 sm:space-y-6 sm:p-6 lg:p-8">
+        ><main
+            class="min-w-0 flex-1 space-y-5 overflow-x-hidden p-3 sm:space-y-6 sm:p-6 lg:p-8"
+        >
             <div>
                 <Link
                     href="/admin/planifications"
@@ -421,11 +555,14 @@ watch(() => props.plan.groups, (groups) => {
                                 >Formation libre</span
                             >
                         </div>
-                        <h1 class="mt-3 break-words text-xl font-bold sm:text-2xl">
+                        <h1
+                            class="mt-3 text-xl font-bold break-words sm:text-2xl"
+                        >
                             {{ plan.title }}
                         </h1>
                         <p class="mt-1 text-muted-foreground">
-                            {{ plan.level.course.title }} · {{ plan.level.name }} ({{ plan.level.code }}) ·
+                            {{ plan.level.course.title }} ·
+                            {{ plan.level.name }} ({{ plan.level.code }}) ·
                             {{ plan.level.duration_hours }} heures par groupe
                         </p>
                         <p
@@ -438,7 +575,10 @@ watch(() => props.plan.groups, (groups) => {
                         </p>
                     </div>
                     <Button v-if="access.is_admin" variant="outline" as-child>
-                        <Link :href="`/admin/planifications/${plan.id}/parametres`"><Settings class="mr-2 size-4" />Paramètres</Link>
+                        <Link
+                            :href="`/admin/planifications/${plan.id}/parametres`"
+                            ><Settings class="mr-2 size-4" />Paramètres</Link
+                        >
                     </Button>
                 </div>
                 <div class="mt-5 grid grid-cols-3 gap-2 sm:mt-6 sm:gap-3">
@@ -483,14 +623,20 @@ watch(() => props.plan.groups, (groups) => {
             >
                 {{ $page.props.errors.group }}
             </div>
-            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div
+                class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
+            >
                 <div>
                     <h2 class="text-xl font-semibold">Groupes et séances</h2>
                     <p class="text-sm text-muted-foreground">
                         Chaque groupe possède son propre calendrier.
                     </p>
                 </div>
-                <Button v-if="access.manage_groups" class="w-full sm:w-auto" variant="outline" @click="openGroup()"
+                <Button
+                    v-if="access.manage_groups"
+                    class="w-full sm:w-auto"
+                    variant="outline"
+                    @click="openGroup()"
                     ><Plus class="mr-2 size-4" />Ajouter un groupe</Button
                 >
             </div>
@@ -524,13 +670,21 @@ watch(() => props.plan.groups, (groups) => {
                                 ><span class="flex items-center gap-1.5"
                                     ><Users class="size-4" />{{
                                         group.enrollments.length
-                                    }} / {{ group.capacity || '∞' }} étudiants</span
+                                    }}
+                                    /
+                                    {{ group.capacity || '∞' }} étudiants</span
                                 ><span class="flex items-center gap-1.5"
                                     ><Clock3 class="size-4" />{{
                                         group.planned_hours
-                                    }}h /
-                                    {{ plan.level.duration_hours }}h</span
-                                ><span class="flex items-center gap-1.5"><ClipboardCheck class="size-4"/>{{ group.attendance_stats.rate ?? '—' }}% présence · {{ group.attendance_stats.missing_sessions }} feuille(s) manquante(s)</span
+                                    }}h / {{ plan.level.duration_hours }}h</span
+                                ><span class="flex items-center gap-1.5"
+                                    ><ClipboardCheck class="size-4" />{{
+                                        group.attendance_stats.rate ?? '—'
+                                    }}% présence ·
+                                    {{
+                                        group.attendance_stats.missing_sessions
+                                    }}
+                                    feuille(s) manquante(s)</span
                                 >
                             </div>
                             <div
@@ -551,7 +705,11 @@ watch(() => props.plan.groups, (groups) => {
                             </div>
                         </div>
                         <div class="flex flex-wrap gap-2">
-                            <Button class="flex-1 sm:flex-none" size="sm" variant="outline" @click="openRoster(group)"
+                            <Button
+                                class="flex-1 sm:flex-none"
+                                size="sm"
+                                variant="outline"
+                                @click="openRoster(group)"
                                 ><Users class="mr-2 size-4" />Étudiants</Button
                             >
                             <Button
@@ -561,7 +719,11 @@ watch(() => props.plan.groups, (groups) => {
                                 variant="outline"
                                 @click="openGroup(group)"
                                 ><Pencil class="mr-2 size-4" />Modifier</Button
-                            ><Button v-if="access.add_sessions" class="w-full sm:w-auto" size="sm" @click="openSession(group)"
+                            ><Button
+                                v-if="access.add_sessions"
+                                class="w-full sm:w-auto"
+                                size="sm"
+                                @click="openSession(group)"
                                 ><CalendarPlus class="mr-2 size-4" />Ajouter une
                                 séance</Button
                             ><Button
@@ -603,18 +765,26 @@ watch(() => props.plan.groups, (groups) => {
                                     {{ session.teacher.name }}
                                 </p>
                             </div>
-                            <div class="flex justify-start border-t pt-2 sm:justify-end sm:border-0 sm:pt-0">
+                            <div
+                                class="flex justify-start border-t pt-2 sm:justify-end sm:border-0 sm:pt-0"
+                            >
                                 <Button
                                     size="icon"
                                     variant="ghost"
-                                    :title="session.attendance_status === 'pending' ? 'Saisir les présences' : 'Voir les présences'"
+                                    :title="
+                                        session.attendance_status === 'pending'
+                                            ? 'Saisir les présences'
+                                            : 'Voir les présences'
+                                    "
                                     @click="openAttendance(group, session)"
                                     ><ClipboardCheck class="size-4"
                                 /></Button>
                                 <Button
                                     v-if="
-                                        access.record_attendance && session.status !== 'completed' &&
-                                        session.attendance_status === 'completed'
+                                        access.record_attendance &&
+                                        session.status !== 'completed' &&
+                                        session.attendance_status ===
+                                            'completed'
                                     "
                                     size="icon"
                                     variant="ghost"
@@ -623,13 +793,23 @@ watch(() => props.plan.groups, (groups) => {
                                     ><CircleCheck class="size-4 text-green-600"
                                 /></Button>
                                 <Button
-                                    v-if="access.is_admin && session.attendance_status !== 'validated' && session.status !== 'completed'"
+                                    v-if="
+                                        access.is_admin &&
+                                        session.attendance_status !==
+                                            'validated' &&
+                                        session.status !== 'completed'
+                                    "
                                     size="icon"
                                     variant="ghost"
                                     @click="openSession(group, session)"
                                     ><Pencil class="size-4" /></Button
                                 ><Button
-                                    v-if="access.is_admin && session.attendance_status !== 'validated' && session.status !== 'completed'"
+                                    v-if="
+                                        access.is_admin &&
+                                        session.attendance_status !==
+                                            'validated' &&
+                                        session.status !== 'completed'
+                                    "
                                     size="icon"
                                     variant="ghost"
                                     class="text-destructive"
@@ -730,7 +910,11 @@ watch(() => props.plan.groups, (groups) => {
         </div>
 
         <div
-            v-if="sessionModal && sessionGroup && (access.add_sessions || access.is_admin)"
+            v-if="
+                sessionModal &&
+                sessionGroup &&
+                (access.add_sessions || access.is_admin)
+            "
             class="fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center sm:p-4"
             @click.self="sessionModal = false"
         >
@@ -943,99 +1127,383 @@ watch(() => props.plan.groups, (groups) => {
         </div>
 
         <Dialog v-model:open="rosterDialog">
-            <DialogScrollContent class="max-h-[92dvh] w-[calc(100vw-1rem)] max-w-4xl">
+            <DialogScrollContent
+                class="max-h-[92dvh] w-[calc(100vw-1rem)] max-w-4xl"
+            >
                 <DialogHeader>
-                    <DialogTitle>Étudiants · {{ rosterGroup?.name }}</DialogTitle>
-                    <DialogDescription>Ajoutez, consultez, modifiez ou déplacez les étudiants pendant toute la planification.</DialogDescription>
+                    <DialogTitle
+                        >Étudiants · {{ rosterGroup?.name }}</DialogTitle
+                    >
+                    <DialogDescription
+                        >Ajoutez, consultez, modifiez ou déplacez les étudiants
+                        pendant toute la planification.</DialogDescription
+                    >
                 </DialogHeader>
                 <div v-if="rosterGroup" class="space-y-5">
-                    <form v-if="access.is_admin" class="space-y-3 rounded-lg border bg-muted/20 p-3" @submit.prevent="addStudent">
+                    <form
+                        v-if="access.is_admin"
+                        class="space-y-3 rounded-lg border bg-muted/20 p-3"
+                        @submit.prevent="addStudent"
+                    >
                         <div class="relative">
-                            <Search class="absolute left-3 top-2.5 size-4 text-muted-foreground" />
-                            <Input v-model="studentSearch" class="pl-9" placeholder="Rechercher par nom, e-mail, téléphone ou date de naissance…" autocomplete="off" />
+                            <Search
+                                class="absolute top-2.5 left-3 size-4 text-muted-foreground"
+                            />
+                            <Input
+                                v-model="studentSearch"
+                                class="pl-9"
+                                placeholder="Rechercher par nom, e-mail, téléphone ou date de naissance…"
+                                autocomplete="off"
+                            />
                         </div>
-                        <div class="flex flex-col gap-2 text-sm sm:flex-row sm:items-center sm:justify-between">
-                            <span class="text-muted-foreground">{{ addStudentForm.student_ids.length }} étudiant(s) sélectionné(s)</span>
-                            <div class="flex flex-wrap gap-2"><Button type="button" size="sm" variant="ghost" @click="addStudentForm.student_ids=[]">Désélectionner</Button><Button type="button" size="sm" variant="outline" @click="selectAllAvailableStudents">Tout sélectionner</Button></div>
+                        <div
+                            class="flex flex-col gap-2 text-sm sm:flex-row sm:items-center sm:justify-between"
+                        >
+                            <span class="text-muted-foreground"
+                                >{{
+                                    addStudentForm.student_ids.length
+                                }}
+                                étudiant(s) sélectionné(s)</span
+                            >
+                            <div class="flex flex-wrap gap-2">
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="ghost"
+                                    @click="addStudentForm.student_ids = []"
+                                    >Désélectionner</Button
+                                ><Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    @click="selectAllAvailableStudents"
+                                    >Tout sélectionner</Button
+                                >
+                            </div>
                         </div>
-                        <div class="max-h-60 overflow-y-auto rounded-md border bg-background">
+                        <div
+                            class="max-h-60 overflow-y-auto rounded-md border bg-background"
+                        >
                             <button
                                 v-for="student in filteredStudents"
                                 :key="student.id"
                                 type="button"
                                 class="flex w-full items-center gap-3 border-b p-3 text-left transition last:border-0 hover:bg-muted/50"
-                                :class="addStudentForm.student_ids.includes(student.id) ? 'bg-primary/10 ring-1 ring-inset ring-primary' : ''"
+                                :class="
+                                    addStudentForm.student_ids.includes(
+                                        student.id,
+                                    )
+                                        ? 'bg-primary/10 ring-1 ring-primary ring-inset'
+                                        : ''
+                                "
                                 @click="toggleStudentSelection(student.id)"
                             >
-                                <img v-if="student.photo_url" :src="student.photo_url" :alt="studentName(student)" class="size-10 shrink-0 rounded-full object-cover" />
-                                <span v-else class="grid size-10 shrink-0 place-items-center rounded-full bg-primary/10 text-xs font-semibold text-primary">{{ student.first_name[0] }}{{ student.last_name[0] }}</span>
+                                <img
+                                    v-if="student.photo_url"
+                                    :src="student.photo_url"
+                                    :alt="studentName(student)"
+                                    class="size-10 shrink-0 rounded-full object-cover"
+                                />
+                                <span
+                                    v-else
+                                    class="grid size-10 shrink-0 place-items-center rounded-full bg-primary/10 text-xs font-semibold text-primary"
+                                    >{{ student.first_name[0]
+                                    }}{{ student.last_name[0] }}</span
+                                >
                                 <span class="min-w-0 flex-1">
-                                    <span class="block truncate font-medium">{{ studentName(student) }}</span>
-                                    <span class="block truncate text-xs text-muted-foreground">Né(e) le {{ formatBirthDate(student.birth_date) }} · {{ student.email || student.phone || 'Sans coordonnées' }}</span>
+                                    <span class="block truncate font-medium">{{
+                                        studentName(student)
+                                    }}</span>
+                                    <span
+                                        class="block truncate text-xs text-muted-foreground"
+                                        >Né(e) le
+                                        {{
+                                            formatBirthDate(student.birth_date)
+                                        }}
+                                        ·
+                                        {{
+                                            student.email ||
+                                            student.phone ||
+                                            'Sans coordonnées'
+                                        }}</span
+                                    >
                                 </span>
-                                <span class="grid size-5 shrink-0 place-items-center rounded border" :class="addStudentForm.student_ids.includes(student.id)?'border-primary bg-primary text-primary-foreground':''"><Check v-if="addStudentForm.student_ids.includes(student.id)" class="size-3.5" /></span>
+                                <span
+                                    class="grid size-5 shrink-0 place-items-center rounded border"
+                                    :class="
+                                        addStudentForm.student_ids.includes(
+                                            student.id,
+                                        )
+                                            ? 'border-primary bg-primary text-primary-foreground'
+                                            : ''
+                                    "
+                                    ><Check
+                                        v-if="
+                                            addStudentForm.student_ids.includes(
+                                                student.id,
+                                            )
+                                        "
+                                        class="size-3.5"
+                                /></span>
                             </button>
-                            <p v-if="!filteredStudents.length" class="p-6 text-center text-sm text-muted-foreground">Aucun étudiant disponible ne correspond à cette recherche.</p>
+                            <p
+                                v-if="!filteredStudents.length"
+                                class="p-6 text-center text-sm text-muted-foreground"
+                            >
+                                Aucun étudiant disponible ne correspond à cette
+                                recherche.
+                            </p>
                         </div>
-                        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                            <InputError :message="addStudentForm.errors.student_ids" />
-                            <Button :disabled="addStudentForm.processing || !addStudentForm.student_ids.length"><UserPlus class="mr-2 size-4" />Ajouter {{ addStudentForm.student_ids.length || '' }} étudiant(s)</Button>
+                        <div
+                            class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
+                        >
+                            <InputError
+                                :message="addStudentForm.errors.student_ids"
+                            />
+                            <Button
+                                :disabled="
+                                    addStudentForm.processing ||
+                                    !addStudentForm.student_ids.length
+                                "
+                                ><UserPlus class="mr-2 size-4" />Ajouter
+                                {{
+                                    addStudentForm.student_ids.length || ''
+                                }}
+                                étudiant(s)</Button
+                            >
                         </div>
                     </form>
 
-                    <div v-if="!editingEnrollment" class="overflow-hidden rounded-lg border">
-                        <div v-for="enrollment in rosterGroup.enrollments" :key="enrollment.id" class="flex flex-col gap-3 border-b p-3 last:border-0 sm:flex-row sm:items-center sm:justify-between">
+                    <div
+                        v-if="!editingEnrollment"
+                        class="overflow-hidden rounded-lg border"
+                    >
+                        <div
+                            v-for="enrollment in rosterGroup.enrollments"
+                            :key="enrollment.id"
+                            class="flex flex-col gap-3 border-b p-3 last:border-0 sm:flex-row sm:items-center sm:justify-between"
+                        >
                             <div class="flex min-w-0 items-center gap-3">
-                                <img v-if="enrollment.student.photo_url" :src="enrollment.student.photo_url" :alt="studentName(enrollment.student)" class="size-10 shrink-0 rounded-full object-cover" />
-                                <span v-else class="grid size-10 shrink-0 place-items-center rounded-full bg-muted text-xs font-semibold">{{ enrollment.student.first_name[0] }}{{ enrollment.student.last_name[0] }}</span>
+                                <img
+                                    v-if="enrollment.student.photo_url"
+                                    :src="enrollment.student.photo_url"
+                                    :alt="studentName(enrollment.student)"
+                                    class="size-10 shrink-0 rounded-full object-cover"
+                                />
+                                <span
+                                    v-else
+                                    class="grid size-10 shrink-0 place-items-center rounded-full bg-muted text-xs font-semibold"
+                                    >{{ enrollment.student.first_name[0]
+                                    }}{{
+                                        enrollment.student.last_name[0]
+                                    }}</span
+                                >
                                 <div class="min-w-0">
-                                    <p class="truncate font-medium">{{ studentName(enrollment.student) }}</p>
-                                    <p class="truncate text-xs text-muted-foreground">{{ enrollment.student.email || 'Sans e-mail' }} · {{ enrollment.student.phone || 'Sans téléphone' }}</p>
+                                    <p class="truncate font-medium">
+                                        {{ studentName(enrollment.student) }}
+                                    </p>
+                                    <p
+                                        class="truncate text-xs text-muted-foreground"
+                                    >
+                                        {{
+                                            enrollment.student.email ||
+                                            'Sans e-mail'
+                                        }}
+                                        ·
+                                        {{
+                                            enrollment.student.phone ||
+                                            'Sans téléphone'
+                                        }}
+                                    </p>
                                 </div>
                             </div>
                             <DropdownMenu v-if="access.is_admin">
-                                <DropdownMenuTrigger as-child><Button size="sm" variant="outline">Actions<ChevronDown class="ml-2 size-4" /></Button></DropdownMenuTrigger>
+                                <DropdownMenuTrigger as-child
+                                    ><Button size="sm" variant="outline"
+                                        >Actions<ChevronDown
+                                            class="ml-2 size-4" /></Button
+                                ></DropdownMenuTrigger>
                                 <DropdownMenuContent align="end" class="w-56">
-                                    <DropdownMenuLabel>{{ studentName(enrollment.student) }}</DropdownMenuLabel>
+                                    <DropdownMenuLabel>{{
+                                        studentName(enrollment.student)
+                                    }}</DropdownMenuLabel>
                                     <DropdownMenuSeparator />
                                     <DropdownMenuItem as-child>
-                                        <a :href="`/admin/students/${enrollment.student_id}`" target="_blank" rel="noopener noreferrer"><FolderOpen class="mr-2 size-4" />Ouvrir le dossier</a>
+                                        <a
+                                            :href="`/admin/students/${enrollment.student_id}`"
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            ><FolderOpen
+                                                class="mr-2 size-4"
+                                            />Ouvrir le dossier</a
+                                        >
                                     </DropdownMenuItem>
-                                    <DropdownMenuItem @select="editStudent(enrollment)"><Pencil class="mr-2 size-4" />Modifier rapidement</DropdownMenuItem>
+                                    <DropdownMenuItem
+                                        @select="editStudent(enrollment)"
+                                        ><Pencil class="mr-2 size-4" />Modifier
+                                        rapidement</DropdownMenuItem
+                                    >
                                     <DropdownMenuSub>
-                                        <DropdownMenuSubTrigger><ArrowRightLeft class="mr-2 size-4" />Changer de groupe</DropdownMenuSubTrigger>
+                                        <DropdownMenuSubTrigger
+                                            ><ArrowRightLeft
+                                                class="mr-2 size-4"
+                                            />Changer de
+                                            groupe</DropdownMenuSubTrigger
+                                        >
                                         <DropdownMenuSubContent>
-                                            <DropdownMenuItem v-for="target in plan.groups.filter((item) => item.id !== rosterGroup?.id)" :key="target.id" :disabled="Boolean(target.capacity && target.enrollments.length >= target.capacity)" @select="quickMove(enrollment, target)">
-                                                {{ target.name }}<span class="ml-auto text-xs text-muted-foreground">{{ target.enrollments.length }}/{{ target.capacity || '∞' }}</span>
+                                            <DropdownMenuItem
+                                                v-for="target in plan.groups.filter(
+                                                    (item) =>
+                                                        item.id !==
+                                                        rosterGroup?.id,
+                                                )"
+                                                :key="target.id"
+                                                :disabled="
+                                                    Boolean(
+                                                        target.capacity &&
+                                                            target.enrollments
+                                                                .length >=
+                                                                target.capacity,
+                                                    )
+                                                "
+                                                @select="
+                                                    quickMove(
+                                                        enrollment,
+                                                        target,
+                                                    )
+                                                "
+                                            >
+                                                {{ target.name
+                                                }}<span
+                                                    class="ml-auto text-xs text-muted-foreground"
+                                                    >{{
+                                                        target.enrollments
+                                                            .length
+                                                    }}/{{
+                                                        target.capacity || '∞'
+                                                    }}</span
+                                                >
                                             </DropdownMenuItem>
                                         </DropdownMenuSubContent>
                                     </DropdownMenuSub>
                                 </DropdownMenuContent>
                             </DropdownMenu>
                         </div>
-                        <p v-if="!rosterGroup.enrollments.length" class="p-8 text-center text-sm text-muted-foreground">Aucun étudiant dans ce groupe.</p>
+                        <p
+                            v-if="!rosterGroup.enrollments.length"
+                            class="p-8 text-center text-sm text-muted-foreground"
+                        >
+                            Aucun étudiant dans ce groupe.
+                        </p>
                     </div>
 
-                    <form v-else class="space-y-4 rounded-lg border p-4" @submit.prevent="saveStudent">
-                        <div class="flex items-center justify-between"><h3 class="font-semibold">Modifier le dossier</h3><Button type="button" size="sm" variant="ghost" @click="editingEnrollment = null">Retour à la liste</Button></div>
-                        <div class="grid gap-4 sm:grid-cols-2">
-                            <div><Label>Prénom</Label><Input v-model="studentForm.first_name" class="mt-1" required /></div>
-                            <div><Label>Nom</Label><Input v-model="studentForm.last_name" class="mt-1" required /></div>
-                            <div><Label>E-mail</Label><Input v-model="studentForm.email" class="mt-1" type="email" /></div>
-                            <div><Label>Téléphone</Label><Input v-model="studentForm.phone" class="mt-1" /></div>
-                            <div><Label>Téléphone parent</Label><Input v-model="studentForm.parent_phone" class="mt-1" /></div>
-                            <div><Label>Niveau scolaire</Label><Input v-model="studentForm.school_level" class="mt-1" /></div>
+                    <form
+                        v-else
+                        class="space-y-4 rounded-lg border p-4"
+                        @submit.prevent="saveStudent"
+                    >
+                        <div class="flex items-center justify-between">
+                            <h3 class="font-semibold">Modifier le dossier</h3>
+                            <Button
+                                type="button"
+                                size="sm"
+                                variant="ghost"
+                                @click="editingEnrollment = null"
+                                >Retour à la liste</Button
+                            >
                         </div>
-                        <div><Label>Notes</Label><textarea v-model="studentForm.notes" rows="2" class="mt-1 w-full rounded-md border bg-background p-3 text-sm" /></div>
-                        <InputError :message="Object.values(studentForm.errors)[0]" />
-                        <div class="flex flex-col justify-between gap-3 border-t pt-4 sm:flex-row">
-                            <div class="flex flex-1 gap-2">
-                                <select v-model="moveForm.training_plan_group_id" class="h-9 flex-1 rounded-md border bg-background px-3 text-sm">
-                                    <option v-for="group in plan.groups" :key="group.id" :value="String(group.id)">{{ group.name }}</option>
-                                </select>
-                                <Button type="button" variant="outline" :disabled="moveForm.processing || Number(moveForm.training_plan_group_id) === rosterGroup.id" @click="moveStudent"><ArrowRightLeft class="mr-2 size-4" />Déplacer</Button>
+                        <div class="grid gap-4 sm:grid-cols-2">
+                            <div>
+                                <Label>Prénom</Label
+                                ><Input
+                                    v-model="studentForm.first_name"
+                                    class="mt-1"
+                                    required
+                                />
                             </div>
-                            <Button :disabled="studentForm.processing">Enregistrer</Button>
+                            <div>
+                                <Label>Nom</Label
+                                ><Input
+                                    v-model="studentForm.last_name"
+                                    class="mt-1"
+                                    required
+                                />
+                            </div>
+                            <div>
+                                <Label>E-mail</Label
+                                ><Input
+                                    v-model="studentForm.email"
+                                    class="mt-1"
+                                    type="email"
+                                />
+                            </div>
+                            <div>
+                                <Label>Téléphone</Label
+                                ><Input
+                                    v-model="studentForm.phone"
+                                    class="mt-1"
+                                />
+                            </div>
+                            <div>
+                                <Label>Téléphone parent</Label
+                                ><Input
+                                    v-model="studentForm.parent_phone"
+                                    class="mt-1"
+                                />
+                            </div>
+                            <div>
+                                <Label>Niveau scolaire</Label
+                                ><Input
+                                    v-model="studentForm.school_level"
+                                    class="mt-1"
+                                />
+                            </div>
+                        </div>
+                        <div>
+                            <Label>Notes</Label
+                            ><textarea
+                                v-model="studentForm.notes"
+                                rows="2"
+                                class="mt-1 w-full rounded-md border bg-background p-3 text-sm"
+                            />
+                        </div>
+                        <InputError
+                            :message="Object.values(studentForm.errors)[0]"
+                        />
+                        <div
+                            class="flex flex-col justify-between gap-3 border-t pt-4 sm:flex-row"
+                        >
+                            <div class="flex flex-1 gap-2">
+                                <select
+                                    v-model="moveForm.training_plan_group_id"
+                                    class="h-9 flex-1 rounded-md border bg-background px-3 text-sm"
+                                >
+                                    <option
+                                        v-for="group in plan.groups"
+                                        :key="group.id"
+                                        :value="String(group.id)"
+                                    >
+                                        {{ group.name }}
+                                    </option>
+                                </select>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    :disabled="
+                                        moveForm.processing ||
+                                        Number(
+                                            moveForm.training_plan_group_id,
+                                        ) === rosterGroup.id
+                                    "
+                                    @click="moveStudent"
+                                    ><ArrowRightLeft
+                                        class="mr-2 size-4"
+                                    />Déplacer</Button
+                                >
+                            </div>
+                            <Button :disabled="studentForm.processing"
+                                >Enregistrer</Button
+                            >
                         </div>
                     </form>
                 </div>
@@ -1043,33 +1511,157 @@ watch(() => props.plan.groups, (groups) => {
         </Dialog>
 
         <Dialog v-model:open="attendanceDialog">
-            <DialogScrollContent class="max-h-[92dvh] w-[calc(100vw-1rem)] max-w-2xl">
+            <DialogScrollContent
+                class="max-h-[92dvh] w-[calc(100vw-1rem)] max-w-2xl"
+            >
                 <DialogHeader>
-                    <DialogTitle>{{ attendanceReadOnly ? 'Présences enregistrées' : 'Saisir les présences' }} · {{ attendanceSession?.title }}</DialogTitle>
-                    <DialogDescription>{{ rosterGroup?.name }} · {{ attendanceReadOnly ? 'consultation en lecture seule' : 'sélectionnez le statut de chaque étudiant' }}.</DialogDescription>
+                    <DialogTitle
+                        >{{
+                            attendanceReadOnly
+                                ? 'Présences enregistrées'
+                                : 'Saisir les présences'
+                        }}
+                        · {{ attendanceSession?.title }}</DialogTitle
+                    >
+                    <DialogDescription
+                        >{{ rosterGroup?.name }} ·
+                        {{
+                            attendanceReadOnly
+                                ? 'consultation en lecture seule'
+                                : 'sélectionnez le statut de chaque étudiant'
+                        }}.</DialogDescription
+                    >
                 </DialogHeader>
-                <form v-if="rosterGroup" class="space-y-4" @submit.prevent="saveAttendance">
-                    <div v-if="!attendanceReadOnly" class="flex flex-wrap items-center gap-2 rounded-lg border bg-muted/20 p-3">
-                        <Button type="button" size="sm" variant="outline" @click="toggleAllAttendance">{{ attendanceSelectedIds.length===rosterGroup.enrollments.length?'Tout désélectionner':'Tout sélectionner' }}</Button>
-                        <span class="mr-auto text-sm text-muted-foreground">{{ attendanceSelectedIds.length }} sélectionné(s)</span>
-                        <Button type="button" size="sm" class="bg-emerald-600 hover:bg-emerald-700" :disabled="!attendanceSelectedIds.length" @click="applyAttendanceStatus('present')">Présents</Button>
-                        <Button type="button" size="sm" variant="destructive" :disabled="!attendanceSelectedIds.length" @click="applyAttendanceStatus('absent')">Absents</Button>
-                        <Button type="button" size="sm" variant="outline" :disabled="!attendanceSelectedIds.length" @click="applyAttendanceStatus('late')">En retard</Button>
-                        <Button type="button" size="sm" variant="outline" :disabled="!attendanceSelectedIds.length" @click="applyAttendanceStatus('excused')">Excusés</Button>
+                <form
+                    v-if="rosterGroup"
+                    class="space-y-4"
+                    @submit.prevent="saveAttendance"
+                >
+                    <div
+                        v-if="!attendanceReadOnly"
+                        class="flex flex-wrap items-center gap-2 rounded-lg border bg-muted/20 p-3"
+                    >
+                        <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            @click="toggleAllAttendance"
+                            >{{
+                                attendanceSelectedIds.length ===
+                                rosterGroup.enrollments.length
+                                    ? 'Tout désélectionner'
+                                    : 'Tout sélectionner'
+                            }}</Button
+                        >
+                        <span class="mr-auto text-sm text-muted-foreground"
+                            >{{
+                                attendanceSelectedIds.length
+                            }}
+                            sélectionné(s)</span
+                        >
+                        <Button
+                            type="button"
+                            size="sm"
+                            class="bg-emerald-600 hover:bg-emerald-700"
+                            :disabled="!attendanceSelectedIds.length"
+                            @click="applyAttendanceStatus('present')"
+                            >Présents</Button
+                        >
+                        <Button
+                            type="button"
+                            size="sm"
+                            variant="destructive"
+                            :disabled="!attendanceSelectedIds.length"
+                            @click="applyAttendanceStatus('absent')"
+                            >Absents</Button
+                        >
+                        <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            :disabled="!attendanceSelectedIds.length"
+                            @click="applyAttendanceStatus('late')"
+                            >En retard</Button
+                        >
+                        <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            :disabled="!attendanceSelectedIds.length"
+                            @click="applyAttendanceStatus('excused')"
+                            >Excusés</Button
+                        >
                     </div>
                     <div class="overflow-hidden rounded-lg border">
-                        <div v-for="enrollment in rosterGroup.enrollments" :key="enrollment.id" class="grid grid-cols-[28px_1fr] items-center gap-3 border-b p-3 last:border-0 sm:grid-cols-[32px_1fr_150px]" :class="attendanceSelectedIds.includes(enrollment.student_id)?'bg-primary/5':''">
-                            <input type="checkbox" :checked="attendanceSelectedIds.includes(enrollment.student_id)" :disabled="attendanceReadOnly" class="size-4 disabled:opacity-40" @change="toggleAttendanceStudent(enrollment.student_id)" />
-                            <span class="flex items-center gap-2 font-medium"><img v-if="enrollment.student.photo_url" :src="enrollment.student.photo_url" class="size-8 rounded-full object-cover"/>{{ studentName(enrollment.student) }}</span>
-                            <select v-model="attendanceForm.attendances[enrollment.student_id]" :disabled="attendanceReadOnly" class="col-span-2 h-10 w-full rounded-md border bg-background px-2 text-sm disabled:cursor-default disabled:opacity-100 sm:col-span-1 sm:h-9">
-                                <option value="present">Présent</option><option value="absent">Absent</option><option value="late">En retard</option><option value="excused">Excusé</option>
+                        <div
+                            v-for="enrollment in rosterGroup.enrollments"
+                            :key="enrollment.id"
+                            class="grid grid-cols-[28px_1fr] items-center gap-3 border-b p-3 last:border-0 sm:grid-cols-[32px_1fr_150px]"
+                            :class="
+                                attendanceSelectedIds.includes(
+                                    enrollment.student_id,
+                                )
+                                    ? 'bg-primary/5'
+                                    : ''
+                            "
+                        >
+                            <input
+                                type="checkbox"
+                                :checked="
+                                    attendanceSelectedIds.includes(
+                                        enrollment.student_id,
+                                    )
+                                "
+                                :disabled="attendanceReadOnly"
+                                class="size-4 disabled:opacity-40"
+                                @change="
+                                    toggleAttendanceStudent(
+                                        enrollment.student_id,
+                                    )
+                                "
+                            />
+                            <span class="flex items-center gap-2 font-medium"
+                                ><img
+                                    v-if="enrollment.student.photo_url"
+                                    :src="enrollment.student.photo_url"
+                                    class="size-8 rounded-full object-cover"
+                                />{{ studentName(enrollment.student) }}</span
+                            >
+                            <select
+                                v-model="
+                                    attendanceForm.attendances[
+                                        enrollment.student_id
+                                    ]
+                                "
+                                :disabled="attendanceReadOnly"
+                                class="col-span-2 h-10 w-full rounded-md border bg-background px-2 text-sm disabled:cursor-default disabled:opacity-100 sm:col-span-1 sm:h-9"
+                            >
+                                <option value="present">Présent</option>
+                                <option value="absent">Absent</option>
+                                <option value="late">En retard</option>
+                                <option value="excused">Excusé</option>
                             </select>
                         </div>
-                        <p v-if="!rosterGroup.enrollments.length" class="p-8 text-center text-sm text-muted-foreground">Ajoutez d’abord des étudiants au groupe.</p>
+                        <p
+                            v-if="!rosterGroup.enrollments.length"
+                            class="p-8 text-center text-sm text-muted-foreground"
+                        >
+                            Ajoutez d’abord des étudiants au groupe.
+                        </p>
                     </div>
                     <template v-if="!attendanceReadOnly">
-                        <InputError :message="Object.values(attendanceForm.errors)[0]" />
-                        <DialogFooter><Button :disabled="attendanceForm.processing || !rosterGroup.enrollments.length">Enregistrer les présences</Button></DialogFooter>
+                        <InputError
+                            :message="Object.values(attendanceForm.errors)[0]"
+                        />
+                        <DialogFooter
+                            ><Button
+                                :disabled="
+                                    attendanceForm.processing ||
+                                    !rosterGroup.enrollments.length
+                                "
+                                >Enregistrer les présences</Button
+                            ></DialogFooter
+                        >
                     </template>
                 </form>
             </DialogScrollContent>

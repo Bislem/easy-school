@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { Button } from '@/components/ui/button';
-import { appConfirm, appPrompt } from '@/composables/useAppDialog';
 import {
     Dialog,
     DialogContent,
@@ -11,6 +10,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { appConfirm, appPrompt } from '@/composables/useAppDialog';
 import AdminLayout from '@/layouts/AdminLayout.vue';
 import { edit, index, print } from '@/routes/admin/reservations';
 import { Head, Link, router } from '@inertiajs/vue3';
@@ -126,7 +126,10 @@ function focusPaymentReview() {
         ? "Vérifiez et approuvez ou refusez cette preuve avant d'approuver la réservation."
         : "L'avance requise n'est pas encore approuvée. Aucune preuve en attente n'a été trouvée.";
     nextTick(() =>
-        paymentsSection.value?.scrollIntoView({ behavior: 'smooth', block: 'center' }),
+        paymentsSection.value?.scrollIntoView({
+            behavior: 'smooth',
+            block: 'center',
+        }),
     );
     window.setTimeout(() => {
         highlightedPaymentId.value = null;
@@ -134,28 +137,60 @@ function focusPaymentReview() {
 }
 
 async function approvePayment(payment: any) {
-    if (await appConfirm(`Approuver le paiement ${payment.payment_number} ?`, { title: 'Approuver le paiement', confirmText: 'Approuver' })) {
-        router.patch(`/admin/payments/${payment.id}/approve`, {}, {
-            preserveScroll: true,
-            onSuccess: () => { highlightedPaymentId.value = null; paymentReviewMessage.value = ''; },
-        });
+    if (
+        await appConfirm(`Approuver le paiement ${payment.payment_number} ?`, {
+            title: 'Approuver le paiement',
+            confirmText: 'Approuver',
+        })
+    ) {
+        router.patch(
+            `/admin/payments/${payment.id}/approve`,
+            {},
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    highlightedPaymentId.value = null;
+                    paymentReviewMessage.value = '';
+                },
+            },
+        );
     }
 }
 
 async function refusePayment(payment: any) {
-    const notes = await appPrompt('Refuser cette preuve de paiement ? Ajoutez éventuellement un motif pour le client.', { title: 'Refuser le paiement', tone: 'warning', inputLabel: 'Motif (facultatif)', confirmText: 'Refuser' });
+    const notes = await appPrompt(
+        'Refuser cette preuve de paiement ? Ajoutez éventuellement un motif pour le client.',
+        {
+            title: 'Refuser le paiement',
+            tone: 'warning',
+            inputLabel: 'Motif (facultatif)',
+            confirmText: 'Refuser',
+        },
+    );
     if (notes !== null) {
-        router.patch(`/admin/payments/${payment.id}/disapprove`, { notes }, {
-            preserveScroll: true,
-            onSuccess: () => { highlightedPaymentId.value = null; paymentReviewMessage.value = ''; },
-        });
+        router.patch(
+            `/admin/payments/${payment.id}/disapprove`,
+            { notes },
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    highlightedPaymentId.value = null;
+                    paymentReviewMessage.value = '';
+                },
+            },
+        );
     }
 }
 
 async function rejectReservation() {
     const reason = await appPrompt(
         'Rejeter cette réservation ? Ajoutez un motif facultatif pour le client :',
-        { title: 'Rejeter la réservation', tone: 'warning', inputLabel: 'Motif (facultatif)', confirmText: 'Rejeter' },
+        {
+            title: 'Rejeter la réservation',
+            tone: 'warning',
+            inputLabel: 'Motif (facultatif)',
+            confirmText: 'Rejeter',
+        },
     );
     if (reason !== null) {
         router.patch(
@@ -169,7 +204,12 @@ async function rejectReservation() {
 async function cancelReservation() {
     const reason = await appPrompt(
         'Annuler cette réservation ? Ajoutez un motif facultatif :',
-        { title: 'Annuler la réservation', tone: 'danger', inputLabel: 'Motif (facultatif)', confirmText: 'Annuler la réservation' },
+        {
+            title: 'Annuler la réservation',
+            tone: 'danger',
+            inputLabel: 'Motif (facultatif)',
+            confirmText: 'Annuler la réservation',
+        },
     );
     if (reason !== null) {
         router.patch(
@@ -184,7 +224,10 @@ async function markPaid() {
     if (
         await appConfirm(
             'Enregistrer le solde restant comme paiement en espèces terminé ?',
-            { title: 'Marquer comme payé', confirmText: 'Enregistrer le paiement' },
+            {
+                title: 'Marquer comme payé',
+                confirmText: 'Enregistrer le paiement',
+            },
         )
     ) {
         router.post(
@@ -199,7 +242,13 @@ async function changeStatus(
     action: 'start' | 'complete' | 'no-show',
     message: string,
 ) {
-    if (await appConfirm(message, { title: 'Changer le statut', tone: 'warning', confirmText: 'Confirmer' })) {
+    if (
+        await appConfirm(message, {
+            title: 'Changer le statut',
+            tone: 'warning',
+            confirmText: 'Confirmer',
+        })
+    ) {
         router.patch(
             `/admin/reservations/${props.reservation.id}/${action}`,
             {},
@@ -260,17 +309,23 @@ function fuelRecordLabel(type: string) {
     <Head :title="`Réservation ${reservation?.reservation_number || ''}`" />
     <AdminLayout>
         <main class="flex-1 space-y-5 p-4 sm:space-y-6 sm:p-6 lg:p-8">
-            <div class="flex flex-col items-stretch gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div
+                class="flex flex-col items-stretch gap-4 sm:flex-row sm:items-center sm:justify-between"
+            >
                 <h1 class="min-w-0 text-xl font-semibold sm:text-2xl">
                     <span class="block sm:inline">Réservation</span>
-                    <span class="break-all sm:break-normal">{{ reservation?.reservation_number }}</span>
+                    <span class="break-all sm:break-normal">{{
+                        reservation?.reservation_number
+                    }}</span>
                 </h1>
                 <div class="grid grid-cols-3 gap-2 sm:flex sm:shrink-0">
                     <Link :href="index().url" class="min-w-0">
                         <Button variant="outline" class="w-full">Retour</Button>
                     </Link>
                     <Link :href="edit(reservation.id).url" class="min-w-0">
-                        <Button variant="outline" class="w-full">Modifier</Button>
+                        <Button variant="outline" class="w-full"
+                            >Modifier</Button
+                        >
                     </Link>
                     <a
                         :href="print(reservation.id).url"
@@ -278,7 +333,9 @@ function fuelRecordLabel(type: string) {
                         rel="noopener"
                         class="min-w-0"
                     >
-                        <Button variant="secondary" class="w-full">Imprimer</Button>
+                        <Button variant="secondary" class="w-full"
+                            >Imprimer</Button
+                        >
                     </a>
                 </div>
             </div>
@@ -286,9 +343,14 @@ function fuelRecordLabel(type: string) {
             <div
                 class="flex flex-col items-stretch gap-2 rounded-md border bg-muted/20 p-3 sm:flex-row sm:flex-wrap sm:items-center"
             >
-                <span class="mb-1 text-sm font-medium sm:mr-2 sm:mb-0">Actions</span>
+                <span class="mb-1 text-sm font-medium sm:mr-2 sm:mb-0"
+                    >Actions</span
+                >
                 <template v-if="reservation.status === 'pending'">
-                    <Button size="sm" class="w-full sm:w-auto" @click="approveReservation"
+                    <Button
+                        size="sm"
+                        class="w-full sm:w-auto"
+                        @click="approveReservation"
                         >Approuver la réservation</Button
                     >
                     <Button
@@ -651,7 +713,10 @@ function fuelRecordLabel(type: string) {
                                 {{ fmtMoney(reservation.subtotal) }}
                             </div>
                         </div>
-                        <div v-if="Number(reservation.tax_amount) > 0" class="flex items-center justify-between">
+                        <div
+                            v-if="Number(reservation.tax_amount) > 0"
+                            class="flex items-center justify-between"
+                        >
                             <div class="text-sm">Taxe</div>
                             <div class="font-medium">
                                 {{ fmtMoney(reservation.tax_amount) }}
@@ -663,9 +728,20 @@ function fuelRecordLabel(type: string) {
                                 -{{ fmtMoney(reservation.discount_amount) }}
                             </div>
                         </div>
-                        <div v-if="Number(reservation.security_deposit_amount) > 0" class="flex items-center justify-between rounded bg-amber-50 px-2 py-2 text-amber-800">
+                        <div
+                            v-if="
+                                Number(reservation.security_deposit_amount) > 0
+                            "
+                            class="flex items-center justify-between rounded bg-amber-50 px-2 py-2 text-amber-800"
+                        >
                             <div class="text-sm">Caution remboursable</div>
-                            <div class="font-medium">{{ fmtMoney(reservation.security_deposit_amount) }}</div>
+                            <div class="font-medium">
+                                {{
+                                    fmtMoney(
+                                        reservation.security_deposit_amount,
+                                    )
+                                }}
+                            </div>
                         </div>
                         <div
                             class="flex items-center justify-between border-t pt-2"
@@ -675,14 +751,61 @@ function fuelRecordLabel(type: string) {
                                 {{ fmtMoney(reservation.total_amount) }}
                             </div>
                         </div>
-                        <div v-if="Number(reservation.security_deposit_amount) > 0" class="flex items-center justify-between text-sm">
+                        <div
+                            v-if="
+                                Number(reservation.security_deposit_amount) > 0
+                            "
+                            class="flex items-center justify-between text-sm"
+                        >
                             <div>Montant avec caution</div>
-                            <div class="font-semibold">{{ fmtMoney(Number(reservation.total_amount) + Number(reservation.security_deposit_amount)) }}</div>
+                            <div class="font-semibold">
+                                {{
+                                    fmtMoney(
+                                        Number(reservation.total_amount) +
+                                            Number(
+                                                reservation.security_deposit_amount,
+                                            ),
+                                    )
+                                }}
+                            </div>
                         </div>
-                        <div v-if="Number(reservation.required_advance_amount) > 0" class="mt-2 rounded border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
-                            <div class="flex items-center justify-between"><span>Avance requise ({{ reservation.advance_percentage }}%)</span><strong>{{ fmtMoney(reservation.required_advance_amount) }}</strong></div>
-                            <div class="mt-1 flex items-center justify-between"><span>Paiements approuvés</span><strong>{{ fmtMoney(paidAmount) }}</strong></div>
-                            <p class="mt-1 font-medium" :class="paidAmount >= Number(reservation.required_advance_amount) ? 'text-green-700' : 'text-amber-700'">{{ paidAmount >= Number(reservation.required_advance_amount) ? 'Avance reçue — la réservation peut être approuvée.' : "L'avance doit être vérifiée avant l'approbation." }}</p>
+                        <div
+                            v-if="
+                                Number(reservation.required_advance_amount) > 0
+                            "
+                            class="mt-2 rounded border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900"
+                        >
+                            <div class="flex items-center justify-between">
+                                <span
+                                    >Avance requise ({{
+                                        reservation.advance_percentage
+                                    }}%)</span
+                                ><strong>{{
+                                    fmtMoney(
+                                        reservation.required_advance_amount,
+                                    )
+                                }}</strong>
+                            </div>
+                            <div class="mt-1 flex items-center justify-between">
+                                <span>Paiements approuvés</span
+                                ><strong>{{ fmtMoney(paidAmount) }}</strong>
+                            </div>
+                            <p
+                                class="mt-1 font-medium"
+                                :class="
+                                    paidAmount >=
+                                    Number(reservation.required_advance_amount)
+                                        ? 'text-green-700'
+                                        : 'text-amber-700'
+                                "
+                            >
+                                {{
+                                    paidAmount >=
+                                    Number(reservation.required_advance_amount)
+                                        ? 'Avance reçue — la réservation peut être approuvée.'
+                                        : "L'avance doit être vérifiée avant l'approbation."
+                                }}
+                            </p>
                         </div>
                     </div>
                 </div>
@@ -691,10 +814,19 @@ function fuelRecordLabel(type: string) {
                 <div
                     ref="paymentsSection"
                     class="rounded-md border transition-all md:col-span-2"
-                    :class="paymentReviewMessage ? 'border-amber-400 ring-4 ring-amber-200' : ''"
+                    :class="
+                        paymentReviewMessage
+                            ? 'border-amber-400 ring-4 ring-amber-200'
+                            : ''
+                    "
                 >
                     <div class="border-b px-4 py-3 font-medium">Paiements</div>
-                    <div v-if="paymentReviewMessage" class="border-b border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900">{{ paymentReviewMessage }}</div>
+                    <div
+                        v-if="paymentReviewMessage"
+                        class="border-b border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900"
+                    >
+                        {{ paymentReviewMessage }}
+                    </div>
                     <div class="overflow-x-auto p-4">
                         <table class="min-w-full divide-y divide-gray-200">
                             <thead class="bg-gray-50">
@@ -724,7 +856,11 @@ function fuelRecordLabel(type: string) {
                                     >
                                         Traité le
                                     </th>
-                                    <th class="px-4 py-2 text-right text-xs font-medium tracking-wider text-gray-500 uppercase">Actions</th>
+                                    <th
+                                        class="px-4 py-2 text-right text-xs font-medium tracking-wider text-gray-500 uppercase"
+                                    >
+                                        Actions
+                                    </th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-gray-200 bg-white">
@@ -732,7 +868,11 @@ function fuelRecordLabel(type: string) {
                                     v-for="p in reservation.payments || []"
                                     :key="p.id"
                                     class="transition-colors"
-                                    :class="highlightedPaymentId === p.id ? 'bg-amber-100 ring-2 ring-inset ring-amber-400' : ''"
+                                    :class="
+                                        highlightedPaymentId === p.id
+                                            ? 'bg-amber-100 ring-2 ring-amber-400 ring-inset'
+                                            : ''
+                                    "
                                 >
                                     <td class="px-4 py-2">
                                         {{ p.payment_number }}
@@ -741,12 +881,21 @@ function fuelRecordLabel(type: string) {
                                         {{ fmtMoney(p.amount) }}
                                     </td>
                                     <td class="px-4 py-2">
-                                        <div>{{
-                                            formatPaymentMethod(
-                                                p.payment_method,
-                                            )
-                                        }}</div>
-                                        <a v-if="p.proof_url" :href="p.proof_url" target="_blank" rel="noopener" class="text-xs font-medium text-blue-600 hover:underline">Voir la preuve</a>
+                                        <div>
+                                            {{
+                                                formatPaymentMethod(
+                                                    p.payment_method,
+                                                )
+                                            }}
+                                        </div>
+                                        <a
+                                            v-if="p.proof_url"
+                                            :href="p.proof_url"
+                                            target="_blank"
+                                            rel="noopener"
+                                            class="text-xs font-medium text-blue-600 hover:underline"
+                                            >Voir la preuve</a
+                                        >
                                     </td>
                                     <td class="px-4 py-2">
                                         {{ formatPaymentStatus(p.status) }}
@@ -761,11 +910,27 @@ function fuelRecordLabel(type: string) {
                                         }}
                                     </td>
                                     <td class="px-4 py-2 text-right">
-                                        <div v-if="p.status === 'pending'" class="flex justify-end gap-2">
-                                            <Button size="sm" @click="approvePayment(p)">Approuver</Button>
-                                            <Button size="sm" variant="destructive" @click="refusePayment(p)">Refuser</Button>
+                                        <div
+                                            v-if="p.status === 'pending'"
+                                            class="flex justify-end gap-2"
+                                        >
+                                            <Button
+                                                size="sm"
+                                                @click="approvePayment(p)"
+                                                >Approuver</Button
+                                            >
+                                            <Button
+                                                size="sm"
+                                                variant="destructive"
+                                                @click="refusePayment(p)"
+                                                >Refuser</Button
+                                            >
                                         </div>
-                                        <span v-else class="text-sm text-muted-foreground">—</span>
+                                        <span
+                                            v-else
+                                            class="text-sm text-muted-foreground"
+                                            >—</span
+                                        >
                                     </td>
                                 </tr>
                                 <tr

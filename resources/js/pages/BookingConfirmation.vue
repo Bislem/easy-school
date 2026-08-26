@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import HomeLayout from '@/layouts/HomeLayout.vue';
-import type { AppPageProps } from '@/types';
 import { fleet } from '@/routes';
 import { index } from '@/routes/client/reservations';
+import type { AppPageProps } from '@/types';
 import { Link, usePage } from '@inertiajs/vue3';
 
 interface Reservation {
@@ -230,9 +230,23 @@ function formatStatus(status: string) {
                                     </span>
                                 </div>
                                 <div class="border-t pt-3">
-                                    <div v-if="Number(reservation.security_deposit_amount) > 0" class="mb-2 flex items-center justify-between text-amber-700">
+                                    <div
+                                        v-if="
+                                            Number(
+                                                reservation.security_deposit_amount,
+                                            ) > 0
+                                        "
+                                        class="mb-2 flex items-center justify-between text-amber-700"
+                                    >
                                         <span>Caution remboursable :</span>
-                                        <strong>{{ parseFloat(reservation.security_deposit_amount).toFixed(2) }} DZD</strong>
+                                        <strong
+                                            >{{
+                                                parseFloat(
+                                                    reservation.security_deposit_amount,
+                                                ).toFixed(2)
+                                            }}
+                                            DZD</strong
+                                        >
                                     </div>
                                     <div
                                         class="flex items-center justify-between"
@@ -248,18 +262,66 @@ function formatStatus(status: string) {
                                                 parseFloat(
                                                     reservation.total_amount,
                                                 ).toFixed(2)
-                                            }} DZD
+                                            }}
+                                            DZD
                                         </span>
                                     </div>
-                                    <div v-if="Number(reservation.security_deposit_amount) > 0" class="mt-2 flex items-center justify-between text-sm">
-                                        <span>Montant à prévoir avec caution :</span>
-                                        <strong>{{ (parseFloat(reservation.total_amount) + parseFloat(reservation.security_deposit_amount)).toFixed(2) }} DZD</strong>
+                                    <div
+                                        v-if="
+                                            Number(
+                                                reservation.security_deposit_amount,
+                                            ) > 0
+                                        "
+                                        class="mt-2 flex items-center justify-between text-sm"
+                                    >
+                                        <span
+                                            >Montant à prévoir avec caution
+                                            :</span
+                                        >
+                                        <strong
+                                            >{{
+                                                (
+                                                    parseFloat(
+                                                        reservation.total_amount,
+                                                    ) +
+                                                    parseFloat(
+                                                        reservation.security_deposit_amount,
+                                                    )
+                                                ).toFixed(2)
+                                            }}
+                                            DZD</strong
+                                        >
                                     </div>
                                 </div>
-                                <div v-if="Number(reservation.required_advance_amount) > 0" class="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-amber-900">
-                                    <p class="font-semibold">Avance requise : {{ parseFloat(reservation.required_advance_amount).toFixed(2) }} DZD ({{ reservation.advance_percentage }}%)</p>
-                                    <p class="mt-1 text-sm">Envoyez votre preuve de paiement Algérie Poste afin que l'agence puisse vérifier et approuver votre réservation.</p>
-                                    <Link :href="`/client/reservations/${reservation.id}`" class="mt-2 inline-block text-sm font-semibold underline">Envoyer la preuve de paiement</Link>
+                                <div
+                                    v-if="
+                                        Number(
+                                            reservation.required_advance_amount,
+                                        ) > 0
+                                    "
+                                    class="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-amber-900"
+                                >
+                                    <p class="font-semibold">
+                                        Avance requise :
+                                        {{
+                                            parseFloat(
+                                                reservation.required_advance_amount,
+                                            ).toFixed(2)
+                                        }}
+                                        DZD ({{
+                                            reservation.advance_percentage
+                                        }}%)
+                                    </p>
+                                    <p class="mt-1 text-sm">
+                                        Envoyez votre preuve de paiement Algérie
+                                        Poste afin que l'agence puisse vérifier
+                                        et approuver votre réservation.
+                                    </p>
+                                    <Link
+                                        :href="`/client/reservations/${reservation.id}`"
+                                        class="mt-2 inline-block text-sm font-semibold underline"
+                                        >Envoyer la preuve de paiement</Link
+                                    >
                                 </div>
                             </div>
                         </div>

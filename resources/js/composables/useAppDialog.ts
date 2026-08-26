@@ -12,6 +12,8 @@ type DialogOptions = {
     inputLabel?: string;
     inputPlaceholder?: string;
     inputRequired?: boolean;
+    inputType?: 'text' | 'date' | 'number' | 'email';
+    inputValue?: string;
 };
 
 type DialogResult = boolean | string | null;
@@ -29,44 +31,75 @@ export const appDialogState = reactive({
     inputPlaceholder: '',
     inputRequired: false,
     inputValue: '',
+    inputType: 'text' as 'text' | 'date' | 'number' | 'email',
     showCancel: true,
 });
 
-function openDialog(options: DialogOptions, showCancel = true): Promise<DialogResult> {
+function openDialog(
+    options: DialogOptions,
+    showCancel = true,
+): Promise<DialogResult> {
     if (resolveCurrent) resolveCurrent(false);
     Object.assign(appDialogState, {
         open: true,
-        title: options.title ?? (options.tone === 'danger' ? 'Action sensible' : options.tone === 'warning' ? 'Attention' : 'Confirmation'),
+        title:
+            options.title ??
+            (options.tone === 'danger'
+                ? 'Action sensible'
+                : options.tone === 'warning'
+                  ? 'Attention'
+                  : 'Confirmation'),
         message: options.message,
-        confirmText: options.confirmText ?? (showCancel ? 'Confirmer' : 'Compris'),
+        confirmText:
+            options.confirmText ?? (showCancel ? 'Confirmer' : 'Compris'),
         cancelText: options.cancelText ?? 'Annuler',
         tone: options.tone ?? 'default',
         input: options.input ?? false,
         inputLabel: options.inputLabel ?? '',
         inputPlaceholder: options.inputPlaceholder ?? '',
         inputRequired: options.inputRequired ?? false,
-        inputValue: '',
+        inputValue: options.inputValue ?? '',
+        inputType: options.inputType ?? 'text',
         showCancel,
     });
-    return new Promise((resolve) => { resolveCurrent = resolve; });
+    return new Promise((resolve) => {
+        resolveCurrent = resolve;
+    });
 }
 
 export function resolveAppDialog(confirmed: boolean) {
     if (!resolveCurrent) return;
-    const result = confirmed ? (appDialogState.input ? appDialogState.inputValue : true) : (appDialogState.input ? null : false);
+    const result = confirmed
+        ? appDialogState.input
+            ? appDialogState.inputValue
+            : true
+        : appDialogState.input
+          ? null
+          : false;
     appDialogState.open = false;
     resolveCurrent(result);
     resolveCurrent = null;
 }
 
-export function appConfirm(message: string, options: Omit<DialogOptions, 'message'> = {}) {
+export function appConfirm(
+    message: string,
+    options: Omit<DialogOptions, 'message'> = {},
+) {
     return openDialog({ ...options, message }) as Promise<boolean>;
 }
 
-export async function appAlert(message: string, options: Omit<DialogOptions, 'message'> = {}) {
+export async function appAlert(
+    message: string,
+    options: Omit<DialogOptions, 'message'> = {},
+) {
     await openDialog({ ...options, message }, false);
 }
 
-export function appPrompt(message: string, options: Omit<DialogOptions, 'message' | 'input'> = {}) {
-    return openDialog({ ...options, message, input: true }) as Promise<string | null>;
+export function appPrompt(
+    message: string,
+    options: Omit<DialogOptions, 'message' | 'input'> = {},
+) {
+    return openDialog({ ...options, message, input: true }) as Promise<
+        string | null
+    >;
 }

@@ -158,7 +158,10 @@ const statusTone: Record<string, string> = {
                         chaque formation.
                     </p>
                 </div>
-                <Button v-if="access.is_admin" class="w-full sm:w-auto" @click="openCreate"
+                <Button
+                    v-if="access.is_admin"
+                    class="w-full sm:w-auto"
+                    @click="openCreate"
                     ><Plus class="mr-2 size-4" />Nouvelle planification</Button
                 >
             </header>
@@ -217,7 +220,9 @@ const statusTone: Record<string, string> = {
                         </div>
                     </div>
                     <div class="mt-5 grid grid-cols-3 gap-2">
-                        <div class="min-w-0 rounded-lg bg-muted/50 p-2 text-center sm:p-3">
+                        <div
+                            class="min-w-0 rounded-lg bg-muted/50 p-2 text-center sm:p-3"
+                        >
                             <Layers3
                                 class="mx-auto size-4 text-muted-foreground"
                             />
@@ -228,7 +233,9 @@ const statusTone: Record<string, string> = {
                                 Groupes
                             </p>
                         </div>
-                        <div class="min-w-0 rounded-lg bg-muted/50 p-2 text-center sm:p-3">
+                        <div
+                            class="min-w-0 rounded-lg bg-muted/50 p-2 text-center sm:p-3"
+                        >
                             <CalendarDays
                                 class="mx-auto size-4 text-muted-foreground"
                             />
@@ -239,7 +246,9 @@ const statusTone: Record<string, string> = {
                                 Séances
                             </p>
                         </div>
-                        <div class="min-w-0 rounded-lg bg-muted/50 p-2 text-center sm:p-3">
+                        <div
+                            class="min-w-0 rounded-lg bg-muted/50 p-2 text-center sm:p-3"
+                        >
                             <Clock3
                                 class="mx-auto size-4 text-muted-foreground"
                             />
@@ -260,7 +269,10 @@ const statusTone: Record<string, string> = {
                                 plan.teacher.name
                             }}</span
                         ><span class="font-medium text-primary"
-                            >{{ access.is_admin ? 'Configurer' : 'Voir' }} →</span
+                            >{{
+                                access.is_admin ? 'Configurer' : 'Voir'
+                            }}
+                            →</span
                         >
                     </div></Link
                 >
@@ -271,7 +283,10 @@ const statusTone: Record<string, string> = {
                     Aucune planification trouvée.
                 </div>
             </section>
-            <nav v-if="plans.links.length > 3" class="flex max-w-full gap-1 overflow-x-auto pb-1">
+            <nav
+                v-if="plans.links.length > 3"
+                class="flex max-w-full gap-1 overflow-x-auto pb-1"
+            >
                 <Link
                     v-for="link in plans.links"
                     :key="link.label"

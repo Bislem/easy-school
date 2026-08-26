@@ -34,7 +34,14 @@ interface Driver {
 
 const $page = usePage();
 const car = computed<Car>(() => $page.props.car as Car);
-const agency = computed(() => $page.props.agency as { tax_enabled?: boolean; tax_rate?: number | string; online_advance_percentage?: number | string });
+const agency = computed(
+    () =>
+        $page.props.agency as {
+            tax_enabled?: boolean;
+            tax_rate?: number | string;
+            online_advance_percentage?: number | string;
+        },
+);
 const unavailablePeriods = computed<UnavailablePeriod[]>(
     () => ($page.props.unavailablePeriods as UnavailablePeriod[]) ?? [],
 );
@@ -56,7 +63,8 @@ const form = useForm({
 });
 
 function selectDriverLicense(event: Event) {
-    form.new_driver_license = (event.target as HTMLInputElement).files?.[0] ?? null;
+    form.new_driver_license =
+        (event.target as HTMLInputElement).files?.[0] ?? null;
 }
 
 // Calculate rental details
@@ -81,7 +89,11 @@ const tax = computed(() => {
 const total = computed(() => {
     return subtotal.value + tax.value;
 });
-const requiredAdvance = computed(() => total.value * Number(agency.value.online_advance_percentage || 0) / 100);
+const requiredAdvance = computed(
+    () =>
+        (total.value * Number(agency.value.online_advance_percentage || 0)) /
+        100,
+);
 
 const availabilityError = computed(() => {
     if (!form.start_date) return '';
@@ -139,12 +151,18 @@ const submitBooking = () => {
 
     if (user.role === 'admin') {
         // Authenticated but role is "admin" → show alert
-        void appAlert('Les administrateurs ne peuvent pas effectuer de réservation.', { title: 'Réservation indisponible', tone: 'warning' });
+        void appAlert(
+            'Les administrateurs ne peuvent pas effectuer de réservation.',
+            { title: 'Réservation indisponible', tone: 'warning' },
+        );
         return;
     }
 
     // fallback for any other role
-    void appAlert('Votre rôle ne vous permet pas d’effectuer une réservation.', { title: 'Accès non autorisé', tone: 'warning' });
+    void appAlert(
+        'Votre rôle ne vous permet pas d’effectuer une réservation.',
+        { title: 'Accès non autorisé', tone: 'warning' },
+    );
 };
 
 function formatDate(date: string) {
@@ -322,7 +340,10 @@ const commonLocations = [
                                             class="rounded-xl bg-gradient-to-r from-orange-500 to-orange-600 px-4 py-2 text-white"
                                         >
                                             <span class="text-3xl font-bold"
-                                                >{{ car.price_per_day }} DZD</span
+                                                >{{
+                                                    car.price_per_day
+                                                }}
+                                                DZD</span
                                             >
                                             <span
                                                 class="block text-sm text-orange-100"
@@ -585,53 +606,215 @@ const commonLocations = [
 
                                 <div class="space-y-4 border-t pt-6">
                                     <div>
-                                        <h4 class="text-lg font-semibold text-gray-900">Deuxième conducteur</h4>
-                                        <p class="mt-1 text-sm text-gray-600">Facultatif. Un conducteur doit être approuvé par l’agence avant d’être affecté à la réservation.</p>
+                                        <h4
+                                            class="text-lg font-semibold text-gray-900"
+                                        >
+                                            Deuxième conducteur
+                                        </h4>
+                                        <p class="mt-1 text-sm text-gray-600">
+                                            Facultatif. Un conducteur doit être
+                                            approuvé par l’agence avant d’être
+                                            affecté à la réservation.
+                                        </p>
                                     </div>
                                     <div class="grid gap-3 sm:grid-cols-3">
-                                        <label class="flex cursor-pointer items-center gap-2 rounded-xl border p-3">
-                                            <input v-model="form.secondary_driver_mode" type="radio" value="none" /> Aucun
+                                        <label
+                                            class="flex cursor-pointer items-center gap-2 rounded-xl border p-3"
+                                        >
+                                            <input
+                                                v-model="
+                                                    form.secondary_driver_mode
+                                                "
+                                                type="radio"
+                                                value="none"
+                                            />
+                                            Aucun
                                         </label>
-                                        <label class="flex cursor-pointer items-center gap-2 rounded-xl border p-3">
-                                            <input v-model="form.secondary_driver_mode" type="radio" value="existing" /> Conducteur approuvé
+                                        <label
+                                            class="flex cursor-pointer items-center gap-2 rounded-xl border p-3"
+                                        >
+                                            <input
+                                                v-model="
+                                                    form.secondary_driver_mode
+                                                "
+                                                type="radio"
+                                                value="existing"
+                                            />
+                                            Conducteur approuvé
                                         </label>
-                                        <label class="flex cursor-pointer items-center gap-2 rounded-xl border p-3">
-                                            <input v-model="form.secondary_driver_mode" type="radio" value="new" /> Nouveau conducteur
+                                        <label
+                                            class="flex cursor-pointer items-center gap-2 rounded-xl border p-3"
+                                        >
+                                            <input
+                                                v-model="
+                                                    form.secondary_driver_mode
+                                                "
+                                                type="radio"
+                                                value="new"
+                                            />
+                                            Nouveau conducteur
                                         </label>
                                     </div>
 
-                                    <div v-if="form.secondary_driver_mode === 'existing'">
-                                        <label class="mb-2 block text-sm font-semibold text-gray-700">Choisir un conducteur *</label>
-                                        <select v-model="form.secondary_driver_id" required class="w-full rounded-xl border-2 border-gray-200 bg-white px-4 py-3">
-                                            <option value="">Sélectionnez un conducteur approuvé</option>
-                                            <option v-for="driver in approvedDrivers" :key="driver.id" :value="driver.id">{{ driver.full_name }} — {{ driver.phone }}</option>
+                                    <div
+                                        v-if="
+                                            form.secondary_driver_mode ===
+                                            'existing'
+                                        "
+                                    >
+                                        <label
+                                            class="mb-2 block text-sm font-semibold text-gray-700"
+                                            >Choisir un conducteur *</label
+                                        >
+                                        <select
+                                            v-model="form.secondary_driver_id"
+                                            required
+                                            class="w-full rounded-xl border-2 border-gray-200 bg-white px-4 py-3"
+                                        >
+                                            <option value="">
+                                                Sélectionnez un conducteur
+                                                approuvé
+                                            </option>
+                                            <option
+                                                v-for="driver in approvedDrivers"
+                                                :key="driver.id"
+                                                :value="driver.id"
+                                            >
+                                                {{ driver.full_name }} —
+                                                {{ driver.phone }}
+                                            </option>
                                         </select>
-                                        <p v-if="!approvedDrivers.length" class="mt-2 text-sm text-amber-700">Vous n’avez aucun conducteur approuvé. Ajoutez-en un ci-dessous ou depuis vos paramètres.</p>
-                                        <span v-if="form.errors.secondary_driver_id" class="text-sm text-red-500">{{ form.errors.secondary_driver_id }}</span>
+                                        <p
+                                            v-if="!approvedDrivers.length"
+                                            class="mt-2 text-sm text-amber-700"
+                                        >
+                                            Vous n’avez aucun conducteur
+                                            approuvé. Ajoutez-en un ci-dessous
+                                            ou depuis vos paramètres.
+                                        </p>
+                                        <span
+                                            v-if="
+                                                form.errors.secondary_driver_id
+                                            "
+                                            class="text-sm text-red-500"
+                                            >{{
+                                                form.errors.secondary_driver_id
+                                            }}</span
+                                        >
                                     </div>
 
-                                    <div v-if="form.secondary_driver_mode === 'new'" class="space-y-4 rounded-xl bg-amber-50 p-4">
-                                        <p class="text-sm text-amber-800">Ce conducteur sera enregistré dans votre liste et soumis à l’administrateur. Il sera affecté automatiquement à cette réservation après approbation.</p>
+                                    <div
+                                        v-if="
+                                            form.secondary_driver_mode === 'new'
+                                        "
+                                        class="space-y-4 rounded-xl bg-amber-50 p-4"
+                                    >
+                                        <p class="text-sm text-amber-800">
+                                            Ce conducteur sera enregistré dans
+                                            votre liste et soumis à
+                                            l’administrateur. Il sera affecté
+                                            automatiquement à cette réservation
+                                            après approbation.
+                                        </p>
                                         <div class="grid gap-4 sm:grid-cols-2">
                                             <div>
-                                                <label class="mb-1 block text-sm font-medium">Nom complet *</label>
-                                                <input v-model="form.new_driver_full_name" required class="w-full rounded-lg border px-3 py-2" />
-                                                <span v-if="form.errors.new_driver_full_name" class="text-sm text-red-500">{{ form.errors.new_driver_full_name }}</span>
+                                                <label
+                                                    class="mb-1 block text-sm font-medium"
+                                                    >Nom complet *</label
+                                                >
+                                                <input
+                                                    v-model="
+                                                        form.new_driver_full_name
+                                                    "
+                                                    required
+                                                    class="w-full rounded-lg border px-3 py-2"
+                                                />
+                                                <span
+                                                    v-if="
+                                                        form.errors
+                                                            .new_driver_full_name
+                                                    "
+                                                    class="text-sm text-red-500"
+                                                    >{{
+                                                        form.errors
+                                                            .new_driver_full_name
+                                                    }}</span
+                                                >
                                             </div>
                                             <div>
-                                                <label class="mb-1 block text-sm font-medium">Téléphone *</label>
-                                                <input v-model="form.new_driver_phone" required type="tel" class="w-full rounded-lg border px-3 py-2" />
-                                                <span v-if="form.errors.new_driver_phone" class="text-sm text-red-500">{{ form.errors.new_driver_phone }}</span>
+                                                <label
+                                                    class="mb-1 block text-sm font-medium"
+                                                    >Téléphone *</label
+                                                >
+                                                <input
+                                                    v-model="
+                                                        form.new_driver_phone
+                                                    "
+                                                    required
+                                                    type="tel"
+                                                    class="w-full rounded-lg border px-3 py-2"
+                                                />
+                                                <span
+                                                    v-if="
+                                                        form.errors
+                                                            .new_driver_phone
+                                                    "
+                                                    class="text-sm text-red-500"
+                                                    >{{
+                                                        form.errors
+                                                            .new_driver_phone
+                                                    }}</span
+                                                >
                                             </div>
                                             <div>
-                                                <label class="mb-1 block text-sm font-medium">E-mail (optionnel)</label>
-                                                <input v-model="form.new_driver_email" type="email" class="w-full rounded-lg border px-3 py-2" />
-                                                <span v-if="form.errors.new_driver_email" class="text-sm text-red-500">{{ form.errors.new_driver_email }}</span>
+                                                <label
+                                                    class="mb-1 block text-sm font-medium"
+                                                    >E-mail (optionnel)</label
+                                                >
+                                                <input
+                                                    v-model="
+                                                        form.new_driver_email
+                                                    "
+                                                    type="email"
+                                                    class="w-full rounded-lg border px-3 py-2"
+                                                />
+                                                <span
+                                                    v-if="
+                                                        form.errors
+                                                            .new_driver_email
+                                                    "
+                                                    class="text-sm text-red-500"
+                                                    >{{
+                                                        form.errors
+                                                            .new_driver_email
+                                                    }}</span
+                                                >
                                             </div>
                                             <div>
-                                                <label class="mb-1 block text-sm font-medium">Photo du permis *</label>
-                                                <input required type="file" accept="image/jpeg,image/png,image/webp" class="w-full text-sm" @change="selectDriverLicense" />
-                                                <span v-if="form.errors.new_driver_license" class="text-sm text-red-500">{{ form.errors.new_driver_license }}</span>
+                                                <label
+                                                    class="mb-1 block text-sm font-medium"
+                                                    >Photo du permis *</label
+                                                >
+                                                <input
+                                                    required
+                                                    type="file"
+                                                    accept="image/jpeg,image/png,image/webp"
+                                                    class="w-full text-sm"
+                                                    @change="
+                                                        selectDriverLicense
+                                                    "
+                                                />
+                                                <span
+                                                    v-if="
+                                                        form.errors
+                                                            .new_driver_license
+                                                    "
+                                                    class="text-sm text-red-500"
+                                                    >{{
+                                                        form.errors
+                                                            .new_driver_license
+                                                    }}</span
+                                                >
                                             </div>
                                         </div>
                                     </div>
@@ -713,7 +896,8 @@ const commonLocations = [
                                                 rentalDays > 0
                                                     ? subtotal.toFixed(2)
                                                     : '0.00'
-                                            }} DZD
+                                            }}
+                                            DZD
                                         </span>
                                     </div>
 
@@ -722,7 +906,12 @@ const commonLocations = [
                                         class="flex items-center justify-between py-2"
                                     >
                                         <span class="font-medium text-gray-600"
-                                            >Taxe ({{ Number(agency.tax_rate).toLocaleString('fr-FR') }} %)</span
+                                            >Taxe ({{
+                                                Number(
+                                                    agency.tax_rate,
+                                                ).toLocaleString('fr-FR')
+                                            }}
+                                            %)</span
                                         >
                                         <span
                                             class="text-lg font-bold text-gray-900"
@@ -731,16 +920,31 @@ const commonLocations = [
                                                 rentalDays > 0
                                                     ? tax.toFixed(2)
                                                     : '0.00'
-                                            }} DZD
+                                            }}
+                                            DZD
                                         </span>
                                     </div>
 
                                     <div
                                         class="border-t-2 border-gray-200 pt-4"
                                     >
-                                        <div v-if="Number(car.security_deposit) > 0" class="mb-3 flex items-center justify-between rounded-lg bg-amber-50 px-3 py-2 text-amber-800">
-                                            <span class="font-medium">Caution remboursable</span>
-                                            <span class="font-bold">{{ Number(car.security_deposit).toFixed(2) }} DZD</span>
+                                        <div
+                                            v-if="
+                                                Number(car.security_deposit) > 0
+                                            "
+                                            class="mb-3 flex items-center justify-between rounded-lg bg-amber-50 px-3 py-2 text-amber-800"
+                                        >
+                                            <span class="font-medium"
+                                                >Caution remboursable</span
+                                            >
+                                            <span class="font-bold"
+                                                >{{
+                                                    Number(
+                                                        car.security_deposit,
+                                                    ).toFixed(2)
+                                                }}
+                                                DZD</span
+                                            >
                                         </div>
                                         <div
                                             class="flex items-center justify-between"
@@ -756,16 +960,68 @@ const commonLocations = [
                                                     rentalDays > 0
                                                         ? total.toFixed(2)
                                                         : '0.00'
-                                                }} DZD
+                                                }}
+                                                DZD
                                             </span>
                                         </div>
-                                        <div v-if="Number(car.security_deposit) > 0" class="mt-2 flex items-center justify-between text-sm">
-                                            <span class="font-medium text-gray-600">Montant à prévoir avec caution</span>
-                                            <span class="font-bold text-gray-900">{{ (total + Number(car.security_deposit)).toFixed(2) }} DZD</span>
+                                        <div
+                                            v-if="
+                                                Number(car.security_deposit) > 0
+                                            "
+                                            class="mt-2 flex items-center justify-between text-sm"
+                                        >
+                                            <span
+                                                class="font-medium text-gray-600"
+                                                >Montant à prévoir avec
+                                                caution</span
+                                            >
+                                            <span
+                                                class="font-bold text-gray-900"
+                                                >{{
+                                                    (
+                                                        total +
+                                                        Number(
+                                                            car.security_deposit,
+                                                        )
+                                                    ).toFixed(2)
+                                                }}
+                                                DZD</span
+                                            >
                                         </div>
-                                        <div v-if="Number(agency.online_advance_percentage) > 0" class="mt-3 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
-                                            <div class="flex items-center justify-between"><span>Avance requise ({{ Number(agency.online_advance_percentage).toLocaleString('fr-FR') }}%)</span><strong>{{ requiredAdvance.toFixed(2) }} DZD</strong></div>
-                                            <p class="mt-1 text-xs">Après la réservation, envoyez une preuve de paiement Algérie Poste. L'agence vérifiera le paiement avant de confirmer.</p>
+                                        <div
+                                            v-if="
+                                                Number(
+                                                    agency.online_advance_percentage,
+                                                ) > 0
+                                            "
+                                            class="mt-3 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900"
+                                        >
+                                            <div
+                                                class="flex items-center justify-between"
+                                            >
+                                                <span
+                                                    >Avance requise ({{
+                                                        Number(
+                                                            agency.online_advance_percentage,
+                                                        ).toLocaleString(
+                                                            'fr-FR',
+                                                        )
+                                                    }}%)</span
+                                                ><strong
+                                                    >{{
+                                                        requiredAdvance.toFixed(
+                                                            2,
+                                                        )
+                                                    }}
+                                                    DZD</strong
+                                                >
+                                            </div>
+                                            <p class="mt-1 text-xs">
+                                                Après la réservation, envoyez
+                                                une preuve de paiement Algérie
+                                                Poste. L'agence vérifiera le
+                                                paiement avant de confirmer.
+                                            </p>
                                         </div>
                                     </div>
                                 </div>

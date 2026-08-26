@@ -3,8 +3,8 @@ declare module 'filepond/locale/fr-fr';
 declare module 'filepond/locale/es-es';
 
 declare global {
-  interface Window {
-    route?: (name: string, params?: any) => string
-  }
+    interface Window {
+        route?: (name: string, params?: any) => string;
+    }
 }
-export {}
+export {};

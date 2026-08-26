@@ -73,11 +73,12 @@ interface DashboardData {
 }
 const props = defineProps<{ dashboard: DashboardData | null }>();
 const page = usePage();
-const user = computed(() =>
-    (page.props.auth?.user ?? { name: 'Utilisateur', role: '' }) as {
-        name?: string;
-        role?: string;
-    },
+const user = computed(
+    () =>
+        (page.props.auth?.user ?? { name: 'Utilisateur', role: '' }) as {
+            name?: string;
+            role?: string;
+        },
 );
 const isAdmin = computed(() => user.value.role === 'admin');
 const firstName = computed(() => user.value.name?.split(' ')[0] || '');
@@ -438,14 +439,19 @@ const roleLabel = computed(() =>
                                     >
                                         <div>
                                             <p class="font-medium">
-                                                {{ form.course?.title ?? 'Formation supprimée' }}
+                                                {{
+                                                    form.course?.title ??
+                                                    'Formation supprimée'
+                                                }}
                                             </p>
                                             <p
                                                 class="text-xs text-muted-foreground"
                                             >
                                                 {{ form.groups_count }}
                                                 groupe(s) ·
-                                                {{ form.teacher?.name ?? 'Formateur non affecté'
+                                                {{
+                                                    form.teacher?.name ??
+                                                    'Formateur non affecté'
                                                 }}<span v-if="form.classroom">
                                                     ·
                                                     {{
@@ -565,7 +571,11 @@ const roleLabel = computed(() =>
                                         v-for="session in dashboard.schedule
                                             .today"
                                         :key="session.id"
-                                        :href="session.group?.training_plan_id ? `/admin/planifications/${session.group.training_plan_id}` : '/admin/planifications'"
+                                        :href="
+                                            session.group?.training_plan_id
+                                                ? `/admin/planifications/${session.group.training_plan_id}`
+                                                : '/admin/planifications'
+                                        "
                                         class="flex items-center gap-3 p-3 hover:bg-muted/40"
                                     >
                                         <span
@@ -580,9 +590,20 @@ const roleLabel = computed(() =>
                                                 >{{ session.title }}</span
                                             ><span
                                                 class="block truncate text-xs text-muted-foreground"
-                                                >{{ session.group?.name ?? 'Groupe non affecté' }} ·
-                                                {{ session.classroom?.name ?? 'Salle non affectée' }} ·
-                                                {{ session.teacher?.name ?? 'Formateur non affecté' }}</span
+                                                >{{
+                                                    session.group?.name ??
+                                                    'Groupe non affecté'
+                                                }}
+                                                ·
+                                                {{
+                                                    session.classroom?.name ??
+                                                    'Salle non affectée'
+                                                }}
+                                                ·
+                                                {{
+                                                    session.teacher?.name ??
+                                                    'Formateur non affecté'
+                                                }}</span
                                             ></span
                                         >
                                     </Link>
@@ -635,13 +656,19 @@ const roleLabel = computed(() =>
                                     </div>
                                     <div class="min-w-0 flex-1">
                                         <p class="truncate text-sm font-medium">
-                                            {{ form.course?.title ?? 'Formation supprimée' }}
+                                            {{
+                                                form.course?.title ??
+                                                'Formation supprimée'
+                                            }}
                                         </p>
                                         <p
                                             class="truncate text-xs text-muted-foreground"
                                         >
-                                            {{ form.teacher?.name ?? 'Formateur non affecté' }} ·
-                                            {{ form.confirmed_count }}/{{
+                                            {{
+                                                form.teacher?.name ??
+                                                'Formateur non affecté'
+                                            }}
+                                            · {{ form.confirmed_count }}/{{
                                                 form.max_students
                                             }}
                                             inscrits
@@ -677,7 +704,10 @@ const roleLabel = computed(() =>
                                     <div class="flex justify-between gap-3">
                                         <div>
                                             <p class="text-sm font-medium">
-                                                {{ form.course?.title ?? 'Formation supprimée' }}
+                                                {{
+                                                    form.course?.title ??
+                                                    'Formation supprimée'
+                                                }}
                                             </p>
                                             <p
                                                 class="text-xs text-muted-foreground"
@@ -827,8 +857,13 @@ const roleLabel = computed(() =>
                                         <p
                                             class="truncate text-xs text-muted-foreground"
                                         >
-                                            {{ enrollment.form?.course?.title ?? 'Formation supprimée' }} ·
-                                            Groupe {{ enrollment.group_number }}
+                                            {{
+                                                enrollment.form?.course
+                                                    ?.title ??
+                                                'Formation supprimée'
+                                            }}
+                                            · Groupe
+                                            {{ enrollment.group_number }}
                                         </p>
                                     </div>
                                     <span

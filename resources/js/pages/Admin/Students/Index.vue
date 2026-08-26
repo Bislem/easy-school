@@ -204,7 +204,8 @@ function pageLabel(v: string) {
                                                 ?.title ||
                                             student.enrollments[0]
                                                 ?.training_plan_group?.plan
-                                                ?.course?.title || '—'
+                                                ?.course?.title ||
+                                            '—'
                                         }}
                                     </td>
                                     <td class="p-4">

@@ -1,11 +1,9 @@
 <script setup lang="ts">
 import { Button } from '@/components/ui/button';
 import AdminLayout from '@/layouts/AdminLayout.vue';
+import { close, index, reply } from '@/routes/admin/support';
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
-import { index } from '@/routes/admin/support';
-import { reply } from '@/routes/admin/support';
-import { close } from '@/routes/admin/support';
 
 // Types
 interface Message {
@@ -107,7 +105,7 @@ watch(
 );
 
 const btnProcessing = ref(false);
-function closeTicket(){
+function closeTicket() {
     btnProcessing.value = true;
     router.post(close(props.ticket.id).url);
 }
@@ -156,7 +154,11 @@ function closeTicket(){
                             class="ml-2"
                             :disabled="btnProcessing"
                         >
-                            {{ btnProcessing ? 'Fermeture…' : 'Fermer le ticket' }}
+                            {{
+                                btnProcessing
+                                    ? 'Fermeture…'
+                                    : 'Fermer le ticket'
+                            }}
                         </Button>
                     </div>
                 </div>
@@ -165,9 +167,7 @@ function closeTicket(){
                 <div v-if="isGuest" class="mt-4 border-t pt-4">
                     <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
                         <div>
-                            <p class="text-sm font-medium text-gray-500">
-                                Nom
-                            </p>
+                            <p class="text-sm font-medium text-gray-500">Nom</p>
                             <p class="mt-1 text-sm text-gray-900">
                                 {{ ticket.guest_name }}
                             </p>
@@ -199,7 +199,7 @@ function closeTicket(){
             <!-- Chat Interface (for client tickets) -->
             <div
                 v-if="!isGuest"
-                class="h-2/3 space-y-4 overflow-scroll p-2 border-2 rounded-md"
+                class="h-2/3 space-y-4 overflow-scroll rounded-md border-2 p-2"
             >
                 <!-- Messages -->
                 <div class="space-y-4">
@@ -207,7 +207,8 @@ function closeTicket(){
                         v-if="!ticket.messages || ticket.messages.length === 0"
                         class="rounded-md border border-dashed p-6 text-center text-sm text-gray-500"
                     >
-                        Aucun message pour le moment. Commencez la conversation ci-dessous.
+                        Aucun message pour le moment. Commencez la conversation
+                        ci-dessous.
                     </div>
                     <div
                         v-for="message in ticket.messages"
@@ -243,7 +244,11 @@ function closeTicket(){
                 </div>
             </div>
             <!-- Reply Form -->
-            <form v-if="!isGuest && ticket.status !== 'closed'" @submit.prevent="submitReply" class="mt-6">
+            <form
+                v-if="!isGuest && ticket.status !== 'closed'"
+                @submit.prevent="submitReply"
+                class="mt-6"
+            >
                 <div class="flex space-x-2">
                     <div class="flex-1">
                         <label for="message" class="sr-only"

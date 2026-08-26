@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { appConfirm } from '@/composables/useAppDialog';
 import InputError from '@/components/InputError.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import FileUpload from '@/components/ViltFilePond/FileUpload.vue';
+import { appConfirm } from '@/composables/useAppDialog';
 import AdminLayout from '@/layouts/AdminLayout.vue';
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
 import { FileText, Pencil, Plus, Search, Trash2, X } from 'lucide-vue-next';
@@ -173,7 +173,11 @@ async function remove(expense: Expense) {
     if (
         await appConfirm(
             `Supprimer définitivement la dépense « ${expense.title} » ?`,
-            { title: 'Supprimer la dépense', tone: 'danger', confirmText: 'Supprimer' },
+            {
+                title: 'Supprimer la dépense',
+                tone: 'danger',
+                confirmText: 'Supprimer',
+            },
         )
     )
         router.delete(`/admin/expenses/${expense.id}`, {

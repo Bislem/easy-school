@@ -6,8 +6,13 @@ import { Label } from '@/components/ui/label';
 import AdminLayout from '@/layouts/AdminLayout.vue';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3';
 import {
+    BadgeCheck,
+    BriefcaseBusiness,
+    CalendarDays,
     Eye,
+    Mail,
     Pencil,
+    Phone,
     Plus,
     Search,
     UserCheck,
@@ -31,6 +36,9 @@ interface ManagedUser {
         id: number;
         employee_code: string;
         employment_status: string;
+        hire_date?: string | null;
+        photo_url?: string | null;
+        social_security_number?: string | null;
         employee_type?: { name: string } | null;
     } | null;
 }
@@ -43,13 +51,18 @@ interface PaginationLink {
 
 const props = defineProps<{
     users: { data: ManagedUser[]; links: PaginationLink[]; total: number };
-    filters: { search?: string; role?: string };
+    filters: { search?: string; role?: string; employee_type?: string; employment_status?: string; access?: string };
+    employeeTypes: { id: number; name: string }[];
+    stats: { total: number; active: number; teachers: number; employees: number };
 }>();
 
 const page = usePage();
 const currentUserId = page.props.auth.user.id;
 const search = ref(props.filters.search ?? '');
 const roleFilter = ref(props.filters.role ?? '');
+const typeFilter = ref(props.filters.employee_type ?? '');
+const statusFilter = ref(props.filters.employment_status ?? '');
+const accessFilter = ref(props.filters.access ?? '');
 const modalOpen = ref(false);
 const editingUser = ref<ManagedUser | null>(null);
 
@@ -69,10 +82,18 @@ const form = useForm({
 function applyFilters() {
     router.get(
         '/admin/users',
-        { search: search.value, role: roleFilter.value },
+        { search: search.value, role: roleFilter.value, employee_type: typeFilter.value, employment_status: statusFilter.value, access: accessFilter.value },
         { preserveState: true, replace: true },
     );
 }
+
+function clearFilters() {
+    search.value = ''; roleFilter.value = ''; typeFilter.value = ''; statusFilter.value = ''; accessFilter.value = '';
+    applyFilters();
+}
+
+const initials = (name: string) => name.split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase();
+const employmentLabel = (status?: string) => ({ active: 'En poste', inactive: 'Inactif', on_leave: 'En congé', terminated: 'Contrat terminé' }[status || ''] || 'Administrateur');
 
 function openCreate() {
     editingUser.value = null;
@@ -172,8 +193,15 @@ const paginationLabel = (label: string) =>
                     {{ page.props.errors.user }}
                 </div>
 
+                <div class="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                    <div class="rounded-xl border bg-card p-4"><p class="text-xs text-muted-foreground">Personnel total</p><b class="text-2xl">{{ stats.total }}</b></div>
+                    <div class="rounded-xl border bg-card p-4"><p class="text-xs text-muted-foreground">Comptes actifs</p><b class="text-2xl text-emerald-600">{{ stats.active }}</b></div>
+                    <div class="rounded-xl border bg-card p-4"><p class="text-xs text-muted-foreground">Enseignants</p><b class="text-2xl">{{ stats.teachers }}</b></div>
+                    <div class="rounded-xl border bg-card p-4"><p class="text-xs text-muted-foreground">Employés</p><b class="text-2xl">{{ stats.employees }}</b></div>
+                </div>
+
                 <form
-                    class="grid gap-3 rounded-xl border bg-card p-4 sm:grid-cols-[1fr_180px_auto]"
+                    class="grid gap-3 rounded-xl border bg-card p-4 md:grid-cols-2 xl:grid-cols-6"
                     @submit.prevent="applyFilters"
                 >
                     <div class="relative">
@@ -182,7 +210,7 @@ const paginationLabel = (label: string) =>
                         /><Input
                             v-model="search"
                             class="pl-9"
-                            placeholder="Rechercher par nom, e-mail ou téléphone"
+                            placeholder="Nom, e-mail, téléphone, matricule, N° SS..."
                         />
                     </div>
                     <select
@@ -194,10 +222,33 @@ const paginationLabel = (label: string) =>
                         <option value="teacher">Enseignants</option>
                         <option value="employee">Employés</option>
                     </select>
-                    <Button type="submit" variant="outline">Rechercher</Button>
+                    <select v-model="typeFilter" class="h-9 rounded-md border border-input bg-transparent px-3 text-sm"><option value="">Toutes les fonctions</option><option v-for="type in employeeTypes" :key="type.id" :value="String(type.id)">{{ type.name }}</option></select>
+                    <select v-model="statusFilter" class="h-9 rounded-md border border-input bg-transparent px-3 text-sm"><option value="">Tous les statuts RH</option><option value="active">En poste</option><option value="on_leave">En congé</option><option value="inactive">Inactif</option><option value="terminated">Contrat terminé</option></select>
+                    <select v-model="accessFilter" class="h-9 rounded-md border border-input bg-transparent px-3 text-sm"><option value="">Tous les accès</option><option value="enabled">Connexion autorisée</option><option value="disabled">Sans accès portail</option><option value="inactive">Compte inactif</option></select>
+                    <div class="flex gap-2"><Button type="submit" class="flex-1"><Search class="mr-2 size-4" />Filtrer</Button><Button type="button" variant="outline" title="Effacer les filtres" @click="clearFilters"><X class="size-4" /></Button></div>
                 </form>
 
+                <div class="flex items-center justify-between"><p class="text-sm text-muted-foreground"><b class="text-foreground">{{ users.total }}</b> résultat(s)</p><p class="hidden text-xs text-muted-foreground sm:block">Cliquez sur « Dossier RH » pour accéder aux congés, documents et informations.</p></div>
+
+                <div class="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+                    <article v-for="user in users.data" :key="user.id" class="group overflow-hidden rounded-2xl border bg-card shadow-sm transition hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md">
+                        <div class="h-1.5" :class="user.is_active ? 'bg-emerald-500' : 'bg-slate-300'"></div>
+                        <div class="p-5">
+                            <div class="flex items-start gap-4">
+                                <img v-if="user.staff?.photo_url" :src="user.staff.photo_url" :alt="user.name" class="size-14 rounded-xl object-cover ring-2 ring-muted" />
+                                <div v-else class="flex size-14 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-lg font-bold text-primary">{{ initials(user.name) }}</div>
+                                <div class="min-w-0 flex-1"><div class="flex items-start justify-between gap-2"><h2 class="truncate font-semibold">{{ user.name }}</h2><BadgeCheck v-if="user.is_active" class="size-4 shrink-0 text-emerald-500" /></div><p class="truncate text-sm text-muted-foreground">{{ user.staff?.employee_type?.name || user.job_title || roleLabel(user.role) }}</p><p class="mt-1 font-mono text-xs text-muted-foreground">{{ user.staff?.employee_code || `USR-${user.id}` }}</p></div>
+                            </div>
+                            <div class="mt-4 flex flex-wrap gap-2"><span class="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">{{ roleLabel(user.role) }}</span><span class="rounded-full px-2.5 py-1 text-xs font-medium" :class="user.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'">{{ user.is_active ? employmentLabel(user.staff?.employment_status) : 'Compte inactif' }}</span><span v-if="!user.can_login" class="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-700">Sans accès portail</span></div>
+                            <div class="mt-4 space-y-2 border-t pt-4 text-sm text-muted-foreground"><p class="flex items-center gap-2 truncate"><Mail class="size-4 shrink-0" />{{ user.email }}</p><p class="flex items-center gap-2"><Phone class="size-4 shrink-0" />{{ user.phone || 'Téléphone non renseigné' }}</p><p v-if="user.staff?.hire_date" class="flex items-center gap-2"><CalendarDays class="size-4 shrink-0" />Embauché(e) le {{ user.staff.hire_date }}</p><p v-else class="flex items-center gap-2"><BriefcaseBusiness class="size-4 shrink-0" />{{ user.staff ? 'Date d’embauche à compléter' : 'Compte administratif' }}</p></div>
+                            <div class="mt-5 grid grid-cols-2 gap-2"><Button v-if="user.staff" as-child><Link :href="`/admin/staff/${user.staff.id}`"><Eye class="mr-2 size-4" />Dossier RH</Link></Button><Button variant="outline" :class="{ 'col-span-2': !user.staff }" @click="openEdit(user)"><Pencil class="mr-2 size-4" />Compte</Button></div>
+                            <Button class="mt-2 w-full" size="sm" :variant="user.is_active ? 'ghost' : 'outline'" :disabled="user.id === currentUserId" @click="toggleActive(user)"><UserX v-if="user.is_active" class="mr-2 size-4" /><UserCheck v-else class="mr-2 size-4" />{{ user.is_active ? 'Désactiver le compte' : 'Réactiver le compte' }}</Button>
+                        </div>
+                    </article>
+                </div>
+
                 <div
+                    v-if="false"
                     class="hidden overflow-hidden rounded-xl border bg-card md:block"
                 >
                     <table class="w-full text-sm">
@@ -301,7 +352,7 @@ const paginationLabel = (label: string) =>
                     </table>
                 </div>
 
-                <div class="grid gap-3 md:hidden">
+                <div v-if="false" class="grid gap-3 md:hidden">
                     <article
                         v-for="user in users.data"
                         :key="user.id"

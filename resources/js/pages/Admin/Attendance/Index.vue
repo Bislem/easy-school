@@ -1,57 +1,800 @@
 <script setup lang="ts">
 import InputError from '@/components/InputError.vue';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogDescription, DialogFooter, DialogHeader, DialogScrollContent, DialogTitle } from '@/components/ui/dialog';
+import {
+    Dialog,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogScrollContent,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import AdminLayout from '@/layouts/AdminLayout.vue';
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
-import { BriefcaseBusiness, CalendarDays, CheckCircle2, Clock3, GraduationCap, MapPin, Search, TrendingUp, UserRoundCheck, UserRoundX } from 'lucide-vue-next';
+import {
+    BriefcaseBusiness,
+    CalendarDays,
+    CheckCircle2,
+    Clock3,
+    GraduationCap,
+    MapPin,
+    Search,
+    TrendingUp,
+    UserRoundCheck,
+    UserRoundX,
+} from 'lucide-vue-next';
 import { computed, ref } from 'vue';
 
-interface Props { personType:'student'|'employee';selectedPerson:any|null;students:any[];employees:any[];records:{data:any[];links:any[]};teachers:any[];filters:any;stats:{total:number;present:number;absent:number;late:number;rate:number|null;worked_hours:number} }
-const props=defineProps<Props>();
-const search=ref('');const correctionOpen=ref(false);const selectedRecord=ref<any|null>(null);
-const filters=useForm({person_type:props.personType,person_id:props.filters.person_id?String(props.filters.person_id):'',date_from:props.filters.date_from??'',date_to:props.filters.date_to??'',status:props.filters.status??''});
-const correction=useForm({attendance_date:new Date().toISOString().slice(0,10),status:'present',actual_teacher_id:'',worked_minutes:0,check_in:'',check_out:'',is_justified:false,justification:'',notes:'',correction_reason:''});
-const people=computed(()=>props.personType==='student'?props.students:props.employees);
-const filteredPeople=computed(()=>{const q=search.value.trim().toLocaleLowerCase('fr');return people.value.filter(person=>{const name=props.personType==='student'?`${person.first_name} ${person.last_name}`:person.name;return !q||`${name} ${person.email??''} ${person.phone??''} ${person.employee_code??''}`.toLocaleLowerCase('fr').includes(q);});});
-const selectedName=computed(()=>!props.selectedPerson?'':props.personType==='student'?`${props.selectedPerson.first_name} ${props.selectedPerson.last_name}`:props.selectedPerson.name);
-const isSelectedTeacher=computed(()=>props.personType==='employee'&&Boolean(props.selectedPerson?.employee_type?.is_teacher));
-const statusLabels:Record<string,string>={present:'Présent',absent:'Absent',late:'En retard',excused:'Excusé',left_early:'Départ anticipé',replaced:'Remplacé',cancelled:'Annulé',leave:'Congé'};
-const statusTone:Record<string,string>={present:'border-emerald-200 bg-emerald-50 text-emerald-800',absent:'border-red-200 bg-red-50 text-red-800',late:'border-amber-200 bg-amber-50 text-amber-800',excused:'border-blue-200 bg-blue-50 text-blue-800',left_early:'border-orange-200 bg-orange-50 text-orange-800',replaced:'border-violet-200 bg-violet-50 text-violet-800',cancelled:'border-slate-200 bg-slate-50 text-slate-700',leave:'border-cyan-200 bg-cyan-50 text-cyan-800'};
-const calendarMonths=computed(()=>{const grouped=new Map<string,any[]>();props.records.data.forEach(record=>{const key=record.date.slice(0,7);grouped.set(key,[...(grouped.get(key)??[]),record]);});return [...grouped.entries()].map(([month,records])=>{const [year,monthNumber]=month.split('-').map(Number);const days=new Date(year,monthNumber,0).getDate();const offset=(new Date(year,monthNumber-1,1).getDay()+6)%7;const byDate=new Map<string,any[]>();records.forEach(record=>byDate.set(record.date,[...(byDate.get(record.date)??[]),record]));return{key:month,label:new Date(year,monthNumber-1,1).toLocaleDateString('fr-FR',{month:'long',year:'numeric'}),cells:[...Array.from({length:offset},()=>null),...Array.from({length:days},(_,index)=>{const date=`${month}-${String(index+1).padStart(2,'0')}`;return{day:index+1,date,records:byDate.get(date)??[]};})]};});});
-function navigate(overrides:Record<string,string>={}){router.get('/admin/attendance',{...filters.data(),...overrides},{preserveState:true,preserveScroll:true,replace:true});}
-function changeType(type:'student'|'employee'){search.value='';filters.person_type=type;filters.person_id='';navigate({person_type:type,person_id:''});}
-function selectPerson(id:number){filters.person_id=String(id);navigate({person_id:String(id)});}
-function applyFilters(){navigate();}
-function clearFilters(){filters.date_from='';filters.date_to='';filters.status='';navigate();}
-function openCorrection(record:any|null=null){selectedRecord.value=record;correction.transform(data=>data);correction.defaults({attendance_date:record?.date??new Date().toISOString().slice(0,10),status:record?.status??'present',actual_teacher_id:String(record?.actual_teacher_id??props.selectedPerson?.user_id??''),worked_minutes:record?.worked_minutes??0,check_in:record?.check_in?.slice(0,5)??'',check_out:record?.check_out?.slice(0,5)??'',is_justified:record?.is_justified??false,justification:record?.justification??'',notes:record?.notes??'',correction_reason:''});correction.reset();correctionOpen.value=true;}
-function saveCorrection(){const record=selectedRecord.value;if(record?.kind==='student'){correction.transform(data=>({records:[{student_id:props.selectedPerson.id,status:data.status,is_justified:data.is_justified,justification:data.justification,notes:data.notes}],correction_reason:data.correction_reason,validate_session:false})).put(`/admin/attendance/sessions/${record.session_id}/students`,{preserveScroll:true,onSuccess:()=>correctionOpen.value=false});}else if(record?.kind==='teacher'){correction.put(`/admin/attendance/sessions/${record.session_id}/teacher`,{preserveScroll:true,onSuccess:()=>correctionOpen.value=false});}else{correction.transform(data=>({...data,staff_id:props.selectedPerson.id})).put('/admin/attendance/employees',{preserveScroll:true,onSuccess:()=>correctionOpen.value=false});}}
-const time=(value?:string|null)=>value?new Date(value).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}):null;
+interface Props {
+    personType: 'student' | 'employee';
+    selectedPerson: any | null;
+    students: any[];
+    employees: any[];
+    records: { data: any[]; links: any[] };
+    teachers: any[];
+    filters: any;
+    stats: {
+        total: number;
+        present: number;
+        absent: number;
+        late: number;
+        rate: number | null;
+        worked_hours: number;
+    };
+}
+const props = defineProps<Props>();
+const search = ref('');
+const correctionOpen = ref(false);
+const selectedRecord = ref<any | null>(null);
+const filters = useForm({
+    person_type: props.personType,
+    person_id: props.filters.person_id ? String(props.filters.person_id) : '',
+    date_from: props.filters.date_from ?? '',
+    date_to: props.filters.date_to ?? '',
+    status: props.filters.status ?? '',
+});
+const correction = useForm({
+    attendance_date: new Date().toISOString().slice(0, 10),
+    status: 'present',
+    actual_teacher_id: '',
+    worked_minutes: 0,
+    check_in: '',
+    check_out: '',
+    is_justified: false,
+    justification: '',
+    notes: '',
+    correction_reason: '',
+});
+const people = computed(() =>
+    props.personType === 'student' ? props.students : props.employees,
+);
+const filteredPeople = computed(() => {
+    const q = search.value.trim().toLocaleLowerCase('fr');
+    return people.value.filter((person) => {
+        const name =
+            props.personType === 'student'
+                ? `${person.first_name} ${person.last_name}`
+                : person.name;
+        return (
+            !q ||
+            `${name} ${person.email ?? ''} ${person.phone ?? ''} ${person.employee_code ?? ''}`
+                .toLocaleLowerCase('fr')
+                .includes(q)
+        );
+    });
+});
+const selectedName = computed(() =>
+    !props.selectedPerson
+        ? ''
+        : props.personType === 'student'
+          ? `${props.selectedPerson.first_name} ${props.selectedPerson.last_name}`
+          : props.selectedPerson.name,
+);
+const isSelectedTeacher = computed(
+    () =>
+        props.personType === 'employee' &&
+        Boolean(props.selectedPerson?.employee_type?.is_teacher),
+);
+const statusLabels: Record<string, string> = {
+    present: 'Présent',
+    absent: 'Absent',
+    late: 'En retard',
+    excused: 'Excusé',
+    left_early: 'Départ anticipé',
+    replaced: 'Remplacé',
+    cancelled: 'Annulé',
+    leave: 'Congé',
+};
+const statusTone: Record<string, string> = {
+    present: 'border-emerald-200 bg-emerald-50 text-emerald-800',
+    absent: 'border-red-200 bg-red-50 text-red-800',
+    late: 'border-amber-200 bg-amber-50 text-amber-800',
+    excused: 'border-blue-200 bg-blue-50 text-blue-800',
+    left_early: 'border-orange-200 bg-orange-50 text-orange-800',
+    replaced: 'border-violet-200 bg-violet-50 text-violet-800',
+    cancelled: 'border-slate-200 bg-slate-50 text-slate-700',
+    leave: 'border-cyan-200 bg-cyan-50 text-cyan-800',
+};
+const calendarMonths = computed(() => {
+    const grouped = new Map<string, any[]>();
+    props.records.data.forEach((record) => {
+        const key = record.date.slice(0, 7);
+        grouped.set(key, [...(grouped.get(key) ?? []), record]);
+    });
+    return [...grouped.entries()].map(([month, records]) => {
+        const [year, monthNumber] = month.split('-').map(Number);
+        const days = new Date(year, monthNumber, 0).getDate();
+        const offset = (new Date(year, monthNumber - 1, 1).getDay() + 6) % 7;
+        const byDate = new Map<string, any[]>();
+        records.forEach((record) =>
+            byDate.set(record.date, [
+                ...(byDate.get(record.date) ?? []),
+                record,
+            ]),
+        );
+        return {
+            key: month,
+            label: new Date(year, monthNumber - 1, 1).toLocaleDateString(
+                'fr-FR',
+                { month: 'long', year: 'numeric' },
+            ),
+            cells: [
+                ...Array.from({ length: offset }, () => null),
+                ...Array.from({ length: days }, (_, index) => {
+                    const date = `${month}-${String(index + 1).padStart(2, '0')}`;
+                    return {
+                        day: index + 1,
+                        date,
+                        records: byDate.get(date) ?? [],
+                    };
+                }),
+            ],
+        };
+    });
+});
+function navigate(overrides: Record<string, string> = {}) {
+    router.get(
+        '/admin/attendance',
+        { ...filters.data(), ...overrides },
+        { preserveState: true, preserveScroll: true, replace: true },
+    );
+}
+function changeType(type: 'student' | 'employee') {
+    search.value = '';
+    filters.person_type = type;
+    filters.person_id = '';
+    navigate({ person_type: type, person_id: '' });
+}
+function selectPerson(id: number) {
+    filters.person_id = String(id);
+    navigate({ person_id: String(id) });
+}
+function applyFilters() {
+    navigate();
+}
+function clearFilters() {
+    filters.date_from = '';
+    filters.date_to = '';
+    filters.status = '';
+    navigate();
+}
+function openCorrection(record: any | null = null) {
+    selectedRecord.value = record;
+    correction.transform((data) => data);
+    correction.defaults({
+        attendance_date: record?.date ?? new Date().toISOString().slice(0, 10),
+        status: record?.status ?? 'present',
+        actual_teacher_id: String(
+            record?.actual_teacher_id ?? props.selectedPerson?.user_id ?? '',
+        ),
+        worked_minutes: record?.worked_minutes ?? 0,
+        check_in: record?.check_in?.slice(0, 5) ?? '',
+        check_out: record?.check_out?.slice(0, 5) ?? '',
+        is_justified: record?.is_justified ?? false,
+        justification: record?.justification ?? '',
+        notes: record?.notes ?? '',
+        correction_reason: '',
+    });
+    correction.reset();
+    correctionOpen.value = true;
+}
+function saveCorrection() {
+    const record = selectedRecord.value;
+    if (record?.kind === 'student') {
+        correction
+            .transform((data) => ({
+                records: [
+                    {
+                        student_id: props.selectedPerson.id,
+                        status: data.status,
+                        is_justified: data.is_justified,
+                        justification: data.justification,
+                        notes: data.notes,
+                    },
+                ],
+                correction_reason: data.correction_reason,
+                validate_session: false,
+            }))
+            .put(`/admin/attendance/sessions/${record.session_id}/students`, {
+                preserveScroll: true,
+                onSuccess: () => (correctionOpen.value = false),
+            });
+    } else if (record?.kind === 'teacher') {
+        correction.put(
+            `/admin/attendance/sessions/${record.session_id}/teacher`,
+            {
+                preserveScroll: true,
+                onSuccess: () => (correctionOpen.value = false),
+            },
+        );
+    } else {
+        correction
+            .transform((data) => ({
+                ...data,
+                staff_id: props.selectedPerson.id,
+            }))
+            .put('/admin/attendance/employees', {
+                preserveScroll: true,
+                onSuccess: () => (correctionOpen.value = false),
+            });
+    }
+}
+const time = (value?: string | null) =>
+    value
+        ? new Date(value).toLocaleTimeString('fr-FR', {
+              hour: '2-digit',
+              minute: '2-digit',
+          })
+        : null;
 </script>
 
-<template><Head title="Présences"/><AdminLayout><main class="flex min-h-0 flex-1 flex-col bg-muted/15 lg:flex-row">
- <aside class="w-full shrink-0 border-b bg-card lg:w-80 lg:border-r lg:border-b-0"><div class="space-y-5 p-4 lg:sticky lg:top-0 lg:max-h-screen lg:overflow-y-auto">
-  <div><h1 class="text-xl font-bold">Présences</h1><p class="text-sm text-muted-foreground">Sélectionnez une personne pour consulter son calendrier.</p></div>
-  <div class="grid grid-cols-2 rounded-lg bg-muted p-1"><button class="rounded-md px-3 py-2 text-sm font-medium" :class="personType==='student'?'bg-background shadow-sm':'text-muted-foreground'" @click="changeType('student')"><GraduationCap class="mr-1 inline size-4"/>Étudiants</button><button class="rounded-md px-3 py-2 text-sm font-medium" :class="personType==='employee'?'bg-background shadow-sm':'text-muted-foreground'" @click="changeType('employee')"><BriefcaseBusiness class="mr-1 inline size-4"/>Employés</button></div>
-  <div><Label>Rechercher</Label><div class="relative mt-1"><Search class="absolute top-2.5 left-3 size-4 text-muted-foreground"/><Input v-model="search" class="pl-9" :placeholder="personType==='student'?'Nom, e-mail, téléphone…':'Nom, fonction, matricule…'"/></div><div class="mt-2 max-h-64 space-y-1 overflow-y-auto rounded-lg border p-1"><button v-for="person in filteredPeople" :key="person.id" class="flex w-full items-center gap-3 rounded-md p-2 text-left text-sm hover:bg-muted" :class="Number(filters.person_id)===person.id?'bg-primary/10 text-primary':''" @click="selectPerson(person.id)"><div class="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted font-semibold">{{(person.first_name??person.name)?.[0]}}</div><span class="min-w-0"><b class="block truncate">{{personType==='student'?`${person.first_name} ${person.last_name}`:person.name}}</b><small class="block truncate text-muted-foreground">{{personType==='student'?(person.email||person.phone||'Étudiant'):(person.employee_type?.name||person.employee_code)}}</small></span></button><p v-if="!filteredPeople.length" class="p-4 text-center text-sm text-muted-foreground">Aucun résultat.</p></div></div>
-  <form class="space-y-3 border-t pt-4" @submit.prevent="applyFilters"><p class="text-sm font-semibold">Filtres optionnels</p><div><Label>Date de début</Label><Input v-model="filters.date_from" class="mt-1" type="date"/></div><div><Label>Date de fin</Label><Input v-model="filters.date_to" class="mt-1" type="date"/></div><div><Label>Type de pointage</Label><select v-model="filters.status" class="mt-1 h-9 w-full rounded-md border bg-background px-3 text-sm"><option value="">Tous</option><option v-for="(label,key) in statusLabels" :key="key" :value="key">{{label}}</option></select></div><div class="grid grid-cols-2 gap-2"><Button>Filtrer</Button><Button type="button" variant="outline" @click="clearFilters">Effacer</Button></div></form>
- </div></aside>
- <section class="min-w-0 flex-1 p-4 sm:p-6 lg:p-8"><div v-if="selectedPerson" class="mx-auto max-w-7xl space-y-6">
-  <header class="flex flex-wrap items-center justify-between gap-4"><div><p class="text-sm text-muted-foreground">Historique individuel</p><h2 class="text-2xl font-bold">{{selectedName}}</h2><p v-if="personType==='employee'" class="text-sm text-muted-foreground">{{selectedPerson.employee_type?.name}} · {{selectedPerson.employee_code}}</p></div><Button v-if="personType==='employee'&&!isSelectedTeacher" @click="openCorrection(null)">Ajouter un pointage</Button></header>
-  <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-5"><article v-for="card in [{label:'Total',value:stats.total,icon:CalendarDays,tone:'text-slate-600 bg-slate-100'},{label:'Présences',value:stats.present,icon:UserRoundCheck,tone:'text-emerald-600 bg-emerald-100'},{label:'Absences',value:stats.absent,icon:UserRoundX,tone:'text-red-600 bg-red-100'},{label:'Retards',value:stats.late,icon:Clock3,tone:'text-amber-600 bg-amber-100'},{label:'Taux de présence',value:stats.rate===null?'—':`${stats.rate}%`,icon:TrendingUp,tone:'text-primary bg-primary/10'}]" :key="card.label" class="rounded-xl border bg-card p-4 shadow-sm"><div class="flex items-center justify-between"><div><p class="text-xs text-muted-foreground">{{card.label}}</p><b class="mt-1 block text-2xl">{{card.value}}</b></div><span class="rounded-lg p-2" :class="card.tone"><component :is="card.icon" class="size-5"/></span></div></article></div>
-  <div v-if="personType==='employee'" class="rounded-xl border bg-card px-4 py-3 text-sm"><b>{{stats.worked_hours}} heures</b> travaillées sur les pointages affichés.</div>
-  <section v-for="month in calendarMonths" :key="month.key" class="overflow-hidden rounded-2xl border bg-card shadow-sm"><div class="border-b px-5 py-4"><h3 class="text-lg font-semibold capitalize">{{month.label}}</h3></div><div class="grid grid-cols-7 border-b bg-muted/30 text-center text-xs font-medium text-muted-foreground"><div v-for="day in ['Lun','Mar','Mer','Jeu','Ven','Sam','Dim']" :key="day" class="p-2">{{day}}</div></div><div class="grid grid-cols-7"><div v-for="(cell,index) in month.cells" :key="index" class="min-h-28 border-r border-b p-2" :class="!cell?'bg-muted/20':''"><template v-if="cell"><span class="text-xs font-semibold text-muted-foreground">{{cell.day}}</span><div class="mt-1 space-y-1"><button v-for="record in cell.records" :key="record.id" class="w-full rounded-md border p-2 text-left text-xs transition hover:shadow-sm" :class="statusTone[record.status]" @click="openCorrection(record)"><b class="block">{{statusLabels[record.status]??record.status}}</b><span v-if="record.session" class="mt-0.5 block truncate">{{record.session}}</span><span v-if="record.starts_at" class="block opacity-75">{{time(record.starts_at)}}–{{time(record.ends_at)}}</span></button></div></template></div></div></section>
-  <div v-if="!records.data.length" class="rounded-2xl border border-dashed bg-card p-12 text-center"><CalendarDays class="mx-auto size-10 text-muted-foreground/50"/><h3 class="mt-3 font-semibold">Aucun pointage trouvé</h3><p class="text-sm text-muted-foreground">Modifiez les dates ou le type de pointage dans la barre latérale.</p></div>
-  <nav v-if="records.links?.length>3" class="flex max-w-full gap-1 overflow-x-auto"><Link v-for="link in records.links" :key="link.label" :href="link.url||'#'" preserve-scroll class="rounded-md border px-3 py-2 text-sm" :class="{'bg-primary text-primary-foreground':link.active,'pointer-events-none opacity-40':!link.url}" v-html="link.label"/></nav>
- </div><div v-else class="flex min-h-[60vh] items-center justify-center"><div class="max-w-md text-center"><CalendarDays class="mx-auto size-12 text-primary/50"/><h2 class="mt-4 text-xl font-semibold">Sélectionnez une personne</h2><p class="mt-1 text-muted-foreground">Choisissez Étudiant ou Employé, puis recherchez la personne dans la barre latérale.</p></div></div></section>
-</main>
-<Dialog v-model:open="correctionOpen"><DialogScrollContent><DialogHeader><DialogTitle>{{selectedRecord?'Consulter ou corriger le pointage':'Ajouter un pointage'}}</DialogTitle><DialogDescription v-if="selectedRecord">{{selectedRecord.formation||selectedPerson?.employee_type?.name}}<span v-if="selectedRecord.planning"> · {{selectedRecord.planning}}</span><span v-if="selectedRecord.group"> · {{selectedRecord.group}}</span><span v-if="selectedRecord.room"> · {{selectedRecord.room}}</span></DialogDescription></DialogHeader><form class="space-y-4" @submit.prevent="saveCorrection">
- <div v-if="!selectedRecord||selectedRecord.kind==='employee'"><Label>Date du pointage</Label><Input v-model="correction.attendance_date" class="mt-1" type="date" required/></div><div><Label>Statut</Label><select v-model="correction.status" class="mt-1 h-9 w-full rounded-md border bg-background px-3"><option v-for="(label,key) in statusLabels" v-show="selectedRecord?.kind==='student'?['present','absent','late','excused','left_early'].includes(String(key)):selectedRecord?.kind==='teacher'?['present','absent','late','excused','replaced','cancelled'].includes(String(key)):['present','absent','late','excused','leave'].includes(String(key))" :key="key" :value="key">{{label}}</option></select></div>
- <div v-if="selectedRecord?.kind==='teacher'&&correction.status==='replaced'"><Label>Remplaçant</Label><select v-model="correction.actual_teacher_id" class="mt-1 h-9 w-full rounded-md border bg-background px-3"><option v-for="teacher in teachers" :key="teacher.id" :value="String(teacher.id)">{{teacher.name}}</option></select></div>
- <div v-if="selectedRecord?.kind!=='student'"><Label>Minutes travaillées</Label><Input v-model="correction.worked_minutes" class="mt-1" type="number" min="0"/></div><div v-if="!selectedRecord||selectedRecord.kind==='employee'" class="grid grid-cols-2 gap-3"><div><Label>Arrivée</Label><Input v-model="correction.check_in" class="mt-1" type="time"/></div><div><Label>Départ</Label><Input v-model="correction.check_out" class="mt-1" type="time"/></div></div>
- <div><Label>Justification du statut</Label><Input v-model="correction.justification" class="mt-1"/></div><div v-if="selectedRecord"><Label>Justificatif écrit de correction</Label><textarea v-model="correction.correction_reason" required rows="3" class="mt-1 w-full rounded-md border bg-background p-3 text-sm" placeholder="Décrivez la preuve et la raison de cette modification."/></div>
- <div v-if="selectedRecord" class="rounded-lg bg-muted/40 p-3 text-xs text-muted-foreground"><p v-if="selectedRecord.formation"><b>Formation :</b> {{selectedRecord.formation}}</p><p v-if="selectedRecord.planning"><b>Planification :</b> {{selectedRecord.planning}}</p><p v-if="selectedRecord.room"><MapPin class="mr-1 inline size-3"/>{{selectedRecord.room}}</p><p v-if="selectedRecord.teacher"><b>Formateur :</b> {{selectedRecord.teacher}}</p></div><InputError :message="Object.values(correction.errors)[0]"/><DialogFooter><Button :disabled="correction.processing"><CheckCircle2 class="mr-2 size-4"/>{{selectedRecord?'Enregistrer la correction':'Ajouter le pointage'}}</Button></DialogFooter>
-</form></DialogScrollContent></Dialog>
-</AdminLayout></template>
+<template>
+    <Head title="Présences" /><AdminLayout
+        ><main class="flex min-h-0 flex-1 flex-col bg-muted/15 lg:flex-row">
+            <aside
+                class="w-full shrink-0 border-b bg-card lg:w-80 lg:border-r lg:border-b-0"
+            >
+                <div
+                    class="space-y-5 p-4 lg:sticky lg:top-0 lg:max-h-screen lg:overflow-y-auto"
+                >
+                    <div>
+                        <h1 class="text-xl font-bold">Présences</h1>
+                        <p class="text-sm text-muted-foreground">
+                            Sélectionnez une personne pour consulter son
+                            calendrier.
+                        </p>
+                    </div>
+                    <div class="grid grid-cols-2 rounded-lg bg-muted p-1">
+                        <button
+                            class="rounded-md px-3 py-2 text-sm font-medium"
+                            :class="
+                                personType === 'student'
+                                    ? 'bg-background shadow-sm'
+                                    : 'text-muted-foreground'
+                            "
+                            @click="changeType('student')"
+                        >
+                            <GraduationCap
+                                class="mr-1 inline size-4"
+                            />Étudiants</button
+                        ><button
+                            class="rounded-md px-3 py-2 text-sm font-medium"
+                            :class="
+                                personType === 'employee'
+                                    ? 'bg-background shadow-sm'
+                                    : 'text-muted-foreground'
+                            "
+                            @click="changeType('employee')"
+                        >
+                            <BriefcaseBusiness
+                                class="mr-1 inline size-4"
+                            />Employés
+                        </button>
+                    </div>
+                    <div>
+                        <Label>Rechercher</Label>
+                        <div class="relative mt-1">
+                            <Search
+                                class="absolute top-2.5 left-3 size-4 text-muted-foreground"
+                            /><Input
+                                v-model="search"
+                                class="pl-9"
+                                :placeholder="
+                                    personType === 'student'
+                                        ? 'Nom, e-mail, téléphone…'
+                                        : 'Nom, fonction, matricule…'
+                                "
+                            />
+                        </div>
+                        <div
+                            class="mt-2 max-h-64 space-y-1 overflow-y-auto rounded-lg border p-1"
+                        >
+                            <button
+                                v-for="person in filteredPeople"
+                                :key="person.id"
+                                class="flex w-full items-center gap-3 rounded-md p-2 text-left text-sm hover:bg-muted"
+                                :class="
+                                    Number(filters.person_id) === person.id
+                                        ? 'bg-primary/10 text-primary'
+                                        : ''
+                                "
+                                @click="selectPerson(person.id)"
+                            >
+                                <div
+                                    class="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted font-semibold"
+                                >
+                                    {{
+                                        (person.first_name ?? person.name)?.[0]
+                                    }}
+                                </div>
+                                <span class="min-w-0"
+                                    ><b class="block truncate">{{
+                                        personType === 'student'
+                                            ? `${person.first_name} ${person.last_name}`
+                                            : person.name
+                                    }}</b
+                                    ><small
+                                        class="block truncate text-muted-foreground"
+                                        >{{
+                                            personType === 'student'
+                                                ? person.email ||
+                                                  person.phone ||
+                                                  'Étudiant'
+                                                : person.employee_type?.name ||
+                                                  person.employee_code
+                                        }}</small
+                                    ></span
+                                >
+                            </button>
+                            <p
+                                v-if="!filteredPeople.length"
+                                class="p-4 text-center text-sm text-muted-foreground"
+                            >
+                                Aucun résultat.
+                            </p>
+                        </div>
+                    </div>
+                    <form
+                        class="space-y-3 border-t pt-4"
+                        @submit.prevent="applyFilters"
+                    >
+                        <p class="text-sm font-semibold">Filtres optionnels</p>
+                        <div>
+                            <Label>Date de début</Label
+                            ><Input
+                                v-model="filters.date_from"
+                                class="mt-1"
+                                type="date"
+                            />
+                        </div>
+                        <div>
+                            <Label>Date de fin</Label
+                            ><Input
+                                v-model="filters.date_to"
+                                class="mt-1"
+                                type="date"
+                            />
+                        </div>
+                        <div>
+                            <Label>Type de pointage</Label
+                            ><select
+                                v-model="filters.status"
+                                class="mt-1 h-9 w-full rounded-md border bg-background px-3 text-sm"
+                            >
+                                <option value="">Tous</option>
+                                <option
+                                    v-for="(label, key) in statusLabels"
+                                    :key="key"
+                                    :value="key"
+                                >
+                                    {{ label }}
+                                </option>
+                            </select>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2">
+                            <Button>Filtrer</Button
+                            ><Button
+                                type="button"
+                                variant="outline"
+                                @click="clearFilters"
+                                >Effacer</Button
+                            >
+                        </div>
+                    </form>
+                </div>
+            </aside>
+            <section class="min-w-0 flex-1 p-4 sm:p-6 lg:p-8">
+                <div v-if="selectedPerson" class="mx-auto max-w-7xl space-y-6">
+                    <header
+                        class="flex flex-wrap items-center justify-between gap-4"
+                    >
+                        <div>
+                            <p class="text-sm text-muted-foreground">
+                                Historique individuel
+                            </p>
+                            <h2 class="text-2xl font-bold">
+                                {{ selectedName }}
+                            </h2>
+                            <p
+                                v-if="personType === 'employee'"
+                                class="text-sm text-muted-foreground"
+                            >
+                                {{ selectedPerson.employee_type?.name }} ·
+                                {{ selectedPerson.employee_code }}
+                            </p>
+                        </div>
+                        <Button
+                            v-if="
+                                personType === 'employee' && !isSelectedTeacher
+                            "
+                            @click="openCorrection(null)"
+                            >Ajouter un pointage</Button
+                        >
+                    </header>
+                    <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+                        <article
+                            v-for="card in [
+                                {
+                                    label: 'Total',
+                                    value: stats.total,
+                                    icon: CalendarDays,
+                                    tone: 'text-slate-600 bg-slate-100',
+                                },
+                                {
+                                    label: 'Présences',
+                                    value: stats.present,
+                                    icon: UserRoundCheck,
+                                    tone: 'text-emerald-600 bg-emerald-100',
+                                },
+                                {
+                                    label: 'Absences',
+                                    value: stats.absent,
+                                    icon: UserRoundX,
+                                    tone: 'text-red-600 bg-red-100',
+                                },
+                                {
+                                    label: 'Retards',
+                                    value: stats.late,
+                                    icon: Clock3,
+                                    tone: 'text-amber-600 bg-amber-100',
+                                },
+                                {
+                                    label: 'Taux de présence',
+                                    value:
+                                        stats.rate === null
+                                            ? '—'
+                                            : `${stats.rate}%`,
+                                    icon: TrendingUp,
+                                    tone: 'text-primary bg-primary/10',
+                                },
+                            ]"
+                            :key="card.label"
+                            class="rounded-xl border bg-card p-4 shadow-sm"
+                        >
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-xs text-muted-foreground">
+                                        {{ card.label }}
+                                    </p>
+                                    <b class="mt-1 block text-2xl">{{
+                                        card.value
+                                    }}</b>
+                                </div>
+                                <span class="rounded-lg p-2" :class="card.tone"
+                                    ><component :is="card.icon" class="size-5"
+                                /></span>
+                            </div>
+                        </article>
+                    </div>
+                    <div
+                        v-if="personType === 'employee'"
+                        class="rounded-xl border bg-card px-4 py-3 text-sm"
+                    >
+                        <b>{{ stats.worked_hours }} heures</b> travaillées sur
+                        les pointages affichés.
+                    </div>
+                    <section
+                        v-for="month in calendarMonths"
+                        :key="month.key"
+                        class="overflow-hidden rounded-2xl border bg-card shadow-sm"
+                    >
+                        <div class="border-b px-5 py-4">
+                            <h3 class="text-lg font-semibold capitalize">
+                                {{ month.label }}
+                            </h3>
+                        </div>
+                        <div
+                            class="grid grid-cols-7 border-b bg-muted/30 text-center text-xs font-medium text-muted-foreground"
+                        >
+                            <div
+                                v-for="day in [
+                                    'Lun',
+                                    'Mar',
+                                    'Mer',
+                                    'Jeu',
+                                    'Ven',
+                                    'Sam',
+                                    'Dim',
+                                ]"
+                                :key="day"
+                                class="p-2"
+                            >
+                                {{ day }}
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-7">
+                            <div
+                                v-for="(cell, index) in month.cells"
+                                :key="index"
+                                class="min-h-28 border-r border-b p-2"
+                                :class="!cell ? 'bg-muted/20' : ''"
+                            >
+                                <template v-if="cell"
+                                    ><span
+                                        class="text-xs font-semibold text-muted-foreground"
+                                        >{{ cell.day }}</span
+                                    >
+                                    <div class="mt-1 space-y-1">
+                                        <button
+                                            v-for="record in cell.records"
+                                            :key="record.id"
+                                            class="w-full rounded-md border p-2 text-left text-xs transition hover:shadow-sm"
+                                            :class="statusTone[record.status]"
+                                            @click="openCorrection(record)"
+                                        >
+                                            <b class="block">{{
+                                                statusLabels[record.status] ??
+                                                record.status
+                                            }}</b
+                                            ><span
+                                                v-if="record.session"
+                                                class="mt-0.5 block truncate"
+                                                >{{ record.session }}</span
+                                            ><span
+                                                v-if="record.starts_at"
+                                                class="block opacity-75"
+                                                >{{ time(record.starts_at) }}–{{
+                                                    time(record.ends_at)
+                                                }}</span
+                                            >
+                                        </button>
+                                    </div></template
+                                >
+                            </div>
+                        </div>
+                    </section>
+                    <div
+                        v-if="!records.data.length"
+                        class="rounded-2xl border border-dashed bg-card p-12 text-center"
+                    >
+                        <CalendarDays
+                            class="mx-auto size-10 text-muted-foreground/50"
+                        />
+                        <h3 class="mt-3 font-semibold">
+                            Aucun pointage trouvé
+                        </h3>
+                        <p class="text-sm text-muted-foreground">
+                            Modifiez les dates ou le type de pointage dans la
+                            barre latérale.
+                        </p>
+                    </div>
+                    <nav
+                        v-if="records.links?.length > 3"
+                        class="flex max-w-full gap-1 overflow-x-auto"
+                    >
+                        <Link
+                            v-for="link in records.links"
+                            :key="link.label"
+                            :href="link.url || '#'"
+                            preserve-scroll
+                            class="rounded-md border px-3 py-2 text-sm"
+                            :class="{
+                                'bg-primary text-primary-foreground':
+                                    link.active,
+                                'pointer-events-none opacity-40': !link.url,
+                            }"
+                            v-html="link.label"
+                        />
+                    </nav>
+                </div>
+                <div
+                    v-else
+                    class="flex min-h-[60vh] items-center justify-center"
+                >
+                    <div class="max-w-md text-center">
+                        <CalendarDays class="mx-auto size-12 text-primary/50" />
+                        <h2 class="mt-4 text-xl font-semibold">
+                            Sélectionnez une personne
+                        </h2>
+                        <p class="mt-1 text-muted-foreground">
+                            Choisissez Étudiant ou Employé, puis recherchez la
+                            personne dans la barre latérale.
+                        </p>
+                    </div>
+                </div>
+            </section>
+        </main>
+        <Dialog v-model:open="correctionOpen"
+            ><DialogScrollContent
+                ><DialogHeader
+                    ><DialogTitle>{{
+                        selectedRecord
+                            ? 'Consulter ou corriger le pointage'
+                            : 'Ajouter un pointage'
+                    }}</DialogTitle
+                    ><DialogDescription v-if="selectedRecord"
+                        >{{
+                            selectedRecord.formation ||
+                            selectedPerson?.employee_type?.name
+                        }}<span v-if="selectedRecord.planning">
+                            · {{ selectedRecord.planning }}</span
+                        ><span v-if="selectedRecord.group">
+                            · {{ selectedRecord.group }}</span
+                        ><span v-if="selectedRecord.room">
+                            · {{ selectedRecord.room }}</span
+                        ></DialogDescription
+                    ></DialogHeader
+                >
+                <form class="space-y-4" @submit.prevent="saveCorrection">
+                    <div
+                        v-if="
+                            !selectedRecord ||
+                            selectedRecord.kind === 'employee'
+                        "
+                    >
+                        <Label>Date du pointage</Label
+                        ><Input
+                            v-model="correction.attendance_date"
+                            class="mt-1"
+                            type="date"
+                            required
+                        />
+                    </div>
+                    <div>
+                        <Label>Statut</Label
+                        ><select
+                            v-model="correction.status"
+                            class="mt-1 h-9 w-full rounded-md border bg-background px-3"
+                        >
+                            <option
+                                v-for="(label, key) in statusLabels"
+                                v-show="
+                                    selectedRecord?.kind === 'student'
+                                        ? [
+                                              'present',
+                                              'absent',
+                                              'late',
+                                              'excused',
+                                              'left_early',
+                                          ].includes(String(key))
+                                        : selectedRecord?.kind === 'teacher'
+                                          ? [
+                                                'present',
+                                                'absent',
+                                                'late',
+                                                'excused',
+                                                'replaced',
+                                                'cancelled',
+                                            ].includes(String(key))
+                                          : [
+                                                'present',
+                                                'absent',
+                                                'late',
+                                                'excused',
+                                                'leave',
+                                            ].includes(String(key))
+                                "
+                                :key="key"
+                                :value="key"
+                            >
+                                {{ label }}
+                            </option>
+                        </select>
+                    </div>
+                    <div
+                        v-if="
+                            selectedRecord?.kind === 'teacher' &&
+                            correction.status === 'replaced'
+                        "
+                    >
+                        <Label>Remplaçant</Label
+                        ><select
+                            v-model="correction.actual_teacher_id"
+                            class="mt-1 h-9 w-full rounded-md border bg-background px-3"
+                        >
+                            <option
+                                v-for="teacher in teachers"
+                                :key="teacher.id"
+                                :value="String(teacher.id)"
+                            >
+                                {{ teacher.name }}
+                            </option>
+                        </select>
+                    </div>
+                    <div v-if="selectedRecord?.kind !== 'student'">
+                        <Label>Minutes travaillées</Label
+                        ><Input
+                            v-model="correction.worked_minutes"
+                            class="mt-1"
+                            type="number"
+                            min="0"
+                        />
+                    </div>
+                    <div
+                        v-if="
+                            !selectedRecord ||
+                            selectedRecord.kind === 'employee'
+                        "
+                        class="grid grid-cols-2 gap-3"
+                    >
+                        <div>
+                            <Label>Arrivée</Label
+                            ><Input
+                                v-model="correction.check_in"
+                                class="mt-1"
+                                type="time"
+                            />
+                        </div>
+                        <div>
+                            <Label>Départ</Label
+                            ><Input
+                                v-model="correction.check_out"
+                                class="mt-1"
+                                type="time"
+                            />
+                        </div>
+                    </div>
+                    <div>
+                        <Label>Justification du statut</Label
+                        ><Input
+                            v-model="correction.justification"
+                            class="mt-1"
+                        />
+                    </div>
+                    <div v-if="selectedRecord">
+                        <Label>Justificatif écrit de correction</Label
+                        ><textarea
+                            v-model="correction.correction_reason"
+                            required
+                            rows="3"
+                            class="mt-1 w-full rounded-md border bg-background p-3 text-sm"
+                            placeholder="Décrivez la preuve et la raison de cette modification."
+                        />
+                    </div>
+                    <div
+                        v-if="selectedRecord"
+                        class="rounded-lg bg-muted/40 p-3 text-xs text-muted-foreground"
+                    >
+                        <p v-if="selectedRecord.formation">
+                            <b>Formation :</b> {{ selectedRecord.formation }}
+                        </p>
+                        <p v-if="selectedRecord.planning">
+                            <b>Planification :</b> {{ selectedRecord.planning }}
+                        </p>
+                        <p v-if="selectedRecord.room">
+                            <MapPin class="mr-1 inline size-3" />{{
+                                selectedRecord.room
+                            }}
+                        </p>
+                        <p v-if="selectedRecord.teacher">
+                            <b>Formateur :</b> {{ selectedRecord.teacher }}
+                        </p>
+                    </div>
+                    <InputError
+                        :message="Object.values(correction.errors)[0]"
+                    /><DialogFooter
+                        ><Button :disabled="correction.processing"
+                            ><CheckCircle2 class="mr-2 size-4" />{{
+                                selectedRecord
+                                    ? 'Enregistrer la correction'
+                                    : 'Ajouter le pointage'
+                            }}</Button
+                        ></DialogFooter
+                    >
+                </form></DialogScrollContent
+            ></Dialog
+        >
+    </AdminLayout>
+</template>

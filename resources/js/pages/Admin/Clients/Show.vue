@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { appPrompt } from '@/composables/useAppDialog';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -11,6 +10,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import { appPrompt } from '@/composables/useAppDialog';
 import AdminLayout from '@/layouts/AdminLayout.vue';
 import { activate, index, suspend } from '@/routes/admin/clients';
 import { Head, Link, router } from '@inertiajs/vue3';
@@ -149,13 +149,27 @@ function suspendClient() {
 }
 
 function approveDriver(driverId: number) {
-    router.patch(`/admin/clients/${props.client.id}/drivers/${driverId}/approve`, {}, { preserveScroll: true });
+    router.patch(
+        `/admin/clients/${props.client.id}/drivers/${driverId}/approve`,
+        {},
+        { preserveScroll: true },
+    );
 }
 
 async function rejectDriver(driverId: number) {
-    const reason = await appPrompt('Vous pouvez indiquer le motif du refus.', { title: 'Refuser le conducteur', tone: 'warning', inputLabel: 'Motif (facultatif)', confirmText: 'Refuser' }) ?? undefined;
+    const reason =
+        (await appPrompt('Vous pouvez indiquer le motif du refus.', {
+            title: 'Refuser le conducteur',
+            tone: 'warning',
+            inputLabel: 'Motif (facultatif)',
+            confirmText: 'Refuser',
+        })) ?? undefined;
     if (reason !== undefined) {
-        router.patch(`/admin/clients/${props.client.id}/drivers/${driverId}/reject`, { reason }, { preserveScroll: true });
+        router.patch(
+            `/admin/clients/${props.client.id}/drivers/${driverId}/reject`,
+            { reason },
+            { preserveScroll: true },
+        );
     }
 }
 
@@ -177,20 +191,44 @@ function activateClient() {
 }
 
 async function rejectClient() {
-    const reason = await appPrompt('Refuser cette demande de compte ? Indiquez éventuellement le motif.', { title: 'Refuser le compte', tone: 'warning', inputLabel: 'Motif (facultatif)', confirmText: 'Refuser' });
+    const reason = await appPrompt(
+        'Refuser cette demande de compte ? Indiquez éventuellement le motif.',
+        {
+            title: 'Refuser le compte',
+            tone: 'warning',
+            inputLabel: 'Motif (facultatif)',
+            confirmText: 'Refuser',
+        },
+    );
     if (reason !== null) {
-        router.patch(`/admin/clients/${props.client.id}/reject`, { reason }, { preserveScroll: true });
+        router.patch(
+            `/admin/clients/${props.client.id}/reject`,
+            { reason },
+            { preserveScroll: true },
+        );
     }
 }
 
 function fmtDate(value?: string | null) {
-    return value ? new Date(`${value.slice(0, 10)}T00:00:00`).toLocaleDateString('fr-FR') : '—';
+    return value
+        ? new Date(`${value.slice(0, 10)}T00:00:00`).toLocaleDateString('fr-FR')
+        : '—';
 }
 
 const statusStyle = computed(() => {
     const status = props.client.approval_status;
-    const colors: Record<string, string> = { approved: '#10B981', pending: '#F59E0B', rejected: '#DC2626', suspended: '#6B7280' };
-    const labels: Record<string, string> = { approved: 'Approuvé', pending: 'En attente', rejected: 'Refusé', suspended: 'Suspendu' };
+    const colors: Record<string, string> = {
+        approved: '#10B981',
+        pending: '#F59E0B',
+        rejected: '#DC2626',
+        suspended: '#6B7280',
+    };
+    const labels: Record<string, string> = {
+        approved: 'Approuvé',
+        pending: 'En attente',
+        rejected: 'Refusé',
+        suspended: 'Suspendu',
+    };
     const hex = colors[status] || '#6B7280';
     const toRgb = (h: string) => [
         parseInt(h.slice(1, 3), 16),
@@ -220,7 +258,9 @@ const statusStyle = computed(() => {
                         <div class="text-sm text-muted-foreground">
                             {{ client.email }}
                         </div>
-                        <div class="text-sm text-muted-foreground">{{ client.phone || '—' }}</div>
+                        <div class="text-sm text-muted-foreground">
+                            {{ client.phone || '—' }}
+                        </div>
                     </div>
                     <span
                         class="inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-xs font-medium"
@@ -237,7 +277,9 @@ const statusStyle = computed(() => {
                     </span>
                 </div>
                 <div class="flex items-center gap-2">
-                    <Link :href="'/admin/clients/' + client.id + '/edit'"><Button variant="outline">Modifier</Button></Link>
+                    <Link :href="'/admin/clients/' + client.id + '/edit'"
+                        ><Button variant="outline">Modifier</Button></Link
+                    >
                     <Button
                         v-if="client.approval_status === 'approved'"
                         variant="destructive"
@@ -247,48 +289,147 @@ const statusStyle = computed(() => {
                     <Button v-else @click="showActivateDialog = true"
                         >Approuver le client</Button
                     >
-                    <Button v-if="client.approval_status === 'pending'" variant="destructive" @click="rejectClient">Refuser</Button>
+                    <Button
+                        v-if="client.approval_status === 'pending'"
+                        variant="destructive"
+                        @click="rejectClient"
+                        >Refuser</Button
+                    >
                     <Link :href="index()">
                         <Button variant="outline">Retour</Button>
                     </Link>
                 </div>
             </div>
 
-            <section class="rounded-md border" :class="client.approval_status === 'pending' ? 'border-amber-300 ring-2 ring-amber-100' : ''">
-                <div class="border-b px-4 py-3 font-medium">Dossier du permis de conduire</div>
+            <section
+                class="rounded-md border"
+                :class="
+                    client.approval_status === 'pending'
+                        ? 'border-amber-300 ring-2 ring-amber-100'
+                        : ''
+                "
+            >
+                <div class="border-b px-4 py-3 font-medium">
+                    Dossier du permis de conduire
+                </div>
                 <div class="grid gap-4 p-4 sm:grid-cols-2 lg:grid-cols-4">
-                    <div><p class="text-sm text-muted-foreground">Date de naissance</p><p class="font-medium">{{ fmtDate(client.birth_date) }}</p></div>
-                    <div><p class="text-sm text-muted-foreground">Numéro du permis</p><p class="font-medium">{{ client.driving_license_number || '—' }}</p></div>
-                    <div><p class="text-sm text-muted-foreground">Délivré le</p><p class="font-medium">{{ fmtDate(client.driving_license_delivered_at) }}</p></div>
-                    <div><p class="text-sm text-muted-foreground">Autorité de délivrance</p><p class="font-medium">{{ client.driving_license_authority || '—' }}</p></div>
-                    <div class="sm:col-span-2 lg:col-span-4">
-                        <a v-if="client.driving_license_url" :href="client.driving_license_url" target="_blank" rel="noopener" class="inline-flex rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground">Ouvrir la copie du permis</a>
-                        <p v-else class="text-sm text-destructive">Aucune copie du permis disponible.</p>
+                    <div>
+                        <p class="text-sm text-muted-foreground">
+                            Date de naissance
+                        </p>
+                        <p class="font-medium">
+                            {{ fmtDate(client.birth_date) }}
+                        </p>
                     </div>
-                    <div v-if="client.rejection_reason" class="rounded bg-red-50 p-3 text-sm text-red-700 sm:col-span-2 lg:col-span-4"><strong>Motif du refus :</strong> {{ client.rejection_reason }}</div>
+                    <div>
+                        <p class="text-sm text-muted-foreground">
+                            Numéro du permis
+                        </p>
+                        <p class="font-medium">
+                            {{ client.driving_license_number || '—' }}
+                        </p>
+                    </div>
+                    <div>
+                        <p class="text-sm text-muted-foreground">Délivré le</p>
+                        <p class="font-medium">
+                            {{ fmtDate(client.driving_license_delivered_at) }}
+                        </p>
+                    </div>
+                    <div>
+                        <p class="text-sm text-muted-foreground">
+                            Autorité de délivrance
+                        </p>
+                        <p class="font-medium">
+                            {{ client.driving_license_authority || '—' }}
+                        </p>
+                    </div>
+                    <div class="sm:col-span-2 lg:col-span-4">
+                        <a
+                            v-if="client.driving_license_url"
+                            :href="client.driving_license_url"
+                            target="_blank"
+                            rel="noopener"
+                            class="inline-flex rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
+                            >Ouvrir la copie du permis</a
+                        >
+                        <p v-else class="text-sm text-destructive">
+                            Aucune copie du permis disponible.
+                        </p>
+                    </div>
+                    <div
+                        v-if="client.rejection_reason"
+                        class="rounded bg-red-50 p-3 text-sm text-red-700 sm:col-span-2 lg:col-span-4"
+                    >
+                        <strong>Motif du refus :</strong>
+                        {{ client.rejection_reason }}
+                    </div>
                 </div>
             </section>
 
             <section class="rounded-md border">
-                <div class="border-b px-4 py-3 font-medium">Conducteurs supplémentaires ({{ drivers.length }}/3)</div>
+                <div class="border-b px-4 py-3 font-medium">
+                    Conducteurs supplémentaires ({{ drivers.length }}/3)
+                </div>
                 <div v-if="drivers.length" class="divide-y">
-                    <div v-for="driver in drivers" :key="driver.id" class="flex flex-wrap items-center justify-between gap-3 p-4">
+                    <div
+                        v-for="driver in drivers"
+                        :key="driver.id"
+                        class="flex flex-wrap items-center justify-between gap-3 p-4"
+                    >
                         <div>
                             <div class="flex items-center gap-2">
                                 <strong>{{ driver.full_name }}</strong>
-                                <span class="rounded-full px-2 py-0.5 text-xs" :class="driver.approval_status === 'approved' ? 'bg-green-100 text-green-800' : driver.approval_status === 'rejected' ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-800'">{{ driver.approval_status }}</span>
+                                <span
+                                    class="rounded-full px-2 py-0.5 text-xs"
+                                    :class="
+                                        driver.approval_status === 'approved'
+                                            ? 'bg-green-100 text-green-800'
+                                            : driver.approval_status ===
+                                                'rejected'
+                                              ? 'bg-red-100 text-red-800'
+                                              : 'bg-amber-100 text-amber-800'
+                                    "
+                                    >{{ driver.approval_status }}</span
+                                >
                             </div>
-                            <p class="text-sm text-muted-foreground">{{ driver.phone }}<span v-if="driver.email"> · {{ driver.email }}</span></p>
-                            <a :href="driver.driving_license_url" target="_blank" class="text-sm text-primary underline">Voir le permis</a>
-                            <p v-if="driver.rejection_reason" class="mt-1 text-sm text-red-600">{{ driver.rejection_reason }}</p>
+                            <p class="text-sm text-muted-foreground">
+                                {{ driver.phone
+                                }}<span v-if="driver.email">
+                                    · {{ driver.email }}</span
+                                >
+                            </p>
+                            <a
+                                :href="driver.driving_license_url"
+                                target="_blank"
+                                class="text-sm text-primary underline"
+                                >Voir le permis</a
+                            >
+                            <p
+                                v-if="driver.rejection_reason"
+                                class="mt-1 text-sm text-red-600"
+                            >
+                                {{ driver.rejection_reason }}
+                            </p>
                         </div>
-                        <div v-if="driver.approval_status !== 'approved'" class="flex gap-2">
-                            <Button size="sm" @click="approveDriver(driver.id)">Approuver</Button>
-                            <Button size="sm" variant="destructive" @click="rejectDriver(driver.id)">Refuser</Button>
+                        <div
+                            v-if="driver.approval_status !== 'approved'"
+                            class="flex gap-2"
+                        >
+                            <Button size="sm" @click="approveDriver(driver.id)"
+                                >Approuver</Button
+                            >
+                            <Button
+                                size="sm"
+                                variant="destructive"
+                                @click="rejectDriver(driver.id)"
+                                >Refuser</Button
+                            >
                         </div>
                     </div>
                 </div>
-                <p v-else class="p-4 text-sm text-muted-foreground">Aucun conducteur supplémentaire.</p>
+                <p v-else class="p-4 text-sm text-muted-foreground">
+                    Aucun conducteur supplémentaire.
+                </p>
             </section>
 
             <!-- Stats -->

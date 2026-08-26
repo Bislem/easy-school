@@ -34,7 +34,7 @@ defineProps<Props>();
         <DropdownMenuItem :as-child="true">
             <Link class="block w-full" :href="edit()" prefetch as="button">
                 <UserIcon class="mr-2 h-4 w-4" />
-                    Paramètres du compte
+                Paramètres du compte
             </Link>
         </DropdownMenuItem>
     </DropdownMenuGroup>

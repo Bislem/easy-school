@@ -87,7 +87,9 @@ const navigateToClient = (id: number) => {
         <main class="flex-1 space-y-6 p-8">
             <div class="flex items-center justify-between gap-4">
                 <h1 class="text-2xl font-semibold">Clients</h1>
-                <Link href="/admin/clients/create"><Button>Créer un client</Button></Link>
+                <Link href="/admin/clients/create"
+                    ><Button>Créer un client</Button></Link
+                >
             </div>
 
             <div class="flex flex-col gap-4">
@@ -202,7 +204,9 @@ const navigateToClient = (id: number) => {
                                 <div class="text-xs text-muted-foreground">
                                     {{ c.email }}
                                 </div>
-                                <div class="text-xs text-muted-foreground">{{ c.phone || '—' }}</div>
+                                <div class="text-xs text-muted-foreground">
+                                    {{ c.phone || '—' }}
+                                </div>
                             </td>
                             <td class="px-4 py-3">
                                 {{ c.reservations_count }}
@@ -215,9 +219,8 @@ const navigateToClient = (id: number) => {
                                         backgroundColor: getStatusColor(
                                             c.approval_status,
                                         ).bg,
-                                        color: getStatusColor(
-                                            c.approval_status,
-                                        ).text,
+                                        color: getStatusColor(c.approval_status)
+                                            .text,
                                     }"
                                 >
                                     <span
@@ -228,7 +231,10 @@ const navigateToClient = (id: number) => {
                                             ).dot,
                                         }"
                                     />
-                                    {{ statuses[c.approval_status]?.label || c.approval_status }}
+                                    {{
+                                        statuses[c.approval_status]?.label ||
+                                        c.approval_status
+                                    }}
                                 </span>
                             </td>
                             <td class="px-4 py-3 text-right">

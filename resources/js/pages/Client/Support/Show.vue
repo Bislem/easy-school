@@ -101,7 +101,6 @@ watch(
 </script>
 
 <template>
-
     <Head :title="`Ticket #${ticket.id}`" />
     <ClientLayout>
         <div class="p-4">
@@ -113,13 +112,17 @@ watch(
                             {{ ticket.subject }}
                         </h1>
                         <div class="mt-2 flex items-center">
-                            <span class="rounded-full px-3 py-1 text-xs font-medium" :class="statusColors[
-                                ticket.status as TicketStatusType
-                                ] || 'bg-gray-100 text-gray-800'
-                                ">
+                            <span
+                                class="rounded-full px-3 py-1 text-xs font-medium"
+                                :class="
+                                    statusColors[
+                                        ticket.status as TicketStatusType
+                                    ] || 'bg-gray-100 text-gray-800'
+                                "
+                            >
                                 {{
                                     statusLabels[
-                                    ticket.status as TicketStatusType
+                                        ticket.status as TicketStatusType
                                     ] || ticket.status
                                 }}
                             </span>
@@ -138,28 +141,42 @@ watch(
             </div>
 
             <!-- Chat Interface -->
-            <div class="h-2/3 space-y-4 overflow-scroll rounded-md border-2 p-2">
+            <div
+                class="h-2/3 space-y-4 overflow-scroll rounded-md border-2 p-2"
+            >
                 <!-- Messages -->
-                <div class="space-y-4 min-h-[200px]">
-                    <div v-if="!ticket.messages || ticket.messages.length === 0"
-                        class="rounded-md border border-dashed p-6 text-center text-sm text-gray-500">
-                        Aucun message pour le moment. Commencez la conversation ci-dessous. </div>
-                    <div v-for="message in ticket.messages" :key="message.id" :class="[
-                        'flex',
-                        message.is_admin ? 'justify-start' : 'justify-end',
-                    ]">
-                        <div :class="[
-                            'max-w-3xl rounded-lg px-4 py-2',
-                            message.is_admin
-                                ? 'rounded-tl-none bg-gray-200 text-gray-800'
-                                : 'rounded-tr-none bg-blue-500 text-white',
-                        ]">
+                <div class="min-h-[200px] space-y-4">
+                    <div
+                        v-if="!ticket.messages || ticket.messages.length === 0"
+                        class="rounded-md border border-dashed p-6 text-center text-sm text-gray-500"
+                    >
+                        Aucun message pour le moment. Commencez la conversation
+                        ci-dessous.
+                    </div>
+                    <div
+                        v-for="message in ticket.messages"
+                        :key="message.id"
+                        :class="[
+                            'flex',
+                            message.is_admin ? 'justify-start' : 'justify-end',
+                        ]"
+                    >
+                        <div
+                            :class="[
+                                'max-w-3xl rounded-lg px-4 py-2',
+                                message.is_admin
+                                    ? 'rounded-tl-none bg-gray-200 text-gray-800'
+                                    : 'rounded-tr-none bg-blue-500 text-white',
+                            ]"
+                        >
                             <p class="whitespace-pre-line">
                                 {{ message.message }}
                             </p>
                             <p class="mt-1 text-right text-xs opacity-75">
                                 {{ formatDate(message.created_at) }}
-                                <span v-if="message.is_admin" class="ml-1">• Équipe d'assistance</span>
+                                <span v-if="message.is_admin" class="ml-1"
+                                    >• Équipe d'assistance</span
+                                >
                                 <span v-else class="ml-1">• You</span>
                             </p>
                         </div>
@@ -168,21 +185,38 @@ watch(
                 </div>
             </div>
             <!-- Reply Form -->
-            <form v-if="ticket.status !== 'closed'" @submit.prevent="submitReply" class="mt-6">
+            <form
+                v-if="ticket.status !== 'closed'"
+                @submit.prevent="submitReply"
+                class="mt-6"
+            >
                 <div class="flex space-x-2">
                     <div class="flex-1">
-                        <label for="message" class="sr-only">Répondre au ticket</label>
-                        <textarea id="message" v-model="form.message" rows="3"
+                        <label for="message" class="sr-only"
+                            >Répondre au ticket</label
+                        >
+                        <textarea
+                            id="message"
+                            v-model="form.message"
+                            rows="3"
                             class="w-full rounded-lg border-1 border-gray-300 p-2"
-                            placeholder="Saisissez votre message ici… (Ctrl+Entrée pour envoyer)" required
-                            aria-label="Saisissez votre message ici" @keydown.ctrl.enter.prevent="submitReply"></textarea>
-                        <p v-if="form.errors.message" class="mt-1 text-sm text-red-600">
+                            placeholder="Saisissez votre message ici… (Ctrl+Entrée pour envoyer)"
+                            required
+                            aria-label="Saisissez votre message ici"
+                            @keydown.ctrl.enter.prevent="submitReply"
+                        ></textarea>
+                        <p
+                            v-if="form.errors.message"
+                            class="mt-1 text-sm text-red-600"
+                        >
                             {{ form.errors.message }}
                         </p>
                     </div>
-                    <button type="submit"
+                    <button
+                        type="submit"
                         class="mb-2 w-20 cursor-pointer self-end rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
-                        :disabled="!canSend">
+                        :disabled="!canSend"
+                    >
                         <span v-if="form.processing">Envoi...</span>
                         <span v-else>Envoyer</span>
                     </button>

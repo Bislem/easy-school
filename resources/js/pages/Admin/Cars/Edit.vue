@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { appConfirm } from '@/composables/useAppDialog';
 import InputError from '@/components/InputError.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import FileUpload from '@/components/ViltFilePond/FileUpload.vue';
+import { appConfirm } from '@/composables/useAppDialog';
 import AdminLayout from '@/layouts/AdminLayout.vue';
 import { index, store, update } from '@/routes/admin/cars';
 import { show as showReservation } from '@/routes/admin/reservations';
@@ -16,7 +16,7 @@ const props = defineProps<{
     imageFiles: Array<{ id: number; url: string }>;
     enums: {
         colors: Array<{ name: string; value: string; hex: string }>;
-        fuelTypes: {value: string; label: string}[];
+        fuelTypes: { value: string; label: string }[];
         statuses: Array<{ value: string; label: string; color: string }>;
     };
     reservations?: {
@@ -28,21 +28,32 @@ const props = defineProps<{
             total_days: number;
             total_amount: number | string;
             status: string;
-            user?: { id: number; name: string; email: string; phone?: string | null } | null;
+            user?: {
+                id: number;
+                name: string;
+                email: string;
+                phone?: string | null;
+            } | null;
         }>;
         links: Array<{ url: string | null; label: string; active: boolean }>;
         total: number;
     };
-    reservationStatuses?: Array<{ value: string; label: string; color: string }>;
+    reservationStatuses?: Array<{
+        value: string;
+        label: string;
+        color: string;
+    }>;
 }>();
 
 const isEdit = computed(() => !!props.car);
 
 function reservationStatus(status: string) {
-    return props.reservationStatuses?.find((item) => item.value === status) ?? {
-        label: status,
-        color: '#6B7280',
-    };
+    return (
+        props.reservationStatuses?.find((item) => item.value === status) ?? {
+            label: status,
+            color: '#6B7280',
+        }
+    );
 }
 
 function paginationLabel(label: string) {
@@ -114,16 +125,33 @@ function addMaintenance() {
     maintenanceForm.post('/admin/expenses', {
         preserveScroll: true,
         onSuccess: () => {
-            maintenanceForm.reset('title', 'amount', 'vendor', 'reference', 'next_service_date', 'notes');
+            maintenanceForm.reset(
+                'title',
+                'amount',
+                'vendor',
+                'reference',
+                'next_service_date',
+                'notes',
+            );
             maintenanceForm.category = 'Entretien';
-            maintenanceForm.expense_date = new Date().toISOString().slice(0, 10);
+            maintenanceForm.expense_date = new Date()
+                .toISOString()
+                .slice(0, 10);
         },
     });
 }
 
 async function deleteMaintenance(expense: any) {
-    if (await appConfirm(`Supprimer l'entretien « ${expense.title} » ?`, { title: 'Supprimer l’entretien', tone: 'danger', confirmText: 'Supprimer' })) {
-        router.delete(`/admin/expenses/${expense.id}`, { preserveScroll: true });
+    if (
+        await appConfirm(`Supprimer l'entretien « ${expense.title} » ?`, {
+            title: 'Supprimer l’entretien',
+            tone: 'danger',
+            confirmText: 'Supprimer',
+        })
+    ) {
+        router.delete(`/admin/expenses/${expense.id}`, {
+            preserveScroll: true,
+        });
     }
 }
 
@@ -181,31 +209,90 @@ function submit() {
 
             <form class="space-y-6" @submit.prevent="submit">
                 <div v-if="isEdit" class="rounded-md border">
-                    <div class="border-b px-4 py-3 font-medium">Historique du réservoir</div>
+                    <div class="border-b px-4 py-3 font-medium">
+                        Historique du réservoir
+                    </div>
                     <div class="overflow-x-auto p-4">
-                        <table v-if="car?.fuel_tank_records?.length" class="min-w-full divide-y divide-gray-200 text-sm">
+                        <table
+                            v-if="car?.fuel_tank_records?.length"
+                            class="min-w-full divide-y divide-gray-200 text-sm"
+                        >
                             <thead class="bg-gray-50">
                                 <tr>
-                                    <th class="px-3 py-2 text-left font-medium text-gray-500">Événement</th>
-                                    <th class="px-3 py-2 text-left font-medium text-gray-500">Niveau</th>
-                                    <th class="px-3 py-2 text-left font-medium text-gray-500">Réservation</th>
-                                    <th class="px-3 py-2 text-left font-medium text-gray-500">Enregistré le</th>
-                                    <th class="px-3 py-2 text-left font-medium text-gray-500">Enregistré par</th>
-                                    <th class="px-3 py-2 text-left font-medium text-gray-500">Remarques</th>
+                                    <th
+                                        class="px-3 py-2 text-left font-medium text-gray-500"
+                                    >
+                                        Événement
+                                    </th>
+                                    <th
+                                        class="px-3 py-2 text-left font-medium text-gray-500"
+                                    >
+                                        Niveau
+                                    </th>
+                                    <th
+                                        class="px-3 py-2 text-left font-medium text-gray-500"
+                                    >
+                                        Réservation
+                                    </th>
+                                    <th
+                                        class="px-3 py-2 text-left font-medium text-gray-500"
+                                    >
+                                        Enregistré le
+                                    </th>
+                                    <th
+                                        class="px-3 py-2 text-left font-medium text-gray-500"
+                                    >
+                                        Enregistré par
+                                    </th>
+                                    <th
+                                        class="px-3 py-2 text-left font-medium text-gray-500"
+                                    >
+                                        Remarques
+                                    </th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-gray-200">
-                                <tr v-for="record in car.fuel_tank_records" :key="record.id">
-                                    <td class="px-3 py-2 font-medium">{{ record.record_type === 'rental_start' ? 'Début de location' : 'Fin de location' }}</td>
-                                    <td class="px-3 py-2">{{ record.fuel_level }}%</td>
-                                    <td class="px-3 py-2">{{ record.reservation?.reservation_number || '—' }}</td>
-                                    <td class="px-3 py-2">{{ new Date(record.recorded_at).toLocaleString() }}</td>
-                                    <td class="px-3 py-2">{{ record.recorded_by?.name || '—' }}</td>
-                                    <td class="px-3 py-2">{{ record.notes || '—' }}</td>
+                                <tr
+                                    v-for="record in car.fuel_tank_records"
+                                    :key="record.id"
+                                >
+                                    <td class="px-3 py-2 font-medium">
+                                        {{
+                                            record.record_type ===
+                                            'rental_start'
+                                                ? 'Début de location'
+                                                : 'Fin de location'
+                                        }}
+                                    </td>
+                                    <td class="px-3 py-2">
+                                        {{ record.fuel_level }}%
+                                    </td>
+                                    <td class="px-3 py-2">
+                                        {{
+                                            record.reservation
+                                                ?.reservation_number || '—'
+                                        }}
+                                    </td>
+                                    <td class="px-3 py-2">
+                                        {{
+                                            new Date(
+                                                record.recorded_at,
+                                            ).toLocaleString()
+                                        }}
+                                    </td>
+                                    <td class="px-3 py-2">
+                                        {{ record.recorded_by?.name || '—' }}
+                                    </td>
+                                    <td class="px-3 py-2">
+                                        {{ record.notes || '—' }}
+                                    </td>
                                 </tr>
                             </tbody>
                         </table>
-                        <p v-else class="text-sm text-muted-foreground">Aucun enregistrement de réservoir n'a été enregistré pour ce véhicule.</p>
+                        <p v-else class="text-sm text-muted-foreground">
+                            Aucun enregistrement de réservoir n'a été enregistré
+                            pour ce véhicule.
+                        </p>
                     </div>
                 </div>
                 <div class="space-y-6">
@@ -270,7 +357,9 @@ function submit() {
                             </div>
 
                             <div>
-                                <Label for="security_deposit">Caution / dépôt de garantie</Label>
+                                <Label for="security_deposit"
+                                    >Caution / dépôt de garantie</Label
+                                >
                                 <Input
                                     id="security_deposit"
                                     v-model="form.security_deposit"
@@ -279,15 +368,20 @@ function submit() {
                                     min="0"
                                     placeholder="0.00"
                                 />
-                                <p class="mt-1 text-xs text-muted-foreground">Saisissez 0 si aucune caution n'est requise.</p>
-                                <InputError :message="form.errors.security_deposit" class="mt-1" />
+                                <p class="mt-1 text-xs text-muted-foreground">
+                                    Saisissez 0 si aucune caution n'est requise.
+                                </p>
+                                <InputError
+                                    :message="form.errors.security_deposit"
+                                    class="mt-1"
+                                />
                             </div>
 
                             <!-- Color -->
                             <div>
                                 <Label class="mb-2 block">Couleur</Label>
                                 <div
-                                    class="flex flex-row items-center flex-wrap gap-2"
+                                    class="flex flex-row flex-wrap items-center gap-2"
                                 >
                                     <div
                                         v-for="color in carColors"
@@ -303,10 +397,12 @@ function submit() {
                                         />
                                         <label
                                             :for="'color-' + color.value"
-                                            class="flex w-full cursor-pointer min-w-fit items-center justify-between rounded-md border p-2 text-sm font-medium peer-checked:border-blue-500 peer-checked:ring-1 peer-checked:ring-blue-500 hover:bg-gray-50 dark:hover:bg-gray-800"
+                                            class="flex w-full min-w-fit cursor-pointer items-center justify-between rounded-md border p-2 text-sm font-medium peer-checked:border-blue-500 peer-checked:ring-1 peer-checked:ring-blue-500 hover:bg-gray-50 dark:hover:bg-gray-800"
                                             :title="color.name"
                                         >
-                                            <span class="mr-1">{{ color.name }}</span>
+                                            <span class="mr-1">{{
+                                                color.name
+                                            }}</span>
                                             <span
                                                 class="inline-block !h-4 !w-4 rounded-full border border-gray-300"
                                                 :style="{
@@ -373,7 +469,9 @@ function submit() {
 
                         <!-- License Plate -->
                         <div>
-                            <Label for="license_plate">Plaque d'immatriculation</Label>
+                            <Label for="license_plate"
+                                >Plaque d'immatriculation</Label
+                            >
                             <Input
                                 id="license_plate"
                                 v-model="form.license_plate"
@@ -496,81 +594,299 @@ function submit() {
 
             <section v-if="isEdit" class="space-y-4 rounded-lg border p-5">
                 <div>
-                    <h2 class="text-lg font-semibold">Entretien et coûts de maintenance</h2>
-                    <p class="text-sm text-muted-foreground">Chaque coût ajouté ici est automatiquement comptabilisé dans le module Dépenses et dans les rapports.</p>
+                    <h2 class="text-lg font-semibold">
+                        Entretien et coûts de maintenance
+                    </h2>
+                    <p class="text-sm text-muted-foreground">
+                        Chaque coût ajouté ici est automatiquement comptabilisé
+                        dans le module Dépenses et dans les rapports.
+                    </p>
                 </div>
 
-                <form class="grid gap-4 md:grid-cols-2 lg:grid-cols-4" @submit.prevent="addMaintenance">
-                    <label class="grid gap-1 text-sm font-medium">Type d'entretien<Input v-model="maintenanceForm.category" list="maintenance-categories" required /><datalist id="maintenance-categories"><option value="Vidange" /><option value="Réparation" /><option value="Pneus" /><option value="Freins" /><option value="Révision" /><option value="Pièces" /><option value="Lavage" /></datalist></label>
-                    <label class="grid gap-1 text-sm font-medium">Détail / libellé<Input v-model="maintenanceForm.title" required placeholder="Ex. Vidange moteur" /><InputError :message="maintenanceForm.errors.title" /></label>
-                    <label class="grid gap-1 text-sm font-medium">Montant<Input v-model="maintenanceForm.amount" type="number" min="0.01" step="0.01" required /><InputError :message="maintenanceForm.errors.amount" /></label>
-                    <label class="grid gap-1 text-sm font-medium">Date<Input v-model="maintenanceForm.expense_date" type="date" required /></label>
-                    <label class="grid gap-1 text-sm font-medium">Prestataire<Input v-model="maintenanceForm.vendor" /></label>
-                    <label class="grid gap-1 text-sm font-medium">Référence / facture<Input v-model="maintenanceForm.reference" /></label>
-                    <label class="grid gap-1 text-sm font-medium">Kilométrage<Input v-model="maintenanceForm.mileage" type="number" min="0" /></label>
-                    <label class="grid gap-1 text-sm font-medium">Prochain entretien<Input v-model="maintenanceForm.next_service_date" type="date" /></label>
-                    <label class="grid gap-1 text-sm font-medium md:col-span-2 lg:col-span-4">Notes<textarea v-model="maintenanceForm.notes" rows="2" class="rounded-md border bg-background px-3 py-2" /></label>
-                    <div class="lg:col-span-4"><Button type="submit" :disabled="maintenanceForm.processing">Ajouter le coût d'entretien</Button></div>
+                <form
+                    class="grid gap-4 md:grid-cols-2 lg:grid-cols-4"
+                    @submit.prevent="addMaintenance"
+                >
+                    <label class="grid gap-1 text-sm font-medium"
+                        >Type d'entretien<Input
+                            v-model="maintenanceForm.category"
+                            list="maintenance-categories"
+                            required /><datalist id="maintenance-categories">
+                            <option value="Vidange" />
+                            <option value="Réparation" />
+                            <option value="Pneus" />
+                            <option value="Freins" />
+                            <option value="Révision" />
+                            <option value="Pièces" />
+                            <option value="Lavage" /></datalist
+                    ></label>
+                    <label class="grid gap-1 text-sm font-medium"
+                        >Détail / libellé<Input
+                            v-model="maintenanceForm.title"
+                            required
+                            placeholder="Ex. Vidange moteur" /><InputError
+                            :message="maintenanceForm.errors.title"
+                    /></label>
+                    <label class="grid gap-1 text-sm font-medium"
+                        >Montant<Input
+                            v-model="maintenanceForm.amount"
+                            type="number"
+                            min="0.01"
+                            step="0.01"
+                            required /><InputError
+                            :message="maintenanceForm.errors.amount"
+                    /></label>
+                    <label class="grid gap-1 text-sm font-medium"
+                        >Date<Input
+                            v-model="maintenanceForm.expense_date"
+                            type="date"
+                            required
+                    /></label>
+                    <label class="grid gap-1 text-sm font-medium"
+                        >Prestataire<Input v-model="maintenanceForm.vendor"
+                    /></label>
+                    <label class="grid gap-1 text-sm font-medium"
+                        >Référence / facture<Input
+                            v-model="maintenanceForm.reference"
+                    /></label>
+                    <label class="grid gap-1 text-sm font-medium"
+                        >Kilométrage<Input
+                            v-model="maintenanceForm.mileage"
+                            type="number"
+                            min="0"
+                    /></label>
+                    <label class="grid gap-1 text-sm font-medium"
+                        >Prochain entretien<Input
+                            v-model="maintenanceForm.next_service_date"
+                            type="date"
+                    /></label>
+                    <label
+                        class="grid gap-1 text-sm font-medium md:col-span-2 lg:col-span-4"
+                        >Notes<textarea
+                            v-model="maintenanceForm.notes"
+                            rows="2"
+                            class="rounded-md border bg-background px-3 py-2"
+                        />
+                    </label>
+                    <div class="lg:col-span-4">
+                        <Button
+                            type="submit"
+                            :disabled="maintenanceForm.processing"
+                            >Ajouter le coût d'entretien</Button
+                        >
+                    </div>
                 </form>
 
                 <div class="overflow-x-auto rounded-md border">
                     <table class="min-w-full text-sm">
-                        <thead class="border-b bg-muted/50"><tr><th class="px-3 py-2 text-left">Date</th><th class="px-3 py-2 text-left">Entretien</th><th class="px-3 py-2 text-left">Prestataire</th><th class="px-3 py-2 text-left">Kilométrage</th><th class="px-3 py-2 text-right">Montant</th><th class="px-3 py-2"></th></tr></thead>
-                        <tbody class="divide-y"><tr v-for="expense in car.expenses" :key="expense.id"><td class="px-3 py-2">{{ new Date(`${expense.expense_date}T00:00:00`).toLocaleDateString('fr-FR') }}</td><td class="px-3 py-2"><div class="font-medium">{{ expense.title }}</div><div class="text-xs text-muted-foreground">{{ expense.category }}<span v-if="expense.notes"> · {{ expense.notes }}</span></div></td><td class="px-3 py-2">{{ expense.vendor || '—' }}</td><td class="px-3 py-2">{{ expense.mileage ? `${expense.mileage.toLocaleString('fr-FR')} km` : '—' }}</td><td class="px-3 py-2 text-right font-semibold">{{ Number(expense.amount).toLocaleString('fr-FR', { minimumFractionDigits: 2 }) }} DZD</td><td class="px-3 py-2 text-right"><Button size="sm" variant="ghost" class="text-destructive" @click="deleteMaintenance(expense)">Supprimer</Button></td></tr><tr v-if="!car.expenses?.length"><td colspan="6" class="px-3 py-8 text-center text-muted-foreground">Aucun coût d'entretien enregistré.</td></tr></tbody>
+                        <thead class="border-b bg-muted/50">
+                            <tr>
+                                <th class="px-3 py-2 text-left">Date</th>
+                                <th class="px-3 py-2 text-left">Entretien</th>
+                                <th class="px-3 py-2 text-left">Prestataire</th>
+                                <th class="px-3 py-2 text-left">Kilométrage</th>
+                                <th class="px-3 py-2 text-right">Montant</th>
+                                <th class="px-3 py-2"></th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y">
+                            <tr
+                                v-for="expense in car.expenses"
+                                :key="expense.id"
+                            >
+                                <td class="px-3 py-2">
+                                    {{
+                                        new Date(
+                                            `${expense.expense_date}T00:00:00`,
+                                        ).toLocaleDateString('fr-FR')
+                                    }}
+                                </td>
+                                <td class="px-3 py-2">
+                                    <div class="font-medium">
+                                        {{ expense.title }}
+                                    </div>
+                                    <div class="text-xs text-muted-foreground">
+                                        {{ expense.category
+                                        }}<span v-if="expense.notes">
+                                            · {{ expense.notes }}</span
+                                        >
+                                    </div>
+                                </td>
+                                <td class="px-3 py-2">
+                                    {{ expense.vendor || '—' }}
+                                </td>
+                                <td class="px-3 py-2">
+                                    {{
+                                        expense.mileage
+                                            ? `${expense.mileage.toLocaleString('fr-FR')} km`
+                                            : '—'
+                                    }}
+                                </td>
+                                <td class="px-3 py-2 text-right font-semibold">
+                                    {{
+                                        Number(expense.amount).toLocaleString(
+                                            'fr-FR',
+                                            { minimumFractionDigits: 2 },
+                                        )
+                                    }}
+                                    DZD
+                                </td>
+                                <td class="px-3 py-2 text-right">
+                                    <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        class="text-destructive"
+                                        @click="deleteMaintenance(expense)"
+                                        >Supprimer</Button
+                                    >
+                                </td>
+                            </tr>
+                            <tr v-if="!car.expenses?.length">
+                                <td
+                                    colspan="6"
+                                    class="px-3 py-8 text-center text-muted-foreground"
+                                >
+                                    Aucun coût d'entretien enregistré.
+                                </td>
+                            </tr>
+                        </tbody>
                     </table>
                 </div>
             </section>
 
             <section v-if="isEdit && reservations" class="rounded-lg border">
-                <div class="flex flex-col gap-1 border-b px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-                    <h2 class="text-lg font-semibold">Historique des réservations</h2>
-                    <span class="text-sm text-muted-foreground">{{ reservations.total }} réservation(s)</span>
+                <div
+                    class="flex flex-col gap-1 border-b px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+                >
+                    <h2 class="text-lg font-semibold">
+                        Historique des réservations
+                    </h2>
+                    <span class="text-sm text-muted-foreground"
+                        >{{ reservations.total }} réservation(s)</span
+                    >
                 </div>
 
                 <div class="overflow-x-auto">
                     <table class="min-w-full divide-y divide-gray-200 text-sm">
                         <thead class="bg-muted/50">
                             <tr>
-                                <th class="px-4 py-3 text-left font-medium">Référence</th>
-                                <th class="px-4 py-3 text-left font-medium">Client</th>
-                                <th class="px-4 py-3 text-left font-medium">Période</th>
-                                <th class="px-4 py-3 text-left font-medium">Durée</th>
-                                <th class="px-4 py-3 text-left font-medium">Statut</th>
-                                <th class="px-4 py-3 text-right font-medium">Montant</th>
+                                <th class="px-4 py-3 text-left font-medium">
+                                    Référence
+                                </th>
+                                <th class="px-4 py-3 text-left font-medium">
+                                    Client
+                                </th>
+                                <th class="px-4 py-3 text-left font-medium">
+                                    Période
+                                </th>
+                                <th class="px-4 py-3 text-left font-medium">
+                                    Durée
+                                </th>
+                                <th class="px-4 py-3 text-left font-medium">
+                                    Statut
+                                </th>
+                                <th class="px-4 py-3 text-right font-medium">
+                                    Montant
+                                </th>
                                 <th class="px-4 py-3"></th>
                             </tr>
                         </thead>
                         <tbody class="divide-y">
-                            <tr v-for="reservation in reservations.data" :key="reservation.id">
-                                <td class="whitespace-nowrap px-4 py-3 font-medium">{{ reservation.reservation_number }}</td>
-                                <td class="px-4 py-3">
-                                    <div class="font-medium">{{ reservation.user?.name || '—' }}</div>
-                                    <div class="text-xs text-muted-foreground">{{ reservation.user?.phone || reservation.user?.email || '—' }}</div>
+                            <tr
+                                v-for="reservation in reservations.data"
+                                :key="reservation.id"
+                            >
+                                <td
+                                    class="px-4 py-3 font-medium whitespace-nowrap"
+                                >
+                                    {{ reservation.reservation_number }}
                                 </td>
-                                <td class="whitespace-nowrap px-4 py-3">
-                                    {{ new Date(`${reservation.start_date.slice(0, 10)}T00:00:00`).toLocaleDateString('fr-FR') }}
+                                <td class="px-4 py-3">
+                                    <div class="font-medium">
+                                        {{ reservation.user?.name || '—' }}
+                                    </div>
+                                    <div class="text-xs text-muted-foreground">
+                                        {{
+                                            reservation.user?.phone ||
+                                            reservation.user?.email ||
+                                            '—'
+                                        }}
+                                    </div>
+                                </td>
+                                <td class="px-4 py-3 whitespace-nowrap">
+                                    {{
+                                        new Date(
+                                            `${reservation.start_date.slice(0, 10)}T00:00:00`,
+                                        ).toLocaleDateString('fr-FR')
+                                    }}
                                     –
-                                    {{ new Date(`${reservation.end_date.slice(0, 10)}T00:00:00`).toLocaleDateString('fr-FR') }}
+                                    {{
+                                        new Date(
+                                            `${reservation.end_date.slice(0, 10)}T00:00:00`,
+                                        ).toLocaleDateString('fr-FR')
+                                    }}
                                 </td>
-                                <td class="whitespace-nowrap px-4 py-3">{{ reservation.total_days }} jour(s)</td>
+                                <td class="px-4 py-3 whitespace-nowrap">
+                                    {{ reservation.total_days }} jour(s)
+                                </td>
                                 <td class="px-4 py-3">
-                                    <span class="inline-flex whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium" :style="{ color: reservationStatus(reservation.status).color, backgroundColor: `${reservationStatus(reservation.status).color}18` }">
-                                        {{ reservationStatus(reservation.status).label }}
+                                    <span
+                                        class="inline-flex rounded-full px-2.5 py-1 text-xs font-medium whitespace-nowrap"
+                                        :style="{
+                                            color: reservationStatus(
+                                                reservation.status,
+                                            ).color,
+                                            backgroundColor: `${reservationStatus(reservation.status).color}18`,
+                                        }"
+                                    >
+                                        {{
+                                            reservationStatus(
+                                                reservation.status,
+                                            ).label
+                                        }}
                                     </span>
                                 </td>
-                                <td class="whitespace-nowrap px-4 py-3 text-right font-semibold">{{ Number(reservation.total_amount).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }} DZD</td>
+                                <td
+                                    class="px-4 py-3 text-right font-semibold whitespace-nowrap"
+                                >
+                                    {{
+                                        Number(
+                                            reservation.total_amount,
+                                        ).toLocaleString('fr-FR', {
+                                            minimumFractionDigits: 2,
+                                            maximumFractionDigits: 2,
+                                        })
+                                    }}
+                                    DZD
+                                </td>
                                 <td class="px-4 py-3 text-right">
-                                    <Link :href="showReservation(reservation.id).url"><Button size="sm" variant="outline">Voir</Button></Link>
+                                    <Link
+                                        :href="
+                                            showReservation(reservation.id).url
+                                        "
+                                        ><Button size="sm" variant="outline"
+                                            >Voir</Button
+                                        ></Link
+                                    >
                                 </td>
                             </tr>
                             <tr v-if="!reservations.data.length">
-                                <td colspan="7" class="px-4 py-8 text-center text-muted-foreground">Aucune réservation enregistrée pour ce véhicule.</td>
+                                <td
+                                    colspan="7"
+                                    class="px-4 py-8 text-center text-muted-foreground"
+                                >
+                                    Aucune réservation enregistrée pour ce
+                                    véhicule.
+                                </td>
                             </tr>
                         </tbody>
                     </table>
                 </div>
 
-                <nav v-if="reservations.links.length > 3" class="flex flex-wrap gap-2 border-t px-4 py-3">
+                <nav
+                    v-if="reservations.links.length > 3"
+                    class="flex flex-wrap gap-2 border-t px-4 py-3"
+                >
                     <Link
                         v-for="(link, index) in reservations.links"
                         :key="index"
@@ -578,10 +894,13 @@ function submit() {
                         preserve-scroll
                         :class="[
                             'rounded-md px-3 py-1.5 text-sm',
-                            link.active ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-muted/80',
+                            link.active
+                                ? 'bg-primary text-primary-foreground'
+                                : 'bg-muted text-muted-foreground hover:bg-muted/80',
                             !link.url && 'pointer-events-none opacity-50',
                         ]"
-                    >{{ paginationLabel(link.label) }}</Link>
+                        >{{ paginationLabel(link.label) }}</Link
+                    >
                 </nav>
             </section>
         </main>

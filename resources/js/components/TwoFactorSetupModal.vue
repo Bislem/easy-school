@@ -56,7 +56,8 @@ const modalConfig = computed<{
     if (showVerificationStep.value) {
         return {
             title: 'Vérifier le code d’authentification',
-            description: 'Saisissez le code à 6 chiffres de votre application d’authentification',
+            description:
+                'Saisissez le code à 6 chiffres de votre application d’authentification',
             buttonText: 'Continuer',
         };
     }

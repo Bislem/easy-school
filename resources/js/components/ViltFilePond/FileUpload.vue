@@ -1,16 +1,16 @@
 <script setup lang="ts">
-import { ref, onMounted, watch, computed } from "vue";
-import vueFilePond from "vue-filepond";
-import FilePondPluginFileValidateType from "filepond-plugin-file-validate-type";
-import FilePondPluginFileValidateSize from "filepond-plugin-file-validate-size";
-import FilePondPluginImagePreview from "filepond-plugin-image-preview";
-import { setOptions } from "filepond";
-import { usePage } from "@inertiajs/vue3";
+import { usePage } from '@inertiajs/vue3';
+import { setOptions } from 'filepond';
+import FilePondPluginFileValidateSize from 'filepond-plugin-file-validate-size';
+import FilePondPluginFileValidateType from 'filepond-plugin-file-validate-type';
+import FilePondPluginImagePreview from 'filepond-plugin-image-preview';
+import { computed, onMounted, ref, watch } from 'vue';
+import vueFilePond from 'vue-filepond';
 
 // Import locales
-import ar_AR from "filepond/locale/ar-ar";
-import fr_FR from "filepond/locale/fr-fr";
-import es_ES from "filepond/locale/es-es";
+import ar_AR from 'filepond/locale/ar-ar';
+import es_ES from 'filepond/locale/es-es';
+import fr_FR from 'filepond/locale/fr-fr';
 
 const props = defineProps({
     modelValue: {
@@ -24,12 +24,12 @@ const props = defineProps({
     allowedFileTypes: {
         type: Array,
         default: () => [
-            "image/jpeg",
-            "image/png",
-            "image/gif",
-            "image/svg+xml",
-            "image/webp",
-            "image/avif",
+            'image/jpeg',
+            'image/png',
+            'image/gif',
+            'image/svg+xml',
+            'image/webp',
+            'image/avif',
         ],
     },
     allowMultiple: {
@@ -40,13 +40,17 @@ const props = defineProps({
         type: Number,
         default: 1,
     },
+    unlimited: {
+        type: Boolean,
+        default: false,
+    },
     maxFileSize: {
         type: Number,
         default: 1024 * 1024 * 5, // 5MB
     },
     collection: {
         type: String,
-        default: "default",
+        default: 'default',
     },
     disabled: {
         type: Boolean,
@@ -58,20 +62,20 @@ const props = defineProps({
     },
     theme: {
         type: String,
-        default: "light",
-        validator: (value) => ["light", "dark"].includes(value),
+        default: 'light',
+        validator: (value) => ['light', 'dark'].includes(value),
     },
     width: {
         type: String,
-        default: "100%",
+        default: '100%',
     },
 });
 
 const emit = defineEmits([
-    "update:modelValue",
-    "fileAdded",
-    "fileRemoved",
-    "error",
+    'update:modelValue',
+    'fileAdded',
+    'fileRemoved',
+    'error',
 ]);
 
 // Reactive state
@@ -96,7 +100,7 @@ const LOCALE_MAP: Record<string, any> = {
 const FilePond = vueFilePond(
     FilePondPluginFileValidateType,
     FilePondPluginFileValidateSize,
-    FilePondPluginImagePreview
+    FilePondPluginImagePreview,
 );
 
 // Initialize locale
@@ -115,7 +119,9 @@ const chunkFileSize =
 
 // Helper: Fallback route builder if Ziggy's route() is not available
 function routeOrFallback(name: string, params: Record<string, any> = {}) {
-    const hasRoute = typeof window !== 'undefined' && typeof (window as any).route === 'function';
+    const hasRoute =
+        typeof window !== 'undefined' &&
+        typeof (window as any).route === 'function';
     if (hasRoute) {
         return (window as any).route(name, params);
     }
@@ -137,40 +143,40 @@ function parseUploadResponse(responseText: any) {
     // Check if it's an XMLHttpRequest object and extract responseText
     if (
         responseText &&
-        typeof responseText === "object" &&
+        typeof responseText === 'object' &&
         responseText.responseText !== undefined
     ) {
         responseText = responseText.responseText;
     }
 
     // Handle empty or null responses
-    if (!responseText || responseText === "" || responseText === "null") {
+    if (!responseText || responseText === '' || responseText === 'null') {
         return null;
     }
 
     try {
         // If it's already a parsed object
-        if (typeof responseText === "object" && responseText !== null) {
+        if (typeof responseText === 'object' && responseText !== null) {
             return responseText.folder || responseText;
         }
 
         const response = JSON.parse(responseText);
-        return typeof response === "string"
+        return typeof response === 'string'
             ? response
             : response.folder || response;
     } catch {
         const stringResponse =
-            typeof responseText === "string"
+            typeof responseText === 'string'
                 ? responseText.trim()
                 : String(responseText).trim();
 
         // Check for invalid responses
         if (
-            stringResponse.includes("[object") ||
-            stringResponse === "null" ||
-            stringResponse === ""
+            stringResponse.includes('[object') ||
+            stringResponse === 'null' ||
+            stringResponse === ''
         ) {
-            console.error("Invalid response format:", stringResponse);
+            console.error('Invalid response format:', stringResponse);
             return null;
         }
 
@@ -181,51 +187,55 @@ function parseUploadResponse(responseText: any) {
 // Add temporary folder to state
 function addTempFolder(folder: string, file: any) {
     tempFolders.value.push(folder);
-    emit("fileAdded", { folder, file });
-    emit("update:modelValue", [...tempFolders.value]);
+    emit('fileAdded', { folder, file });
+    emit('update:modelValue', [...tempFolders.value]);
 }
 
 // Handle file revert (removal of temporary files)
-function handleRevert(uniqueId: string, load: any, error: (msg: string) => void) {
+function handleRevert(
+    uniqueId: string,
+    load: any,
+    error: (msg: string) => void,
+) {
     if (!uniqueId) {
-        error("Aucun identifiant unique fourni");
+        error('Aucun identifiant unique fourni');
         return;
     }
 
     const index = tempFolders.value.indexOf(uniqueId);
     if (index === -1) {
-        error("Fichier introuvable");
+        error('Fichier introuvable');
         return;
     }
 
     // Optimistically remove from UI
     tempFolders.value.splice(index, 1);
-    emit("update:modelValue", [...tempFolders.value]);
+    emit('update:modelValue', [...tempFolders.value]);
 
     // Send delete request to server
-    fetch(routeOrFallback("filepond.revert", { folder: uniqueId }), {
-        method: "DELETE",
+    fetch(routeOrFallback('filepond.revert', { folder: uniqueId }), {
+        method: 'DELETE',
         headers: {
-            "X-CSRF-TOKEN": String(page.props.csrf_token),
-            Accept: "application/json",
+            'X-CSRF-TOKEN': String(page.props.csrf_token),
+            Accept: 'application/json',
         },
     })
         .then((response) => {
             if (response.ok) {
-                emit("fileRemoved", { folder: uniqueId, type: "temp" });
+                emit('fileRemoved', { folder: uniqueId, type: 'temp' });
                 load();
             } else {
                 // Restore folder on server error
                 tempFolders.value.splice(index, 0, uniqueId);
-                emit("update:modelValue", [...tempFolders.value]);
-                error("Impossible de supprimer le fichier du serveur");
+                emit('update:modelValue', [...tempFolders.value]);
+                error('Impossible de supprimer le fichier du serveur');
             }
         })
         .catch(() => {
             // Restore folder on network error
             tempFolders.value.splice(index, 0, uniqueId);
-            emit("update:modelValue", [...tempFolders.value]);
-            error("Impossible de supprimer le fichier");
+            emit('update:modelValue', [...tempFolders.value]);
+            error('Impossible de supprimer le fichier');
         });
 }
 
@@ -236,13 +246,13 @@ function handleFileRemove(error: any, file: any) {
     // Check if this is a local file (existing file)
     if ((file.origin === 3 || file.origin === 1) && file.source) {
         const existingFile = (props.initialFiles as any[]).find(
-            (f: any) => f.url === file.source
+            (f: any) => f.url === file.source,
         ) as any;
 
         if (existingFile?.id) {
-            emit("fileRemoved", {
+            emit('fileRemoved', {
                 fileId: existingFile.id,
-                type: "existing",
+                type: 'existing',
                 file: existingFile,
             });
         }
@@ -253,7 +263,7 @@ function handleFileRemove(error: any, file: any) {
 function resetFiles() {
     files.value = [];
     tempFolders.value = [];
-    emit("update:modelValue", []);
+    emit('update:modelValue', []);
 
     // Clear FilePond instance if available
     if (filePondRef.value) {
@@ -264,14 +274,14 @@ function resetFiles() {
 // Server configuration for FilePond
 const serverOptions: any = {
     process: {
-        url: routeOrFallback("filepond.upload"),
-        method: "POST",
+        url: routeOrFallback('filepond.upload'),
+        method: 'POST',
         headers: {
-            "X-CSRF-TOKEN": String(page.props.csrf_token),
+            'X-CSRF-TOKEN': String(page.props.csrf_token),
         },
         ondata: (formData: FormData) => {
             if (props.collection) {
-                formData.append("collection", props.collection);
+                formData.append('collection', props.collection);
             }
             return formData;
         },
@@ -280,7 +290,7 @@ const serverOptions: any = {
             let responseText = response;
             if (
                 response &&
-                typeof response === "object" &&
+                typeof response === 'object' &&
                 response.responseText !== undefined
             ) {
                 responseText = response.responseText;
@@ -293,21 +303,21 @@ const serverOptions: any = {
             return result;
         },
         onerror: (response) => {
-            console.error("Upload error:", response);
+            console.error('Upload error:', response);
         },
     },
     patch: {
-        url: routeOrFallback("filepond.patch") + "?patch=",
-        method: "PATCH",
+        url: routeOrFallback('filepond.patch') + '?patch=',
+        method: 'PATCH',
         headers: {
-            "X-CSRF-TOKEN": page.props.csrf_token,
+            'X-CSRF-TOKEN': page.props.csrf_token,
         },
         onload: (response) => {
             // Extract response text from XMLHttpRequest object
             let responseText = response;
             if (
                 response &&
-                typeof response === "object" &&
+                typeof response === 'object' &&
                 response.responseText !== undefined
             ) {
                 responseText = response.responseText;
@@ -316,31 +326,35 @@ const serverOptions: any = {
             // For chunk uploads, response might be empty for intermediate chunks
             if (
                 !responseText ||
-                responseText === "" ||
-                responseText === "null"
+                responseText === '' ||
+                responseText === 'null'
             ) {
                 return null;
             }
 
             const result = parseUploadResponse(responseText);
 
-            if (result && result !== "null") {
+            if (result && result !== 'null') {
                 addTempFolder(result, null);
                 return result;
             }
             return null;
         },
         onerror: (response) => {
-            console.error("Patch error:", response);
+            console.error('Patch error:', response);
         },
     },
     revert: handleRevert,
-    restore: routeOrFallback("filepond.restore") + "?restore=",
-    load: (source: string, load: (b: Blob) => void, error: (msg: string) => void) => {
+    restore: routeOrFallback('filepond.restore') + '?restore=',
+    load: (
+        source: string,
+        load: (b: Blob) => void,
+        error: (msg: string) => void,
+    ) => {
         fetch(source)
             .then((response) => response.blob())
             .then(load)
-            .catch(() => error("Impossible de charger le fichier"));
+            .catch(() => error('Impossible de charger le fichier'));
     },
 };
 
@@ -349,9 +363,9 @@ const filePondOptions = computed(() => ({
     server: serverOptions,
     allowMultiple: props.allowMultiple,
     acceptedFileTypes: props.allowedFileTypes,
-    maxFiles: props.maxFiles,
+    maxFiles: props.unlimited ? null : props.maxFiles,
     maxFileSize: props.maxFileSize,
-    credits: "none",
+    credits: 'none',
     disabled: props.disabled,
     required: props.required,
     chunkUploads: true,
@@ -366,10 +380,10 @@ watch(
     (newValue: any) => {
         const currentValue = tempFolders.value;
         if (JSON.stringify(newValue) !== JSON.stringify(currentValue)) {
-            tempFolders.value = [...(((newValue || []) as string[]))];
+            tempFolders.value = [...((newValue || []) as string[])];
         }
     },
-    { deep: true }
+    { deep: true },
 );
 
 // Initialize component
@@ -378,14 +392,14 @@ onMounted(() => {
 
     // Initialize modelValue
     if ((props.modelValue as any[])?.length > 0) {
-        tempFolders.value = [...((props.modelValue as any[]) as string[])];
+        tempFolders.value = [...(props.modelValue as any[] as string[])];
     }
 
     // Initialize initial files
     if ((props.initialFiles as any[])?.length > 0) {
         files.value = (props.initialFiles as any[]).map((file: any) => ({
             source: file.url,
-            options: { type: "local" },
+            options: { type: 'local' },
         }));
     }
 });

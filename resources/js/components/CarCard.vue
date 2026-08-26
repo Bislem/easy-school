@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { router, usePage } from '@inertiajs/vue3';
 import { show } from '@/routes/fleet';
+import { router, usePage } from '@inertiajs/vue3';
 import { computed } from 'vue';
 
 interface Car {
@@ -61,13 +61,14 @@ defineProps<Props>();
         </div>
 
         <!--  Car Details -->
-        <div class=" space-y-4 p-4">
+        <div class="space-y-4 p-4">
             <!-- Header -->
             <div class="space-y-2">
                 <h3
                     class="text-xl font-bold text-gray-900 transition-colors group-hover:text-orange-600"
                 >
-                    {{ car.make }} {{ car.model }} - {{ car.year }} - {{ car.id }}
+                    {{ car.make }} {{ car.model }} - {{ car.year }} -
+                    {{ car.id }}
                 </h3>
 
                 <div class="flex items-center gap-2">
@@ -87,10 +88,14 @@ defineProps<Props>();
                         </svg>
                         <span class="font-medium">{{ car.fuel_type }}</span>
                     </div>
-                    <div class="text-xs bg-slate-400 px-2 py-1 rounded-md text-white">
+                    <div
+                        class="rounded-md bg-slate-400 px-2 py-1 text-xs text-white"
+                    >
                         <p>+ GPS</p>
                     </div>
-                    <div class="text-xs bg-slate-400 px-2 py-1 rounded-md text-white">
+                    <div
+                        class="rounded-md bg-slate-400 px-2 py-1 text-xs text-white"
+                    >
                         <p>+ Assurance</p>
                     </div>
                 </div>

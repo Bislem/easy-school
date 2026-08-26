@@ -46,7 +46,8 @@ onMounted(async () => {
             </CardTitle>
             <CardDescription>
                 Les codes de récupération permettent de retrouver l’accès si
-                vous perdez votre appareil A2F. Conservez-les dans un gestionnaire sécurisé.
+                vous perdez votre appareil A2F. Conservez-les dans un
+                gestionnaire sécurisé.
             </CardDescription>
         </CardHeader>
         <CardContent>
@@ -58,8 +59,8 @@ onMounted(async () => {
                         :is="isRecoveryCodesVisible ? EyeOff : Eye"
                         class="size-4"
                     />
-                    {{ isRecoveryCodesVisible ? 'Masquer' : 'Afficher' }} les codes
-                    de récupération
+                    {{ isRecoveryCodesVisible ? 'Masquer' : 'Afficher' }} les
+                    codes de récupération
                 </Button>
 
                 <Form
@@ -113,7 +114,9 @@ onMounted(async () => {
                     <p class="text-xs text-muted-foreground select-none">
                         Chaque code ne peut être utilisé qu’une fois et sera
                         supprimé après utilisation. Pour en obtenir d’autres,
-                        cliquez sur <span class="font-bold">Régénérer les codes</span> ci-dessus.
+                        cliquez sur
+                        <span class="font-bold">Régénérer les codes</span>
+                        ci-dessus.
                     </p>
                 </div>
             </div>

@@ -10,20 +10,17 @@ import {
     SidebarMenuButton,
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
-import { home } from '@/routes';
-import { fleet as vehiculeIndex } from '@/routes';
-import { contact as contactIndex } from '@/routes';
-import { about as aboutIndex } from '@/routes';
-import { login as loginIndex } from '@/routes';
-import { register as registerIndex } from '@/routes';
+import {
+    about as aboutIndex,
+    contact as contactIndex,
+    home,
+    login as loginIndex,
+    register as registerIndex,
+    fleet as vehiculeIndex,
+} from '@/routes';
 import { type NavItem } from '@/types';
 import { Link } from '@inertiajs/vue3';
-import {
-    Calendar,
-    Car,
-    CreditCard,
-    User,
-} from 'lucide-vue-next';
+import { Calendar, Car, CreditCard, User } from 'lucide-vue-next';
 import AppLogo from './AppLogo.vue';
 
 const mainNavItems: NavItem[] = [

@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Admin\AnnouncementsController;
+use App\Http\Controllers\Admin\AnnualLeavesController;
 use App\Http\Controllers\Admin\AttendanceController;
 use App\Http\Controllers\Admin\AuditController;
 use App\Http\Controllers\Admin\BadgesController;
@@ -9,6 +10,7 @@ use App\Http\Controllers\Admin\ClassroomsController;
 use App\Http\Controllers\Admin\CompanySettingsController;
 use App\Http\Controllers\Admin\CoursesController;
 use App\Http\Controllers\Admin\EmployeeTypesController;
+use App\Http\Controllers\Admin\EmployeeHrRecordsController;
 use App\Http\Controllers\Admin\EnrollmentFormsController;
 use App\Http\Controllers\Admin\ExpensesController;
 use App\Http\Controllers\Admin\ParentsController;
@@ -16,6 +18,7 @@ use App\Http\Controllers\Admin\PortalAccountsController;
 use App\Http\Controllers\Admin\ReportsController;
 use App\Http\Controllers\Admin\SalariesController;
 use App\Http\Controllers\Admin\SchoolSitesController;
+use App\Http\Controllers\Admin\SickLeavesController;
 use App\Http\Controllers\Admin\StaffController;
 use App\Http\Controllers\Admin\StudentFinanceController;
 use App\Http\Controllers\Admin\StudentsController;
@@ -77,6 +80,23 @@ Route::middleware(['auth', 'verified', 'active', 'admin'])
         Route::get('staff', [StaffController::class, 'index'])->name('staff.index');
         Route::post('staff', [StaffController::class, 'store'])->name('staff.store');
         Route::get('staff/{staff}/edit', [StaffController::class, 'edit'])->name('staff.edit');
+        Route::post('staff/{staff}/documents', [StaffController::class, 'storeDocuments'])->name('staff.documents.store');
+        Route::delete('staff/{staff}/documents/{document}', [StaffController::class, 'destroyDocument'])->name('staff.documents.destroy');
+        Route::post('staff/{staff}/annual-leaves', [AnnualLeavesController::class, 'store'])->name('staff.annual-leaves.store');
+        Route::patch('staff/{staff}/annual-leaves/{annualLeave}/approve', [AnnualLeavesController::class, 'approve'])->name('staff.annual-leaves.approve');
+        Route::patch('staff/{staff}/annual-leaves/{annualLeave}/reject', [AnnualLeavesController::class, 'reject'])->name('staff.annual-leaves.reject');
+        Route::patch('staff/{staff}/annual-leaves/{annualLeave}/cancel', [AnnualLeavesController::class, 'cancel'])->name('staff.annual-leaves.cancel');
+        Route::patch('staff/{staff}/annual-leaves/{annualLeave}/complete', [AnnualLeavesController::class, 'complete'])->name('staff.annual-leaves.complete');
+        Route::get('staff/{staff}/annual-leaves/{annualLeave}/print', [AnnualLeavesController::class, 'print'])->name('staff.annual-leaves.print');
+        Route::post('staff/{staff}/sick-leaves', [SickLeavesController::class, 'store'])->name('staff.sick-leaves.store');
+        Route::patch('staff/{staff}/sick-leaves/{sickLeave}/approve', [SickLeavesController::class, 'approve'])->name('staff.sick-leaves.approve');
+        Route::patch('staff/{staff}/sick-leaves/{sickLeave}/reject', [SickLeavesController::class, 'reject'])->name('staff.sick-leaves.reject');
+        Route::patch('staff/{staff}/sick-leaves/{sickLeave}/cancel', [SickLeavesController::class, 'cancel'])->name('staff.sick-leaves.cancel');
+        Route::patch('staff/{staff}/sick-leaves/{sickLeave}/complete', [SickLeavesController::class, 'complete'])->name('staff.sick-leaves.complete');
+        Route::get('staff/{staff}/sick-leaves/{sickLeave}/print', [SickLeavesController::class, 'print'])->name('staff.sick-leaves.print');
+        Route::post('staff/{staff}/hr-records', [EmployeeHrRecordsController::class, 'store'])->name('staff.hr-records.store');
+        Route::patch('staff/{staff}/hr-records/{hrRecord}/status', [EmployeeHrRecordsController::class, 'updateStatus'])->name('staff.hr-records.status');
+        Route::patch('staff/{staff}/hr-records/{hrRecord}/archive', [EmployeeHrRecordsController::class, 'archive'])->name('staff.hr-records.archive');
         Route::get('staff/{staff}', [StaffController::class, 'show'])->name('staff.show');
         Route::post('staff/{staff}', [StaffController::class, 'update'])->name('staff.update');
         Route::patch('staff/{staff}/toggle-active', [StaffController::class, 'toggleActive'])->name('staff.toggle-active');

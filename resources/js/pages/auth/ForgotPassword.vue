@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import PasswordResetLinkController from '@/actions/App/Http/Controllers/Auth/PasswordResetLinkController';
-import HomeLayout from '@/layouts/HomeLayout.vue';
 import InputError from '@/components/InputError.vue';
 import TextLink from '@/components/TextLink.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import HomeLayout from '@/layouts/HomeLayout.vue';
 import { login } from '@/routes';
 import { Form, Head } from '@inertiajs/vue3';
 import { LoaderCircle } from 'lucide-vue-next';
@@ -19,9 +19,10 @@ defineProps<{
     <HomeLayout>
         <Head title="Mot de passe oublié" />
 
-        <div class="flex min-h-[80vh] items-center justify-center px-4 sm:px-6 lg:px-8">
-    
-            <div class="space-y-6 w-1/3">
+        <div
+            class="flex min-h-[80vh] items-center justify-center px-4 sm:px-6 lg:px-8"
+        >
+            <div class="w-1/3 space-y-6">
                 <Form
                     v-bind="PasswordResetLinkController.store.form()"
                     v-slot="{ errors, processing }"
@@ -38,7 +39,7 @@ defineProps<{
                         />
                         <InputError :message="errors.email" />
                     </div>
-    
+
                     <div class="my-6 flex items-center justify-start">
                         <Button
                             class="w-full"
@@ -53,8 +54,10 @@ defineProps<{
                         </Button>
                     </div>
                 </Form>
-    
-                <div class="space-x-1 text-center text-sm text-muted-foreground">
+
+                <div
+                    class="space-x-1 text-center text-sm text-muted-foreground"
+                >
                     <span>Ou retourner à la</span>
                     <TextLink :href="login()">connexion</TextLink>
                 </div>

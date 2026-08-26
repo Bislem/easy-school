@@ -15,7 +15,9 @@ const type = ref(props.reportType),
     dateTo = ref((props.filters as any).date_to ?? ''),
     search = ref((props.filters as any).search ?? '');
 const columns = computed(() =>
-    (props.rows as any).data.length ? Object.keys((props.rows as any).data[0] as object) : [],
+    (props.rows as any).data.length
+        ? Object.keys((props.rows as any).data[0] as object)
+        : [],
 );
 function params() {
     return {
@@ -85,7 +87,10 @@ function exportTo(format: string) {
                     </div>
                 </section>
                 <section class="overflow-x-auto rounded-xl border bg-card">
-                    <table v-if="(rows as any).data.length" class="w-full text-sm">
+                    <table
+                        v-if="(rows as any).data.length"
+                        class="w-full text-sm"
+                    >
                         <thead>
                             <tr class="border-b text-left">
                                 <th v-for="c in columns" :key="c" class="p-3">
@@ -109,8 +114,22 @@ function exportTo(format: string) {
                         Aucune donnée pour ces filtres.
                     </p>
                 </section>
-                <nav v-if="(rows as any).links?.length > 3" class="flex max-w-full gap-1 overflow-x-auto"><Link v-for="link in (rows as any).links" :key="link.label" :href="link.url||'#'" class="rounded-md border px-3 py-2 text-sm" :class="{'bg-primary text-primary-foreground':link.active,'pointer-events-none opacity-40':!link.url}" v-html="link.label"/></nav>
-            </div>
-        </main></AdminLayout
-    >
+                <nav
+                    v-if="(rows as any).links?.length > 3"
+                    class="flex max-w-full gap-1 overflow-x-auto"
+                >
+                    <Link
+                        v-for="link in (rows as any).links"
+                        :key="link.label"
+                        :href="link.url || '#'"
+                        class="rounded-md border px-3 py-2 text-sm"
+                        :class="{
+                            'bg-primary text-primary-foreground': link.active,
+                            'pointer-events-none opacity-40': !link.url,
+                        }"
+                        v-html="link.label"
+                    />
+                </nav>
+            </div></main
+    ></AdminLayout>
 </template>

@@ -9,44 +9,594 @@ import { Head, Link, router, useForm } from '@inertiajs/vue3';
 import { Download, FilePlus2, Search, Users, X } from 'lucide-vue-next';
 import { computed, ref, watch } from 'vue';
 
-const props = defineProps({ certificates:Object, students:Array, types:Array, courses:Array, teachers:Array, completedPlans:Array, filters:Object });
-const open=ref(false), mode=ref<'manual'|'bulk'>('manual'), advanced=ref(false);
-const filters=useForm({search:(props.filters as any).search??'',type:(props.filters as any).type??'',date_from:(props.filters as any).date_from??'',date_to:(props.filters as any).date_to??'',course_id:(props.filters as any).course_id??'',student_id:(props.filters as any).student_id??'',teacher_id:(props.filters as any).teacher_id??''});
-const manual=useForm({student_id:'',course_enrollment_id:'',course_id:'',course_level_id:'',type:'enrollment_attestation',issue_date:new Date().toISOString().slice(0,10),formation_start:'',formation_end:'',result:'',signature_name:'',notes:''});
-const bulk=useForm({training_plan_id:'',group_ids:[] as number[],enrollment_ids:[] as number[],type:'training_attestation',issue_date:new Date().toISOString().slice(0,10),result:'',signature_name:'',notes:''});
-const selectedStudent=computed(()=>(props.students as any[]).find(s=>String(s.id)===manual.student_id));
-const studentOptions=computed(()=>(props.students as any[]).map(s=>({...s,label:`${s.first_name} ${s.last_name}`})));
-const enrollmentOptions=computed(()=>(selectedStudent.value?.enrollments??[]).map((e:any)=>({...e,label:`${e.form?.course?.title??'Inscription sans formation liée'} · Groupe ${e.group_number||'—'}`})));
-const selectedCourse=computed(()=>(props.courses as any[]).find(c=>String(c.id)===manual.course_id));
-const selectedPlan=computed(()=>(props.completedPlans as any[]).find(p=>String(p.id)===bulk.training_plan_id));
-const candidates=computed(()=>selectedPlan.value?.groups.filter((g:any)=>bulk.group_ids.includes(g.id)).flatMap((g:any)=>g.enrollments.map((e:any)=>({...e,group_name:g.name})))??[]);
-const eligibleIds=computed(()=>candidates.value.filter((e:any)=>e.eligible).map((e:any)=>e.id));
-watch(()=>manual.student_id,()=>manual.course_enrollment_id='');
-watch(()=>manual.course_id,()=>manual.course_level_id='');
-watch(()=>bulk.training_plan_id,()=>{bulk.group_ids=[];bulk.enrollment_ids=[];});
-watch(()=>bulk.group_ids,()=>{const allowed=new Set(candidates.value.map((e:any)=>e.id));bulk.enrollment_ids=bulk.enrollment_ids.filter(id=>allowed.has(id));eligibleIds.value.forEach((id:number)=>{if(!bulk.enrollment_ids.includes(id))bulk.enrollment_ids.push(id)});},{deep:true});
-function applyFilters(){router.get('/admin/certificates',filters.data(),{preserveState:true,replace:true});}
-function clearFilters(){filters.reset();router.get('/admin/certificates');}
-function issueManual(){manual.post('/admin/certificates',{onSuccess:()=>{open.value=false;manual.reset();}});}
-function issueBulk(){bulk.post('/admin/certificates/bulk',{onSuccess:()=>{open.value=false;bulk.reset();}});}
-function toggleGroup(id:number){bulk.group_ids=bulk.group_ids.includes(id)?bulk.group_ids.filter(item=>item!==id):[...bulk.group_ids,id];}
-function toggleRecipient(id:number){bulk.enrollment_ids=bulk.enrollment_ids.includes(id)?bulk.enrollment_ids.filter(item=>item!==id):[...bulk.enrollment_ids,id];}
-function openDialog(kind:'manual'|'bulk'){mode.value=kind;open.value=true;}
+const props = defineProps({
+    certificates: Object,
+    students: Array,
+    types: Array,
+    courses: Array,
+    teachers: Array,
+    completedPlans: Array,
+    filters: Object,
+});
+const open = ref(false),
+    mode = ref<'manual' | 'bulk'>('manual'),
+    advanced = ref(false);
+const filters = useForm({
+    search: (props.filters as any).search ?? '',
+    type: (props.filters as any).type ?? '',
+    date_from: (props.filters as any).date_from ?? '',
+    date_to: (props.filters as any).date_to ?? '',
+    course_id: (props.filters as any).course_id ?? '',
+    student_id: (props.filters as any).student_id ?? '',
+    teacher_id: (props.filters as any).teacher_id ?? '',
+});
+const manual = useForm({
+    student_id: '',
+    course_enrollment_id: '',
+    course_id: '',
+    course_level_id: '',
+    type: 'enrollment_attestation',
+    issue_date: new Date().toISOString().slice(0, 10),
+    formation_start: '',
+    formation_end: '',
+    result: '',
+    signature_name: '',
+    notes: '',
+});
+const bulk = useForm({
+    training_plan_id: '',
+    group_ids: [] as number[],
+    enrollment_ids: [] as number[],
+    type: 'training_attestation',
+    issue_date: new Date().toISOString().slice(0, 10),
+    result: '',
+    signature_name: '',
+    notes: '',
+});
+const selectedStudent = computed(() =>
+    (props.students as any[]).find((s) => String(s.id) === manual.student_id),
+);
+const studentOptions = computed(() =>
+    (props.students as any[]).map((s) => ({
+        ...s,
+        label: `${s.first_name} ${s.last_name}`,
+    })),
+);
+const enrollmentOptions = computed(() =>
+    (selectedStudent.value?.enrollments ?? []).map((e: any) => ({
+        ...e,
+        label: `${e.form?.course?.title ?? 'Inscription sans formation liée'} · Groupe ${e.group_number || '—'}`,
+    })),
+);
+const selectedCourse = computed(() =>
+    (props.courses as any[]).find((c) => String(c.id) === manual.course_id),
+);
+const selectedPlan = computed(() =>
+    (props.completedPlans as any[]).find(
+        (p) => String(p.id) === bulk.training_plan_id,
+    ),
+);
+const candidates = computed(
+    () =>
+        selectedPlan.value?.groups
+            .filter((g: any) => bulk.group_ids.includes(g.id))
+            .flatMap((g: any) =>
+                g.enrollments.map((e: any) => ({ ...e, group_name: g.name })),
+            ) ?? [],
+);
+const eligibleIds = computed(() =>
+    candidates.value.filter((e: any) => e.eligible).map((e: any) => e.id),
+);
+watch(
+    () => manual.student_id,
+    () => (manual.course_enrollment_id = ''),
+);
+watch(
+    () => manual.course_id,
+    () => (manual.course_level_id = ''),
+);
+watch(
+    () => bulk.training_plan_id,
+    () => {
+        bulk.group_ids = [];
+        bulk.enrollment_ids = [];
+    },
+);
+watch(
+    () => bulk.group_ids,
+    () => {
+        const allowed = new Set(candidates.value.map((e: any) => e.id));
+        bulk.enrollment_ids = bulk.enrollment_ids.filter((id) =>
+            allowed.has(id),
+        );
+        eligibleIds.value.forEach((id: number) => {
+            if (!bulk.enrollment_ids.includes(id)) bulk.enrollment_ids.push(id);
+        });
+    },
+    { deep: true },
+);
+function applyFilters() {
+    router.get('/admin/certificates', filters.data(), {
+        preserveState: true,
+        replace: true,
+    });
+}
+function clearFilters() {
+    filters.reset();
+    router.get('/admin/certificates');
+}
+function issueManual() {
+    manual.post('/admin/certificates', {
+        onSuccess: () => {
+            open.value = false;
+            manual.reset();
+        },
+    });
+}
+function issueBulk() {
+    bulk.post('/admin/certificates/bulk', {
+        onSuccess: () => {
+            open.value = false;
+            bulk.reset();
+        },
+    });
+}
+function toggleGroup(id: number) {
+    bulk.group_ids = bulk.group_ids.includes(id)
+        ? bulk.group_ids.filter((item) => item !== id)
+        : [...bulk.group_ids, id];
+}
+function toggleRecipient(id: number) {
+    bulk.enrollment_ids = bulk.enrollment_ids.includes(id)
+        ? bulk.enrollment_ids.filter((item) => item !== id)
+        : [...bulk.enrollment_ids, id];
+}
+function openDialog(kind: 'manual' | 'bulk') {
+    mode.value = kind;
+    open.value = true;
+}
 </script>
 
-<template><Head title="Certificats"/><AdminLayout><main class="flex-1 p-4 sm:p-6 lg:p-8"><div class="mx-auto max-w-7xl space-y-6">
- <header class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><h1 class="text-2xl font-semibold">Certificats et attestations</h1><p class="text-sm text-muted-foreground">Émission manuelle, génération par groupes et documents vérifiables.</p></div><div class="flex gap-2"><Button variant="outline" @click="openDialog('manual')"><FilePlus2 class="mr-2 size-4"/>Document manuel</Button><Button @click="openDialog('bulk')"><Users class="mr-2 size-4"/>Générer par groupes</Button></div></header>
- <section class="space-y-3 border-y py-4"><div class="flex flex-col gap-2 md:flex-row"><div class="relative flex-1"><Search class="absolute left-3 top-2.5 size-4 text-muted-foreground"/><Input v-model="filters.search" class="pl-9" placeholder="Numéro, étudiant ou formation" @keyup.enter="applyFilters"/></div><select v-model="filters.type" class="h-9 rounded-md border bg-background px-3" @change="applyFilters"><option value="">Tous les documents</option><option v-for="t in types" :key="(t as any).value" :value="(t as any).value">{{(t as any).label}}</option></select><Button variant="outline" @click="advanced=!advanced">Recherche avancée</Button><Button @click="applyFilters">Rechercher</Button></div>
-  <div v-if="advanced" class="grid gap-3 md:grid-cols-5"><label><Label>Du</Label><Input v-model="filters.date_from" type="date"/></label><label><Label>Au</Label><Input v-model="filters.date_to" type="date"/></label><label><Label>Formation</Label><SearchSelect v-model="filters.course_id" :options="courses as any[]" placeholder="Toutes les formations" search-placeholder="Rechercher une formation" allow-empty/></label><label><Label>Étudiant</Label><SearchSelect v-model="filters.student_id" :options="studentOptions" placeholder="Tous les étudiants" search-placeholder="Rechercher un étudiant" allow-empty/></label><label><Label>Enseignant</Label><SearchSelect v-model="filters.teacher_id" :options="teachers as any[]" placeholder="Tous les enseignants" search-placeholder="Rechercher un enseignant" allow-empty/></label><div class="md:col-span-5 flex justify-end gap-2"><Button variant="ghost" @click="clearFilters">Effacer</Button><Button @click="applyFilters">Appliquer</Button></div></div>
- </section>
- <section class="overflow-x-auto rounded-md border"><table class="w-full text-sm"><thead class="bg-muted/40"><tr class="text-left"><th class="p-3">Numéro</th><th>Étudiant</th><th>Formation</th><th>Type</th><th>Date</th><th></th></tr></thead><tbody><tr v-for="c in (certificates as any).data" :key="c.id" class="border-t"><td class="p-3 font-mono">{{c.certificate_number}}</td><td>{{c.student_name}}</td><td>{{c.formation_name||'Document manuel'}}</td><td>{{(types as any[]).find(t=>t.value===c.type)?.label||c.type}}</td><td>{{c.issue_date}}</td><td class="p-2 text-right"><Button as-child size="icon" variant="outline"><a :href="`/admin/certificates/${c.id}/print`" title="Télécharger le PDF"><Download class="size-4"/></a></Button></td></tr><tr v-if="!(certificates as any).data.length"><td colspan="6" class="p-8 text-center text-muted-foreground">Aucun certificat ne correspond aux filtres.</td></tr></tbody></table></section>
- <nav v-if="(certificates as any).links?.length>3" class="flex max-w-full gap-1 overflow-x-auto"><Link v-for="link in (certificates as any).links" :key="link.label" :href="link.url||'#'" class="rounded-md border px-3 py-2 text-sm" :class="{'bg-primary text-primary-foreground':link.active,'pointer-events-none opacity-40':!link.url}" v-html="link.label"/></nav>
-</div></main>
-<div v-if="open" class="fixed inset-0 z-50 overflow-y-auto bg-black/50 p-4"><div class="mx-auto my-6 w-full max-w-4xl rounded-md bg-background p-6 shadow-xl"><div class="mb-5 flex items-center justify-between"><div><h2 class="text-xl font-semibold">Générer des certificats</h2><p class="text-sm text-muted-foreground">Choisissez une émission manuelle ou une formation terminée.</p></div><Button size="icon" variant="ghost" @click="open=false"><X/></Button></div><div class="mb-5 grid grid-cols-2 border-b"><button class="border-b-2 p-3 text-sm font-medium" :class="mode==='manual'?'border-primary text-primary':'border-transparent text-muted-foreground'" @click="mode='manual'">Document manuel</button><button class="border-b-2 p-3 text-sm font-medium" :class="mode==='bulk'?'border-primary text-primary':'border-transparent text-muted-foreground'" @click="mode='bulk'">Formation / groupes</button></div>
- <form v-if="mode==='manual'" class="space-y-4" @submit.prevent="issueManual"><div class="grid gap-3 md:grid-cols-2"><label><Label>Étudiant</Label><SearchSelect v-model="manual.student_id" :options="studentOptions" placeholder="Sélectionner un étudiant" search-placeholder="Rechercher un étudiant"/></label><label><Label>Inscription facultative</Label><SearchSelect v-model="manual.course_enrollment_id" :options="enrollmentOptions" placeholder="Aucune inscription" search-placeholder="Rechercher une inscription" allow-empty/></label><label><Label>Type</Label><select v-model="manual.type" class="h-9 w-full rounded-md border bg-background px-3"><option v-for="t in types" :value="(t as any).value">{{(t as any).label}}</option></select></label><label><Label>Date d’émission</Label><Input v-model="manual.issue_date" type="date" required/></label></div>
-  <div v-if="!manual.course_enrollment_id" class="grid gap-3 rounded-md border p-4 md:grid-cols-2"><label><Label>Formation facultative</Label><SearchSelect v-model="manual.course_id" :options="courses as any[]" placeholder="Aucune formation" search-placeholder="Rechercher dans le catalogue" allow-empty/></label><label><Label>Niveau facultatif</Label><SearchSelect v-model="manual.course_level_id" :options="selectedCourse?.levels||[]" placeholder="Aucun niveau" search-placeholder="Rechercher un niveau" allow-empty/></label><label><Label>Début</Label><Input v-model="manual.formation_start" type="date"/></label><label><Label>Fin</Label><Input v-model="manual.formation_end" type="date"/></label></div>
-  <div class="grid gap-3 md:grid-cols-2"><Input v-model="manual.result" placeholder="Résultat / mention facultative"/><Input v-model="manual.signature_name" placeholder="Signataire facultatif"/></div><textarea v-model="manual.notes" class="min-h-20 w-full rounded-md border bg-background p-3" placeholder="Notes internes"></textarea><InputError :message="Object.values(manual.errors)[0]"/><div class="flex justify-end"><Button :disabled="manual.processing">Générer le document</Button></div></form>
- <form v-else class="space-y-4" @submit.prevent="issueBulk"><label><Label>Formation terminée</Label><SearchSelect v-model="bulk.training_plan_id" :options="completedPlans as any[]" placeholder="Sélectionner une formation terminée" search-placeholder="Rechercher formation, niveau ou enseignant"/></label><div v-if="selectedPlan" class="space-y-4"><div><Label>Groupes</Label><div class="mt-2 flex flex-wrap gap-2"><button v-for="g in selectedPlan.groups" :key="g.id" type="button" class="rounded-md border px-3 py-2 text-sm" :class="bulk.group_ids.includes(g.id)?'border-primary bg-primary text-primary-foreground':'bg-background'" @click="toggleGroup(g.id)">{{g.name}}</button></div></div>
-  <div v-if="candidates.length"><div class="mb-2 flex items-center justify-between"><div><b>Destinataires</b><p class="text-sm text-muted-foreground">Les profils valides sont présélectionnés. Cochez explicitement les profils signalés pour les inclure.</p></div><span class="text-sm font-medium">{{bulk.enrollment_ids.length}} / {{candidates.length}}</span></div><div class="max-h-72 overflow-y-auto rounded-md border"><label v-for="e in candidates" :key="e.id" class="grid cursor-pointer grid-cols-[28px_1fr_auto] items-center gap-2 border-b p-3 last:border-0" :class="e.warning?'bg-amber-50':''"><input type="checkbox" class="size-4" :checked="bulk.enrollment_ids.includes(e.id)" @change="toggleRecipient(e.id)"/><span><b>{{e.student.first_name}} {{e.student.last_name}}</b><small class="block text-muted-foreground">{{e.group_name}} · Présence {{e.attendance_rate===null?'non renseignée':e.attendance_rate+'%'}}</small></span><span v-if="e.warning" class="rounded bg-amber-200 px-2 py-1 text-xs text-amber-900">{{e.warning}}</span><span v-else class="rounded bg-emerald-100 px-2 py-1 text-xs text-emerald-700">Profil valide</span></label></div></div>
-  <div class="grid gap-3 md:grid-cols-3"><label><Label>Type</Label><select v-model="bulk.type" class="h-9 w-full rounded-md border bg-background px-3"><option v-for="t in types" :value="(t as any).value">{{(t as any).label}}</option></select></label><label><Label>Date d’émission</Label><Input v-model="bulk.issue_date" type="date" required/></label><label><Label>Signataire</Label><Input v-model="bulk.signature_name"/></label></div><Input v-model="bulk.result" placeholder="Résultat / mention commune facultative"/><InputError :message="Object.values(bulk.errors)[0]"/><div class="flex justify-end"><Button :disabled="bulk.processing||!bulk.enrollment_ids.length">Générer {{bulk.enrollment_ids.length}} certificat(s)</Button></div></div></form>
-</div></div></AdminLayout></template>
+<template>
+    <Head title="Certificats" /><AdminLayout
+        ><main class="flex-1 p-4 sm:p-6 lg:p-8">
+            <div class="mx-auto max-w-7xl space-y-6">
+                <header
+                    class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
+                >
+                    <div>
+                        <h1 class="text-2xl font-semibold">
+                            Certificats et attestations
+                        </h1>
+                        <p class="text-sm text-muted-foreground">
+                            Émission manuelle, génération par groupes et
+                            documents vérifiables.
+                        </p>
+                    </div>
+                    <div class="flex gap-2">
+                        <Button variant="outline" @click="openDialog('manual')"
+                            ><FilePlus2 class="mr-2 size-4" />Document
+                            manuel</Button
+                        ><Button @click="openDialog('bulk')"
+                            ><Users class="mr-2 size-4" />Générer par
+                            groupes</Button
+                        >
+                    </div>
+                </header>
+                <section class="space-y-3 border-y py-4">
+                    <div class="flex flex-col gap-2 md:flex-row">
+                        <div class="relative flex-1">
+                            <Search
+                                class="absolute top-2.5 left-3 size-4 text-muted-foreground"
+                            /><Input
+                                v-model="filters.search"
+                                class="pl-9"
+                                placeholder="Numéro, étudiant ou formation"
+                                @keyup.enter="applyFilters"
+                            />
+                        </div>
+                        <select
+                            v-model="filters.type"
+                            class="h-9 rounded-md border bg-background px-3"
+                            @change="applyFilters"
+                        >
+                            <option value="">Tous les documents</option>
+                            <option
+                                v-for="t in types"
+                                :key="(t as any).value"
+                                :value="(t as any).value"
+                            >
+                                {{ (t as any).label }}
+                            </option></select
+                        ><Button variant="outline" @click="advanced = !advanced"
+                            >Recherche avancée</Button
+                        ><Button @click="applyFilters">Rechercher</Button>
+                    </div>
+                    <div v-if="advanced" class="grid gap-3 md:grid-cols-5">
+                        <label
+                            ><Label>Du</Label
+                            ><Input
+                                v-model="filters.date_from"
+                                type="date" /></label
+                        ><label
+                            ><Label>Au</Label
+                            ><Input
+                                v-model="filters.date_to"
+                                type="date" /></label
+                        ><label
+                            ><Label>Formation</Label
+                            ><SearchSelect
+                                v-model="filters.course_id"
+                                :options="courses as any[]"
+                                placeholder="Toutes les formations"
+                                search-placeholder="Rechercher une formation"
+                                allow-empty /></label
+                        ><label
+                            ><Label>Étudiant</Label
+                            ><SearchSelect
+                                v-model="filters.student_id"
+                                :options="studentOptions"
+                                placeholder="Tous les étudiants"
+                                search-placeholder="Rechercher un étudiant"
+                                allow-empty /></label
+                        ><label
+                            ><Label>Enseignant</Label
+                            ><SearchSelect
+                                v-model="filters.teacher_id"
+                                :options="teachers as any[]"
+                                placeholder="Tous les enseignants"
+                                search-placeholder="Rechercher un enseignant"
+                                allow-empty
+                        /></label>
+                        <div class="flex justify-end gap-2 md:col-span-5">
+                            <Button variant="ghost" @click="clearFilters"
+                                >Effacer</Button
+                            ><Button @click="applyFilters">Appliquer</Button>
+                        </div>
+                    </div>
+                </section>
+                <section class="overflow-x-auto rounded-md border">
+                    <table class="w-full text-sm">
+                        <thead class="bg-muted/40">
+                            <tr class="text-left">
+                                <th class="p-3">Numéro</th>
+                                <th>Étudiant</th>
+                                <th>Formation</th>
+                                <th>Type</th>
+                                <th>Date</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr
+                                v-for="c in (certificates as any).data"
+                                :key="c.id"
+                                class="border-t"
+                            >
+                                <td class="p-3 font-mono">
+                                    {{ c.certificate_number }}
+                                </td>
+                                <td>{{ c.student_name }}</td>
+                                <td>
+                                    {{ c.formation_name || 'Document manuel' }}
+                                </td>
+                                <td>
+                                    {{
+                                        (types as any[]).find(
+                                            (t) => t.value === c.type,
+                                        )?.label || c.type
+                                    }}
+                                </td>
+                                <td>{{ c.issue_date }}</td>
+                                <td class="p-2 text-right">
+                                    <Button
+                                        as-child
+                                        size="icon"
+                                        variant="outline"
+                                        ><a
+                                            :href="`/admin/certificates/${c.id}/print`"
+                                            title="Télécharger le PDF"
+                                            ><Download class="size-4" /></a
+                                    ></Button>
+                                </td>
+                            </tr>
+                            <tr v-if="!(certificates as any).data.length">
+                                <td
+                                    colspan="6"
+                                    class="p-8 text-center text-muted-foreground"
+                                >
+                                    Aucun certificat ne correspond aux filtres.
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </section>
+                <nav
+                    v-if="(certificates as any).links?.length > 3"
+                    class="flex max-w-full gap-1 overflow-x-auto"
+                >
+                    <Link
+                        v-for="link in (certificates as any).links"
+                        :key="link.label"
+                        :href="link.url || '#'"
+                        class="rounded-md border px-3 py-2 text-sm"
+                        :class="{
+                            'bg-primary text-primary-foreground': link.active,
+                            'pointer-events-none opacity-40': !link.url,
+                        }"
+                        v-html="link.label"
+                    />
+                </nav>
+            </div>
+        </main>
+        <div
+            v-if="open"
+            class="fixed inset-0 z-50 overflow-y-auto bg-black/50 p-4"
+        >
+            <div
+                class="mx-auto my-6 w-full max-w-4xl rounded-md bg-background p-6 shadow-xl"
+            >
+                <div class="mb-5 flex items-center justify-between">
+                    <div>
+                        <h2 class="text-xl font-semibold">
+                            Générer des certificats
+                        </h2>
+                        <p class="text-sm text-muted-foreground">
+                            Choisissez une émission manuelle ou une formation
+                            terminée.
+                        </p>
+                    </div>
+                    <Button size="icon" variant="ghost" @click="open = false"
+                        ><X
+                    /></Button>
+                </div>
+                <div class="mb-5 grid grid-cols-2 border-b">
+                    <button
+                        class="border-b-2 p-3 text-sm font-medium"
+                        :class="
+                            mode === 'manual'
+                                ? 'border-primary text-primary'
+                                : 'border-transparent text-muted-foreground'
+                        "
+                        @click="mode = 'manual'"
+                    >
+                        Document manuel</button
+                    ><button
+                        class="border-b-2 p-3 text-sm font-medium"
+                        :class="
+                            mode === 'bulk'
+                                ? 'border-primary text-primary'
+                                : 'border-transparent text-muted-foreground'
+                        "
+                        @click="mode = 'bulk'"
+                    >
+                        Formation / groupes
+                    </button>
+                </div>
+                <form
+                    v-if="mode === 'manual'"
+                    class="space-y-4"
+                    @submit.prevent="issueManual"
+                >
+                    <div class="grid gap-3 md:grid-cols-2">
+                        <label
+                            ><Label>Étudiant</Label
+                            ><SearchSelect
+                                v-model="manual.student_id"
+                                :options="studentOptions"
+                                placeholder="Sélectionner un étudiant"
+                                search-placeholder="Rechercher un étudiant" /></label
+                        ><label
+                            ><Label>Inscription facultative</Label
+                            ><SearchSelect
+                                v-model="manual.course_enrollment_id"
+                                :options="enrollmentOptions"
+                                placeholder="Aucune inscription"
+                                search-placeholder="Rechercher une inscription"
+                                allow-empty /></label
+                        ><label
+                            ><Label>Type</Label
+                            ><select
+                                v-model="manual.type"
+                                class="h-9 w-full rounded-md border bg-background px-3"
+                            >
+                                <option
+                                    v-for="t in types"
+                                    :value="(t as any).value"
+                                >
+                                    {{ (t as any).label }}
+                                </option>
+                            </select></label
+                        ><label
+                            ><Label>Date d’émission</Label
+                            ><Input
+                                v-model="manual.issue_date"
+                                type="date"
+                                required
+                        /></label>
+                    </div>
+                    <div
+                        v-if="!manual.course_enrollment_id"
+                        class="grid gap-3 rounded-md border p-4 md:grid-cols-2"
+                    >
+                        <label
+                            ><Label>Formation facultative</Label
+                            ><SearchSelect
+                                v-model="manual.course_id"
+                                :options="courses as any[]"
+                                placeholder="Aucune formation"
+                                search-placeholder="Rechercher dans le catalogue"
+                                allow-empty /></label
+                        ><label
+                            ><Label>Niveau facultatif</Label
+                            ><SearchSelect
+                                v-model="manual.course_level_id"
+                                :options="selectedCourse?.levels || []"
+                                placeholder="Aucun niveau"
+                                search-placeholder="Rechercher un niveau"
+                                allow-empty /></label
+                        ><label
+                            ><Label>Début</Label
+                            ><Input
+                                v-model="manual.formation_start"
+                                type="date" /></label
+                        ><label
+                            ><Label>Fin</Label
+                            ><Input v-model="manual.formation_end" type="date"
+                        /></label>
+                    </div>
+                    <div class="grid gap-3 md:grid-cols-2">
+                        <Input
+                            v-model="manual.result"
+                            placeholder="Résultat / mention facultative"
+                        /><Input
+                            v-model="manual.signature_name"
+                            placeholder="Signataire facultatif"
+                        />
+                    </div>
+                    <textarea
+                        v-model="manual.notes"
+                        class="min-h-20 w-full rounded-md border bg-background p-3"
+                        placeholder="Notes internes"
+                    ></textarea
+                    ><InputError :message="Object.values(manual.errors)[0]" />
+                    <div class="flex justify-end">
+                        <Button :disabled="manual.processing"
+                            >Générer le document</Button
+                        >
+                    </div>
+                </form>
+                <form v-else class="space-y-4" @submit.prevent="issueBulk">
+                    <label
+                        ><Label>Formation terminée</Label
+                        ><SearchSelect
+                            v-model="bulk.training_plan_id"
+                            :options="completedPlans as any[]"
+                            placeholder="Sélectionner une formation terminée"
+                            search-placeholder="Rechercher formation, niveau ou enseignant"
+                    /></label>
+                    <div v-if="selectedPlan" class="space-y-4">
+                        <div>
+                            <Label>Groupes</Label>
+                            <div class="mt-2 flex flex-wrap gap-2">
+                                <button
+                                    v-for="g in selectedPlan.groups"
+                                    :key="g.id"
+                                    type="button"
+                                    class="rounded-md border px-3 py-2 text-sm"
+                                    :class="
+                                        bulk.group_ids.includes(g.id)
+                                            ? 'border-primary bg-primary text-primary-foreground'
+                                            : 'bg-background'
+                                    "
+                                    @click="toggleGroup(g.id)"
+                                >
+                                    {{ g.name }}
+                                </button>
+                            </div>
+                        </div>
+                        <div v-if="candidates.length">
+                            <div class="mb-2 flex items-center justify-between">
+                                <div>
+                                    <b>Destinataires</b>
+                                    <p class="text-sm text-muted-foreground">
+                                        Les profils valides sont
+                                        présélectionnés. Cochez explicitement
+                                        les profils signalés pour les inclure.
+                                    </p>
+                                </div>
+                                <span class="text-sm font-medium"
+                                    >{{ bulk.enrollment_ids.length }} /
+                                    {{ candidates.length }}</span
+                                >
+                            </div>
+                            <div
+                                class="max-h-72 overflow-y-auto rounded-md border"
+                            >
+                                <label
+                                    v-for="e in candidates"
+                                    :key="e.id"
+                                    class="grid cursor-pointer grid-cols-[28px_1fr_auto] items-center gap-2 border-b p-3 last:border-0"
+                                    :class="e.warning ? 'bg-amber-50' : ''"
+                                    ><input
+                                        type="checkbox"
+                                        class="size-4"
+                                        :checked="
+                                            bulk.enrollment_ids.includes(e.id)
+                                        "
+                                        @change="toggleRecipient(e.id)"
+                                    /><span
+                                        ><b
+                                            >{{ e.student.first_name }}
+                                            {{ e.student.last_name }}</b
+                                        ><small
+                                            class="block text-muted-foreground"
+                                            >{{ e.group_name }} · Présence
+                                            {{
+                                                e.attendance_rate === null
+                                                    ? 'non renseignée'
+                                                    : e.attendance_rate + '%'
+                                            }}</small
+                                        ></span
+                                    ><span
+                                        v-if="e.warning"
+                                        class="rounded bg-amber-200 px-2 py-1 text-xs text-amber-900"
+                                        >{{ e.warning }}</span
+                                    ><span
+                                        v-else
+                                        class="rounded bg-emerald-100 px-2 py-1 text-xs text-emerald-700"
+                                        >Profil valide</span
+                                    ></label
+                                >
+                            </div>
+                        </div>
+                        <div class="grid gap-3 md:grid-cols-3">
+                            <label
+                                ><Label>Type</Label
+                                ><select
+                                    v-model="bulk.type"
+                                    class="h-9 w-full rounded-md border bg-background px-3"
+                                >
+                                    <option
+                                        v-for="t in types"
+                                        :value="(t as any).value"
+                                    >
+                                        {{ (t as any).label }}
+                                    </option>
+                                </select></label
+                            ><label
+                                ><Label>Date d’émission</Label
+                                ><Input
+                                    v-model="bulk.issue_date"
+                                    type="date"
+                                    required /></label
+                            ><label
+                                ><Label>Signataire</Label
+                                ><Input v-model="bulk.signature_name"
+                            /></label>
+                        </div>
+                        <Input
+                            v-model="bulk.result"
+                            placeholder="Résultat / mention commune facultative"
+                        /><InputError
+                            :message="Object.values(bulk.errors)[0]"
+                        />
+                        <div class="flex justify-end">
+                            <Button
+                                :disabled="
+                                    bulk.processing ||
+                                    !bulk.enrollment_ids.length
+                                "
+                                >Générer
+                                {{
+                                    bulk.enrollment_ids.length
+                                }}
+                                certificat(s)</Button
+                            >
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div></AdminLayout
+    >
+</template>

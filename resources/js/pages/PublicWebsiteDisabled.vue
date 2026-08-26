@@ -48,12 +48,15 @@ const address = computed(() => {
                 <a
                     :href="`tel:${phone.replace(/\s+/g, '')}`"
                     class="block hover:text-orange-600"
-                    ><span class="font-semibold">Téléphone :</span> {{ phone }}</a
+                    ><span class="font-semibold">Téléphone :</span>
+                    {{ phone }}</a
                 >
                 <a :href="`mailto:${email}`" class="block hover:text-orange-600"
                     ><span class="font-semibold">Email:</span> {{ email }}</a
                 >
-                <p><span class="font-semibold">Adresse :</span> {{ address }}</p>
+                <p>
+                    <span class="font-semibold">Adresse :</span> {{ address }}
+                </p>
             </div>
         </section>
     </main>

@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { appConfirm, appPrompt } from '@/composables/useAppDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { appConfirm, appPrompt } from '@/composables/useAppDialog';
 import AdminLayout from '@/layouts/AdminLayout.vue';
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
 import { computed, ref, watch } from 'vue';
@@ -100,7 +100,12 @@ function recordPayment() {
 }
 
 async function approve(payment: Payment) {
-    if (await appConfirm(`Approuver le paiement ${payment.payment_number} ?`, { title: 'Approuver le paiement', confirmText: 'Approuver' })) {
+    if (
+        await appConfirm(`Approuver le paiement ${payment.payment_number} ?`, {
+            title: 'Approuver le paiement',
+            confirmText: 'Approuver',
+        })
+    ) {
         router.patch(
             `/admin/payments/${payment.id}/approve`,
             {},
@@ -112,7 +117,12 @@ async function approve(payment: Payment) {
 async function disapprove(payment: Payment) {
     const notes = await appPrompt(
         `Refuser le paiement ${payment.payment_number} ? Ajoutez éventuellement un motif pour le client :`,
-        { title: 'Refuser le paiement', tone: 'warning', inputLabel: 'Motif (facultatif)', confirmText: 'Refuser' },
+        {
+            title: 'Refuser le paiement',
+            tone: 'warning',
+            inputLabel: 'Motif (facultatif)',
+            confirmText: 'Refuser',
+        },
     );
     if (notes !== null) {
         router.patch(
@@ -149,7 +159,9 @@ watch(
                 </div>
                 <Button @click="showManualForm = !showManualForm">
                     {{
-                        showManualForm ? 'Fermer le formulaire' : 'Enregistrer un paiement manuel'
+                        showManualForm
+                            ? 'Fermer le formulaire'
+                            : 'Enregistrer un paiement manuel'
                     }}
                 </Button>
             </div>
@@ -162,7 +174,8 @@ watch(
                 <div class="md:col-span-2">
                     <h2 class="font-medium">Enregistrer un paiement</h2>
                     <p class="text-sm text-muted-foreground">
-                        Les paiements manuels sont enregistrés comme approuvés immédiatement.
+                        Les paiements manuels sont enregistrés comme approuvés
+                        immédiatement.
                     </p>
                 </div>
                 <label class="grid gap-1 text-sm font-medium">
@@ -349,8 +362,19 @@ watch(
                                 {{ fmtMoney(payment.amount) }}
                             </td>
                             <td class="px-4 py-3 capitalize">
-                                <div>{{ payment.payment_method.replace('_', ' ') }}</div>
-                                <a v-if="payment.proof_url" :href="payment.proof_url" target="_blank" rel="noopener" class="text-xs font-medium text-blue-600 hover:underline">Voir la preuve</a>
+                                <div>
+                                    {{
+                                        payment.payment_method.replace('_', ' ')
+                                    }}
+                                </div>
+                                <a
+                                    v-if="payment.proof_url"
+                                    :href="payment.proof_url"
+                                    target="_blank"
+                                    rel="noopener"
+                                    class="text-xs font-medium text-blue-600 hover:underline"
+                                    >Voir la preuve</a
+                                >
                             </td>
                             <td class="px-4 py-3">
                                 <span

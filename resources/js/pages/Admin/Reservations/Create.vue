@@ -7,7 +7,13 @@ import AdminLayout from '@/layouts/AdminLayout.vue';
 import { Head, Link, useForm } from '@inertiajs/vue3';
 import { computed, watch } from 'vue';
 
-type Client = { id: number; name: string; email: string; phone?: string; is_active: boolean };
+type Client = {
+    id: number;
+    name: string;
+    email: string;
+    phone?: string;
+    is_active: boolean;
+};
 type Car = {
     id: number;
     make: string;
@@ -60,8 +66,10 @@ const totalDays = computed(() => {
         : Math.floor((end.getTime() - start.getTime()) / 86400000) + 1;
 });
 const subtotal = computed(() => totalDays.value * Number(form.daily_rate || 0));
-const taxAmount = computed(
-    () => props.tax.enabled ? (subtotal.value * Number(props.tax.rate || 0)) / 100 : 0,
+const taxAmount = computed(() =>
+    props.tax.enabled
+        ? (subtotal.value * Number(props.tax.rate || 0)) / 100
+        : 0,
 );
 const totalAmount = computed(() =>
     Math.max(
@@ -220,9 +228,20 @@ watch(
                             />
                         </div>
                         <div>
-                            <Label for="client_phone">Numéro de téléphone</Label>
-                            <Input id="client_phone" v-model="form.client_phone" type="tel" maxlength="50" required />
-                            <InputError :message="form.errors.client_phone" class="mt-1" />
+                            <Label for="client_phone"
+                                >Numéro de téléphone</Label
+                            >
+                            <Input
+                                id="client_phone"
+                                v-model="form.client_phone"
+                                type="tel"
+                                maxlength="50"
+                                required
+                            />
+                            <InputError
+                                :message="form.errors.client_phone"
+                                class="mt-1"
+                            />
                         </div>
                         <div>
                             <Label for="client_password"
@@ -378,7 +397,13 @@ watch(
                         </div>
                         <div>
                             <Label>Taxe de l'agence</Label>
-                            <div class="mt-1 flex h-9 items-center rounded-md border bg-muted/40 px-3 text-sm">{{ tax.enabled ? `${tax.rate}%` : 'Désactivée' }}</div>
+                            <div
+                                class="mt-1 flex h-9 items-center rounded-md border bg-muted/40 px-3 text-sm"
+                            >
+                                {{
+                                    tax.enabled ? `${tax.rate}%` : 'Désactivée'
+                                }}
+                            </div>
                         </div>
                         <div>
                             <Label for="discount_amount">Remise</Label
@@ -424,11 +449,20 @@ watch(
                     >
                         <div class="flex items-center justify-between">
                             <span>Caution remboursable du véhicule</span>
-                            <strong>{{ money(Number(selectedCar?.security_deposit)) }}</strong>
+                            <strong>{{
+                                money(Number(selectedCar?.security_deposit))
+                            }}</strong>
                         </div>
-                        <div class="mt-1 flex items-center justify-between text-sm">
+                        <div
+                            class="mt-1 flex items-center justify-between text-sm"
+                        >
                             <span>Montant à prévoir avec caution</span>
-                            <strong>{{ money(totalAmount + Number(selectedCar?.security_deposit)) }}</strong>
+                            <strong>{{
+                                money(
+                                    totalAmount +
+                                        Number(selectedCar?.security_deposit),
+                                )
+                            }}</strong>
                         </div>
                     </div>
                     <div>

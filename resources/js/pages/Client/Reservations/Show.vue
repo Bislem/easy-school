@@ -57,16 +57,36 @@ function fmtMoney(n?: number | string) {
 }
 
 const proofFolders = ref<string[]>([]);
-const proofForm = useForm({ proof: [] as string[], transaction_id: '', notes: '' });
-const advancePayment = computed(() => (props.reservation.payments || []).find((payment: any) => payment.payment_type === 'advance' && ['pending', 'completed'].includes(payment.status)));
-const canSubmitProof = computed(() => Number(props.reservation.required_advance_amount) > 0 && !advancePayment.value);
+const proofForm = useForm({
+    proof: [] as string[],
+    transaction_id: '',
+    notes: '',
+});
+const advancePayment = computed(() =>
+    (props.reservation.payments || []).find(
+        (payment: any) =>
+            payment.payment_type === 'advance' &&
+            ['pending', 'completed'].includes(payment.status),
+    ),
+);
+const canSubmitProof = computed(
+    () =>
+        Number(props.reservation.required_advance_amount) > 0 &&
+        !advancePayment.value,
+);
 
 function submitProof() {
     proofForm.proof = [...proofFolders.value];
-    proofForm.post(`/client/reservations/${props.reservation.id}/payment-proof`, {
-        preserveScroll: true,
-        onSuccess: () => { proofFolders.value = []; proofForm.reset(); },
-    });
+    proofForm.post(
+        `/client/reservations/${props.reservation.id}/payment-proof`,
+        {
+            preserveScroll: true,
+            onSuccess: () => {
+                proofFolders.value = [];
+                proofForm.reset();
+            },
+        },
+    );
 }
 </script>
 
@@ -74,10 +94,14 @@ function submitProof() {
     <Head :title="`Réservation ${reservation?.reservation_number || ''}`" />
     <ClientLayout>
         <main class="flex-1 space-y-5 p-4 sm:space-y-6 sm:p-6 lg:p-8">
-            <div class="flex flex-col items-stretch gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div
+                class="flex flex-col items-stretch gap-4 sm:flex-row sm:items-center sm:justify-between"
+            >
                 <h1 class="min-w-0 text-xl font-semibold sm:text-2xl">
                     <span class="block sm:inline">Réservation</span>
-                    <span class="break-all sm:break-normal">{{ reservation?.reservation_number }}</span>
+                    <span class="break-all sm:break-normal">{{
+                        reservation?.reservation_number
+                    }}</span>
                 </h1>
                 <div class="grid grid-cols-2 gap-2 sm:flex sm:shrink-0">
                     <Link :href="index().url" class="min-w-0">
@@ -89,7 +113,9 @@ function submitProof() {
                         rel="noopener"
                         class="min-w-0"
                     >
-                        <Button variant="secondary" class="w-full">Imprimer</Button>
+                        <Button variant="secondary" class="w-full"
+                            >Imprimer</Button
+                        >
                     </a>
                 </div>
             </div>
@@ -246,7 +272,10 @@ function submitProof() {
                                 {{ fmtMoney(reservation.subtotal) }}
                             </div>
                         </div>
-                        <div v-if="Number(reservation.tax_amount) > 0" class="flex items-center justify-between">
+                        <div
+                            v-if="Number(reservation.tax_amount) > 0"
+                            class="flex items-center justify-between"
+                        >
                             <div class="text-sm">Taxe</div>
                             <div class="font-medium">
                                 {{ fmtMoney(reservation.tax_amount) }}
@@ -258,9 +287,20 @@ function submitProof() {
                                 -{{ fmtMoney(reservation.discount_amount) }}
                             </div>
                         </div>
-                        <div v-if="Number(reservation.security_deposit_amount) > 0" class="flex items-center justify-between rounded bg-amber-50 px-2 py-2 text-amber-800">
+                        <div
+                            v-if="
+                                Number(reservation.security_deposit_amount) > 0
+                            "
+                            class="flex items-center justify-between rounded bg-amber-50 px-2 py-2 text-amber-800"
+                        >
                             <div class="text-sm">Caution remboursable</div>
-                            <div class="font-medium">{{ fmtMoney(reservation.security_deposit_amount) }}</div>
+                            <div class="font-medium">
+                                {{
+                                    fmtMoney(
+                                        reservation.security_deposit_amount,
+                                    )
+                                }}
+                            </div>
                         </div>
                         <div
                             class="flex items-center justify-between border-t pt-2"
@@ -270,24 +310,123 @@ function submitProof() {
                                 {{ fmtMoney(reservation.total_amount) }}
                             </div>
                         </div>
-                        <div v-if="Number(reservation.security_deposit_amount) > 0" class="flex items-center justify-between text-sm">
+                        <div
+                            v-if="
+                                Number(reservation.security_deposit_amount) > 0
+                            "
+                            class="flex items-center justify-between text-sm"
+                        >
                             <div>Montant avec caution</div>
-                            <div class="font-semibold">{{ fmtMoney(Number(reservation.total_amount) + Number(reservation.security_deposit_amount)) }}</div>
+                            <div class="font-semibold">
+                                {{
+                                    fmtMoney(
+                                        Number(reservation.total_amount) +
+                                            Number(
+                                                reservation.security_deposit_amount,
+                                            ),
+                                    )
+                                }}
+                            </div>
                         </div>
                     </div>
                 </div>
 
                 <!-- Payments -->
-                <div v-if="Number(reservation.required_advance_amount) > 0" class="rounded-md border border-amber-200 md:col-span-2">
-                    <div class="border-b border-amber-200 bg-amber-50 px-4 py-3 font-medium text-amber-900">Avance requise pour confirmer la réservation</div>
+                <div
+                    v-if="Number(reservation.required_advance_amount) > 0"
+                    class="rounded-md border border-amber-200 md:col-span-2"
+                >
+                    <div
+                        class="border-b border-amber-200 bg-amber-50 px-4 py-3 font-medium text-amber-900"
+                    >
+                        Avance requise pour confirmer la réservation
+                    </div>
                     <div class="space-y-4 p-4">
-                        <div class="flex flex-wrap items-center justify-between gap-3"><div><p class="text-sm text-muted-foreground">{{ reservation.advance_percentage }}% du total de location</p><p class="text-xl font-bold">{{ fmtMoney(reservation.required_advance_amount) }}</p></div><span v-if="advancePayment" class="rounded-full px-3 py-1 text-sm" :class="advancePayment.status === 'completed' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'">{{ advancePayment.status === 'completed' ? 'Paiement approuvé' : 'Preuve en vérification' }}</span></div>
-                        <form v-if="canSubmitProof" class="grid gap-4 md:grid-cols-2" @submit.prevent="submitProof">
-                            <div class="md:col-span-2"><p class="text-sm">Téléversez une preuve lisible du paiement Algérie Poste. L'agence vérifiera le montant et les détails avant d'approuver la réservation.</p></div>
-                            <div class="md:col-span-2"><FileUpload v-model="proofFolders" :allow-multiple="false" :max-files="1" :required="true" :allowed-file-types="['image/jpeg', 'image/png', 'image/webp', 'application/pdf']" collection="proof" /><span v-if="proofForm.errors.proof" class="text-xs text-destructive">{{ proofForm.errors.proof }}</span></div>
-                            <label class="grid gap-1 text-sm font-medium">Référence de transaction (facultatif)<input v-model="proofForm.transaction_id" class="h-9 rounded-md border bg-background px-3" maxlength="255" /></label>
-                            <label class="grid gap-1 text-sm font-medium">Notes (facultatif)<input v-model="proofForm.notes" class="h-9 rounded-md border bg-background px-3" maxlength="2000" /></label>
-                            <div class="md:col-span-2"><Button type="submit" :disabled="proofForm.processing || proofFolders.length !== 1">Envoyer la preuve de paiement</Button></div>
+                        <div
+                            class="flex flex-wrap items-center justify-between gap-3"
+                        >
+                            <div>
+                                <p class="text-sm text-muted-foreground">
+                                    {{ reservation.advance_percentage }}% du
+                                    total de location
+                                </p>
+                                <p class="text-xl font-bold">
+                                    {{
+                                        fmtMoney(
+                                            reservation.required_advance_amount,
+                                        )
+                                    }}
+                                </p>
+                            </div>
+                            <span
+                                v-if="advancePayment"
+                                class="rounded-full px-3 py-1 text-sm"
+                                :class="
+                                    advancePayment.status === 'completed'
+                                        ? 'bg-green-100 text-green-700'
+                                        : 'bg-yellow-100 text-yellow-700'
+                                "
+                                >{{
+                                    advancePayment.status === 'completed'
+                                        ? 'Paiement approuvé'
+                                        : 'Preuve en vérification'
+                                }}</span
+                            >
+                        </div>
+                        <form
+                            v-if="canSubmitProof"
+                            class="grid gap-4 md:grid-cols-2"
+                            @submit.prevent="submitProof"
+                        >
+                            <div class="md:col-span-2">
+                                <p class="text-sm">
+                                    Téléversez une preuve lisible du paiement
+                                    Algérie Poste. L'agence vérifiera le montant
+                                    et les détails avant d'approuver la
+                                    réservation.
+                                </p>
+                            </div>
+                            <div class="md:col-span-2">
+                                <FileUpload
+                                    v-model="proofFolders"
+                                    :allow-multiple="false"
+                                    :max-files="1"
+                                    :required="true"
+                                    :allowed-file-types="[
+                                        'image/jpeg',
+                                        'image/png',
+                                        'image/webp',
+                                        'application/pdf',
+                                    ]"
+                                    collection="proof"
+                                /><span
+                                    v-if="proofForm.errors.proof"
+                                    class="text-xs text-destructive"
+                                    >{{ proofForm.errors.proof }}</span
+                                >
+                            </div>
+                            <label class="grid gap-1 text-sm font-medium"
+                                >Référence de transaction (facultatif)<input
+                                    v-model="proofForm.transaction_id"
+                                    class="h-9 rounded-md border bg-background px-3"
+                                    maxlength="255"
+                            /></label>
+                            <label class="grid gap-1 text-sm font-medium"
+                                >Notes (facultatif)<input
+                                    v-model="proofForm.notes"
+                                    class="h-9 rounded-md border bg-background px-3"
+                                    maxlength="2000"
+                            /></label>
+                            <div class="md:col-span-2">
+                                <Button
+                                    type="submit"
+                                    :disabled="
+                                        proofForm.processing ||
+                                        proofFolders.length !== 1
+                                    "
+                                    >Envoyer la preuve de paiement</Button
+                                >
+                            </div>
                         </form>
                     </div>
                 </div>
