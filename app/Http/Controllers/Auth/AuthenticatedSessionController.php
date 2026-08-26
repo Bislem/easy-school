@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers\Auth;
 
+use App\Enums\UserRole;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\LoginRequest;
+use App\Models\CompanySetting;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -11,8 +13,7 @@ use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use Inertia\Response;
 use Laravel\Fortify\Features;
-use App\Enums\UserRole;
-use App\Models\CompanySetting;
+use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
 
 class AuthenticatedSessionController extends Controller
 {
@@ -30,7 +31,7 @@ class AuthenticatedSessionController extends Controller
     /**
      * Handle an incoming authentication request.
      */
-    public function store(LoginRequest $request): RedirectResponse
+    public function store(LoginRequest $request): SymfonyResponse
     {
         $user = $request->validateCredentials();
         $role = $user->getRawOriginal('role');
@@ -53,6 +54,7 @@ class AuthenticatedSessionController extends Controller
 
         if (! $user->is_active) {
             Auth::logout();
+
             return back()->withErrors(['email' => "Votre compte est inactif. Veuillez contacter l'administrateur."])->onlyInput('email');
         }
 
@@ -68,7 +70,11 @@ class AuthenticatedSessionController extends Controller
         Auth::login($user, $request->boolean('remember'));
         $request->session()->regenerate();
 
-        return redirect()->intended(route('dashboard', absolute: false));
+        $destination = redirect()->intended(route('dashboard', absolute: false));
+
+        // Authentication regenerates the session. Force a full navigation for
+        // Inertia logins so the dashboard request always uses the new cookie.
+        return Inertia::location($destination);
     }
 
     /**

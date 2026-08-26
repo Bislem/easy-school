@@ -58,11 +58,21 @@ async function messagingContext() {
     };
 }
 
-function csrfToken(): string {
-    return (
-        document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')
-            ?.content || ''
-    );
+function csrfHeaders(): Record<string, string> {
+    const xsrfCookie = document.cookie
+        .split('; ')
+        .find((cookie) => cookie.startsWith('XSRF-TOKEN='))
+        ?.slice('XSRF-TOKEN='.length);
+
+    if (xsrfCookie) {
+        return { 'X-XSRF-TOKEN': decodeURIComponent(xsrfCookie) };
+    }
+
+    return {
+        'X-CSRF-TOKEN':
+            document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')
+                ?.content || '',
+    };
 }
 
 export async function enableFirebaseNotifications(): Promise<void> {
@@ -82,7 +92,7 @@ export async function enableFirebaseNotifications(): Promise<void> {
         headers: {
             'Content-Type': 'application/json',
             Accept: 'application/json',
-            'X-CSRF-TOKEN': csrfToken(),
+            ...csrfHeaders(),
         },
         body: JSON.stringify({ token }),
     });
@@ -130,7 +140,7 @@ export async function startFirebaseMessaging(): Promise<void> {
             headers: {
                 'Content-Type': 'application/json',
                 Accept: 'application/json',
-                'X-CSRF-TOKEN': csrfToken(),
+                ...csrfHeaders(),
             },
             body: JSON.stringify({ token }),
         }).catch(() => undefined);

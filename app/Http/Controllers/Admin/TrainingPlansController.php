@@ -391,6 +391,14 @@ class TrainingPlansController extends Controller
 
     private function notifySessionAudience(TrainingPlan $plan,TrainingPlanGroup $group,TrainingSession $session,string $type,string $title,string $message): void
     {
+        $session->loadMissing('classroom');
+        $message = collect([
+            $message,
+            'Séance : '.$session->title,
+            'Groupe : '.$group->name,
+            $session->starts_at ? 'Date : '.$session->starts_at->format('d/m/Y à H:i') : null,
+            $session->classroom?->name ? 'Salle : '.$session->classroom->name : null,
+        ])->filter()->implode(' • ');
         $users=collect([$session->teacher_id,$plan->teacher_id]);
         $enrollments=CourseEnrollment::with(['student.user','student.parents.user'])->where('enrollment_form_id',$plan->enrollment_form_id)->where('group_number',$group->group_number)->where('status','registered')->get();
         foreach($enrollments as $enrollment)$users=$users->merge([$enrollment->student?->user_id])->merge($enrollment->student?->parents?->pluck('user_id')??[]);

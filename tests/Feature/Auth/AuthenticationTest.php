@@ -23,6 +23,19 @@ test('users can authenticate using the login screen', function () {
     $response->assertRedirect(route('dashboard', absolute: false));
 });
 
+test('inertia logins perform a full navigation with the regenerated session', function () {
+    $user = User::factory()->create();
+
+    $response = $this->withHeader('X-Inertia', 'true')->post(route('login.store'), [
+        'email' => $user->email,
+        'password' => 'password',
+    ]);
+
+    $this->assertAuthenticatedAs($user);
+    $response->assertStatus(409)
+        ->assertHeader('X-Inertia-Location', route('dashboard'));
+});
+
 test('parents can authenticate using the shared login portal', function () {
     $parent = User::factory()->create([
         'role' => UserRole::PARENT,
