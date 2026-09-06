@@ -5,8 +5,10 @@ use App\Models\AcademicPeriod;
 use App\Models\Classroom;
 use App\Models\Course;
 use App\Models\CourseLevel;
-use App\Models\Tenant;
+use App\Models\SchoolCycle;
+use App\Models\SchoolLevel;
 use App\Models\SchoolSite;
+use App\Models\Tenant;
 use App\Models\TimetableSession;
 use App\Models\TrainingPlan;
 use App\Models\TrainingPlanGroup;
@@ -26,6 +28,7 @@ function timetableFixture(Tenant $tenant): array
     $group = TrainingPlanGroup::create(['training_plan_id' => $plan->id, 'classroom_id' => $room->id, 'group_number' => 1, 'name' => '1AP-A']);
     $period = AcademicPeriod::create(['name' => 'Année scolaire', 'academic_year' => '2026-2027', 'starts_on' => '2026-09-01', 'ends_on' => '2027-06-30', 'is_current' => true]);
     app(TenantContext::class)->clear();
+
     return compact('teacher', 'course', 'room', 'group', 'period');
 }
 
@@ -75,7 +78,9 @@ test('room reservations are linked and disabled rooms are blocked', function () 
     $session = TimetableSession::find($created->json('data.id'));
     expect($session->reservation)->not->toBeNull()->and($session->reservation->classroom_id)->toBe($f['room']->id);
 
-    app(TenantContext::class)->set($tenant); $f['room']->update(['is_available' => false]); app(TenantContext::class)->clear();
+    app(TenantContext::class)->set($tenant);
+    $f['room']->update(['is_available' => false]);
+    app(TenantContext::class)->clear();
     $this->postJson('/api/v1/timetable/sessions/check-conflicts', [...$payload, 'day' => 5])->assertOk()->assertJsonPath('available', false)->assertJsonPath('conflicts.0.type', 'room_unavailable');
 });
 
@@ -110,4 +115,34 @@ test('a recurring occurrence can move rooms without changing its weekly series',
         ->and(TimetableSession::find($baseId)->classroom_id)->toBe($f['room']->id)
         ->and(TimetableSession::find($exceptionId)->reservation->classroom_id)->toBe($room->id);
     $this->getJson('/api/v1/timetable/calendar?from=2026-09-07&to=2026-09-07')->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.room.id', $room->id);
+});
+
+test('conflict checker enforces group subject and teacher assignments', function () {
+    $tenant = Tenant::factory()->create();
+    $admin = User::factory()->create(['tenant_id' => $tenant->id, 'role' => UserRole::ADMIN]);
+    $f = timetableFixture($tenant);
+
+    app(TenantContext::class)->set($tenant);
+    $cycle = SchoolCycle::create(['name' => 'CEM', 'code' => 'CEM', 'sort_order' => 1]);
+    $groupLevel = SchoolLevel::create(['school_cycle_id' => $cycle->id, 'name' => '2AM', 'code' => '2AM', 'sort_order' => 1]);
+    $subjectLevel = SchoolLevel::create(['school_cycle_id' => $cycle->id, 'name' => '3AM', 'code' => '3AM', 'sort_order' => 2]);
+    $otherTeacher = User::factory()->create(['tenant_id' => $tenant->id, 'role' => UserRole::TEACHER]);
+    $f['group']->update(['school_level_id' => $groupLevel->id, 'academic_period_id' => $f['period']->id]);
+    $f['group']->teachers()->sync([$f['teacher']->id]);
+    $f['course']->schoolLevels()->sync([$subjectLevel->id]);
+    $f['course']->teachers()->sync([$f['teacher']->id]);
+    app(TenantContext::class)->clear();
+
+    $response = $this->actingAs($admin, 'sanctum')->postJson('/api/v1/timetable/sessions/check-conflicts', [
+        'training_plan_group_id' => $f['group']->id,
+        'course_id' => $f['course']->id,
+        'teacher_id' => $otherTeacher->id,
+        'academic_period_id' => $f['period']->id,
+        'day' => 2,
+        'start_time' => '08:00',
+        'end_time' => '09:00',
+    ])->assertOk()->assertJsonPath('available', false);
+
+    expect(collect($response->json('conflicts'))->pluck('type')->all())
+        ->toContain('subject_level', 'teacher_subject', 'teacher_group');
 });

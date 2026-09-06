@@ -7,6 +7,7 @@ import AdminLayout from '@/layouts/AdminLayout.vue';
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
 import {
     Building2,
+    DoorOpen,
     MapPin,
     Pencil,
     Plus,
@@ -20,12 +21,18 @@ interface Classroom {
     id: number;
     name: string;
     code: string;
+    type: string;
     capacity: number;
     location?: string | null;
     description?: string | null;
     is_active: boolean;
+    is_available: boolean;
     school_site_id: number;
     site: Site;
+}
+interface RoomType {
+    value: string;
+    label: string;
 }
 interface Site {
     id: number;
@@ -44,6 +51,7 @@ interface PaginationLink {
 const props = defineProps<{
     classrooms: { data: Classroom[]; links: PaginationLink[]; total: number };
     sites: Site[];
+    roomTypes: RoomType[];
     filters: { search?: string; status?: string; site_id?: string };
 }>();
 
@@ -57,10 +65,12 @@ const form = useForm({
     school_site_id: '',
     name: '',
     code: '',
+    type: 'classroom',
     capacity: 1,
     location: '',
     description: '',
     is_active: true,
+    is_available: true,
 });
 
 function applyFilters() {
@@ -79,6 +89,8 @@ function openCreate() {
     form.school_site_id =
         props.sites.length === 1 ? String(props.sites[0].id) : '';
     form.is_active = true;
+    form.is_available = true;
+    form.type = 'classroom';
     modalOpen.value = true;
 }
 
@@ -88,10 +100,12 @@ function openEdit(classroom: Classroom) {
     form.name = classroom.name;
     form.school_site_id = String(classroom.school_site_id);
     form.code = classroom.code;
+    form.type = classroom.type || 'classroom';
     form.capacity = classroom.capacity;
     form.location = classroom.location ?? '';
     form.description = classroom.description ?? '';
     form.is_active = classroom.is_active;
+    form.is_available = classroom.is_available;
     modalOpen.value = true;
 }
 
@@ -123,6 +137,8 @@ const paginationLabel = (label: string) =>
         .replace('&raquo;', '›')
         .replace('Previous', 'Précédent')
         .replace('Next', 'Suivant');
+const roomTypeLabel = (type: string) =>
+    props.roomTypes.find((item) => item.value === type)?.label || type;
 </script>
 
 <template>
@@ -192,6 +208,7 @@ const paginationLabel = (label: string) =>
                             <tr>
                                 <th class="px-5 py-3 font-medium">Salle</th>
                                 <th class="px-5 py-3 font-medium">Site</th>
+                                <th class="px-5 py-3 font-medium">Type</th>
                                 <th class="px-5 py-3 font-medium">Capacité</th>
                                 <th class="px-5 py-3 font-medium">
                                     Emplacement
@@ -226,6 +243,16 @@ const paginationLabel = (label: string) =>
                                 <td class="px-5 py-4">
                                     <span
                                         class="inline-flex items-center gap-1.5"
+                                    >
+                                        <DoorOpen
+                                            class="size-4 text-blue-600"
+                                        />
+                                        {{ roomTypeLabel(classroom.type) }}
+                                    </span>
+                                </td>
+                                <td class="px-5 py-4">
+                                    <span
+                                        class="inline-flex items-center gap-1.5"
                                         ><Users
                                             class="size-4 text-muted-foreground"
                                         />{{ classroom.capacity }} places</span
@@ -235,19 +262,37 @@ const paginationLabel = (label: string) =>
                                     {{ classroom.location || '—' }}
                                 </td>
                                 <td class="px-5 py-4">
-                                    <span
-                                        class="rounded-full px-2.5 py-1 text-xs font-medium"
-                                        :class="
-                                            classroom.is_active
-                                                ? 'bg-green-100 text-green-700'
-                                                : 'bg-red-100 text-red-700'
-                                        "
-                                        >{{
-                                            classroom.is_active
-                                                ? 'Active'
-                                                : 'Inactive'
-                                        }}</span
+                                    <div
+                                        class="flex flex-col items-start gap-1.5"
                                     >
+                                        <span
+                                            class="rounded-full px-2.5 py-1 text-xs font-medium"
+                                            :class="
+                                                classroom.is_active
+                                                    ? 'bg-green-100 text-green-700'
+                                                    : 'bg-red-100 text-red-700'
+                                            "
+                                            >{{
+                                                classroom.is_active
+                                                    ? 'Active'
+                                                    : 'Inactive'
+                                            }}</span
+                                        >
+                                        <span
+                                            v-if="classroom.is_active"
+                                            class="rounded-full px-2.5 py-1 text-xs font-medium"
+                                            :class="
+                                                classroom.is_available
+                                                    ? 'bg-blue-50 text-blue-700'
+                                                    : 'bg-amber-100 text-amber-800'
+                                            "
+                                            >{{
+                                                classroom.is_available
+                                                    ? 'Disponible'
+                                                    : 'Indisponible'
+                                            }}</span
+                                        >
+                                    </div>
                                 </td>
                                 <td class="px-5 py-4">
                                     <div class="flex justify-end gap-2">
@@ -302,18 +347,30 @@ const paginationLabel = (label: string) =>
                             <span
                                 class="shrink-0 rounded-full px-2.5 py-1 text-xs font-medium"
                                 :class="
-                                    classroom.is_active
+                                    classroom.is_active &&
+                                    classroom.is_available
                                         ? 'bg-green-100 text-green-700'
-                                        : 'bg-red-100 text-red-700'
+                                        : classroom.is_active
+                                          ? 'bg-amber-100 text-amber-800'
+                                          : 'bg-red-100 text-red-700'
                                 "
                                 >{{
-                                    classroom.is_active ? 'Active' : 'Inactive'
+                                    !classroom.is_active
+                                        ? 'Inactive'
+                                        : classroom.is_available
+                                          ? 'Disponible'
+                                          : 'Indisponible'
                                 }}</span
                             >
                         </div>
                         <div
                             class="mt-4 grid gap-2 text-sm text-muted-foreground"
                         >
+                            <p class="flex items-center gap-2">
+                                <DoorOpen class="size-4" />{{
+                                    roomTypeLabel(classroom.type)
+                                }}
+                            </p>
                             <p class="flex items-center gap-2">
                                 <Users class="size-4" />{{ classroom.capacity }}
                                 places
@@ -470,6 +527,26 @@ const paginationLabel = (label: string) =>
                     </div>
                     <div class="grid gap-4 sm:grid-cols-2">
                         <div>
+                            <Label for="type">Type de salle</Label
+                            ><select
+                                id="type"
+                                v-model="form.type"
+                                class="mt-1 h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                                required
+                            >
+                                <option
+                                    v-for="roomType in roomTypes"
+                                    :key="roomType.value"
+                                    :value="roomType.value"
+                                >
+                                    {{ roomType.label }}
+                                </option></select
+                            ><InputError
+                                :message="form.errors.type"
+                                class="mt-1"
+                            />
+                        </div>
+                        <div>
                             <Label for="capacity">Capacité</Label
                             ><Input
                                 id="capacity"
@@ -484,18 +561,18 @@ const paginationLabel = (label: string) =>
                                 class="mt-1"
                             />
                         </div>
-                        <div>
-                            <Label for="location">Emplacement</Label
-                            ><Input
-                                id="location"
-                                v-model="form.location"
-                                class="mt-1"
-                                placeholder="1er étage, aile B"
-                            /><InputError
-                                :message="form.errors.location"
-                                class="mt-1"
-                            />
-                        </div>
+                    </div>
+                    <div>
+                        <Label for="location">Emplacement</Label
+                        ><Input
+                            id="location"
+                            v-model="form.location"
+                            class="mt-1"
+                            placeholder="1er étage, aile B"
+                        /><InputError
+                            :message="form.errors.location"
+                            class="mt-1"
+                        />
                     </div>
                     <div>
                         <Label for="description">Description</Label
@@ -512,15 +589,27 @@ const paginationLabel = (label: string) =>
                             class="mt-1"
                         />
                     </div>
-                    <label class="flex items-center gap-3 rounded-lg border p-3"
-                        ><input
-                            v-model="form.is_active"
-                            type="checkbox"
-                            class="size-4 rounded border-gray-300 text-primary"
-                        /><span class="text-sm font-medium"
-                            >Salle active et disponible</span
-                        ></label
-                    >
+                    <div class="grid gap-3 sm:grid-cols-2">
+                        <label
+                            class="flex items-center gap-3 rounded-lg border p-3"
+                            ><input
+                                v-model="form.is_active"
+                                type="checkbox"
+                                class="size-4 rounded border-gray-300 text-primary"
+                            /><span class="text-sm font-medium"
+                                >Salle active</span
+                            ></label
+                        ><label
+                            class="flex items-center gap-3 rounded-lg border p-3"
+                            ><input
+                                v-model="form.is_available"
+                                type="checkbox"
+                                class="size-4 rounded border-gray-300 text-primary"
+                            /><span class="text-sm font-medium"
+                                >Disponible à la réservation</span
+                            ></label
+                        >
+                    </div>
                     <div
                         class="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end"
                     >

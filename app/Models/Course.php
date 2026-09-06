@@ -4,8 +4,8 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Course extends Model
 {
@@ -15,12 +15,15 @@ class Course extends Model
         'title',
         'code',
         'category',
+        'color',
         'duration_hours',
+        'weekly_hours',
         'price',
         'description',
         'objectives',
         'prerequisites',
         'required_room_types',
+        'is_specialized',
         'is_certified',
         'is_active',
     ];
@@ -29,15 +32,38 @@ class Course extends Model
     {
         return [
             'duration_hours' => 'integer',
+            'weekly_hours' => 'decimal:2',
             'price' => 'decimal:2',
             'is_certified' => 'boolean',
             'is_active' => 'boolean',
             'required_room_types' => 'array',
+            'is_specialized' => 'boolean',
         ];
     }
 
-    public function levels(): HasMany { return $this->hasMany(CourseLevel::class); }
-    public function schoolLevels(): BelongsToMany { return $this->belongsToMany(SchoolLevel::class, 'course_school_level')->withPivotValue('tenant_id', app(\App\Tenancy\TenantContext::class)->id())->withTimestamps(); }
-    public function teachers(): BelongsToMany { return $this->belongsToMany(User::class, 'course_teacher', 'course_id', 'teacher_id')->withPivotValue('tenant_id', app(\App\Tenancy\TenantContext::class)->id())->withTimestamps(); }
-    public function timetableSessions(): HasMany { return $this->hasMany(TimetableSession::class); }
+    public function levels(): HasMany
+    {
+        return $this->hasMany(CourseLevel::class);
+    }
+
+    public function schoolLevels(): BelongsToMany
+    {
+        $relation = $this->belongsToMany(SchoolLevel::class, 'course_school_level')->withTimestamps();
+        $tenantId = app(\App\Tenancy\TenantContext::class)->id();
+
+        return $tenantId ? $relation->withPivotValue('tenant_id', $tenantId) : $relation;
+    }
+
+    public function teachers(): BelongsToMany
+    {
+        $relation = $this->belongsToMany(User::class, 'course_teacher', 'course_id', 'teacher_id')->withTimestamps();
+        $tenantId = app(\App\Tenancy\TenantContext::class)->id();
+
+        return $tenantId ? $relation->withPivotValue('tenant_id', $tenantId) : $relation;
+    }
+
+    public function timetableSessions(): HasMany
+    {
+        return $this->hasMany(TimetableSession::class);
+    }
 }

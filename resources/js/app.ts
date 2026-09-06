@@ -39,6 +39,8 @@ const pages = import.meta.glob<DefineComponent>([
     './pages/Admin/Attendance/**/*.vue',
     './pages/Admin/Settings/**/*.vue',
     './pages/Admin/Timetable/**/*.vue',
+    './pages/Admin/Groups/**/*.vue',
+    './pages/Admin/Subjects/**/*.vue',
     './pages/Salary/**/*.vue',
     './pages/Badge/**/*.vue',
     './pages/Portal/**/*.vue',

@@ -6,9 +6,9 @@ namespace App\Models;
 use App\Enums\UserRole;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Fortify\TwoFactorAuthenticatable;
@@ -115,12 +115,23 @@ class User extends Authenticatable
 
     public function taughtSubjects(): BelongsToMany
     {
-        return $this->belongsToMany(Course::class, 'course_teacher', 'teacher_id', 'course_id')->withPivotValue('tenant_id', app(\App\Tenancy\TenantContext::class)->id())->withTimestamps();
+        $relation = $this->belongsToMany(Course::class, 'course_teacher', 'teacher_id', 'course_id')->withTimestamps();
+        $tenantId = app(\App\Tenancy\TenantContext::class)->id();
+
+        return $tenantId ? $relation->withPivotValue('tenant_id', $tenantId) : $relation;
     }
 
     public function taughtGroups(): BelongsToMany
     {
-        return $this->belongsToMany(TrainingPlanGroup::class, 'group_teacher', 'teacher_id', 'training_plan_group_id')->withPivotValue('tenant_id', app(\App\Tenancy\TenantContext::class)->id())->withTimestamps();
+        $relation = $this->belongsToMany(TrainingPlanGroup::class, 'group_teacher', 'teacher_id', 'training_plan_group_id')->withTimestamps();
+        $tenantId = app(\App\Tenancy\TenantContext::class)->id();
+
+        return $tenantId ? $relation->withPivotValue('tenant_id', $tenantId) : $relation;
+    }
+
+    public function principalGroups(): HasMany
+    {
+        return $this->hasMany(TrainingPlanGroup::class, 'principal_teacher_id');
     }
 
     public function timetableSessions(): HasMany

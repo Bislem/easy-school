@@ -45,6 +45,7 @@ type Option = {
     level?: any;
     classroom?: Option | null;
     school_levels?: Array<{ id: number }>;
+    teachers?: Array<{ id: number; name: string }>;
 };
 type Session = {
     id: number;
@@ -246,6 +247,21 @@ const availableSubjects = computed(() => {
             subject.school_levels.some((item) => item.id === level),
     );
 });
+const availableTeachers = computed(() => {
+    const group = catalogue.value.groups.find(
+        (item) => item.id === Number(form.group),
+    );
+    const subject = catalogue.value.subjects.find(
+        (item) => item.id === Number(form.subject),
+    );
+    return catalogue.value.teachers.filter(
+        (teacher) =>
+            (!group?.teachers?.length ||
+                group.teachers.some((item) => item.id === teacher.id)) &&
+            (!subject?.teachers?.length ||
+                subject.teachers.some((item) => item.id === teacher.id)),
+    );
+});
 
 watch(
     () => filters.group,
@@ -271,7 +287,35 @@ watch(
         const group = catalogue.value.groups.find(
             (item) => item.id === Number(form.group),
         );
-        if (group?.classroom_id) form.room = String(group.classroom_id);
+        form.room = group?.classroom_id ? String(group.classroom_id) : '';
+        if (
+            form.subject &&
+            !availableSubjects.value.some(
+                (subject) => subject.id === Number(form.subject),
+            )
+        ) {
+            form.subject = '';
+        }
+        if (
+            form.teacher &&
+            !availableTeachers.value.some(
+                (teacher) => teacher.id === Number(form.teacher),
+            )
+        ) {
+            form.teacher = '';
+        }
+    },
+);
+watch(
+    () => form.subject,
+    () => {
+        if (
+            form.teacher &&
+            !availableTeachers.value.some(
+                (teacher) => teacher.id === Number(form.teacher),
+            )
+        )
+            form.teacher = '';
     },
 );
 watch(
@@ -1087,7 +1131,7 @@ function buildSlots(start: string, end: string, duration: number) {
                         ><select v-model="form.teacher" required>
                             <option value="">Sélectionner</option>
                             <option
-                                v-for="teacher in catalogue.teachers"
+                                v-for="teacher in availableTeachers"
                                 :key="teacher.id"
                                 :value="teacher.id"
                             >

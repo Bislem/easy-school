@@ -11,7 +11,10 @@ use Illuminate\Validation\Rule;
 
 class TimetableSessionRequest extends FormRequest
 {
-    public function authorize(): bool { return $this->user()?->can('timetable.manage') === true; }
+    public function authorize(): bool
+    {
+        return $this->user()?->can('timetable.manage') === true;
+    }
 
     public function rules(): array
     {

@@ -2,14 +2,14 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Enums\RoomType;
 use App\Http\Controllers\Controller;
 use App\Models\Classroom;
 use App\Models\SchoolSite;
+use App\Tenancy\TenantRule;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
-use App\Tenancy\TenantRule;
-use App\Enums\RoomType;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -35,6 +35,10 @@ class ClassroomsController extends Controller
         return Inertia::render('Admin/Classrooms/Index', [
             'classrooms' => $classrooms,
             'sites' => SchoolSite::orderBy('name')->get(['id', 'name', 'code', 'wilaya', 'is_active']),
+            'roomTypes' => array_map(
+                fn (RoomType $type) => ['value' => $type->value, 'label' => $type->label()],
+                RoomType::cases(),
+            ),
             'filters' => $request->only(['search', 'status', 'site_id']),
         ]);
     }

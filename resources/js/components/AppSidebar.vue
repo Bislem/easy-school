@@ -13,6 +13,7 @@ import { type NavItem } from '@/types';
 import { Link, usePage } from '@inertiajs/vue3';
 import {
     Bell,
+    BookMarked,
     BookOpen,
     Building2,
     CalendarClock,
@@ -25,6 +26,7 @@ import {
     ReceiptText,
     Settings,
     Users,
+    UsersRound,
     WalletCards,
 } from 'lucide-vue-next';
 import AppLogo from './AppLogo.vue';
@@ -58,6 +60,16 @@ const mainNavItems: NavItem[] = [
                   title: 'Emploi du temps',
                   href: '/admin/timetable',
                   icon: CalendarClock,
+              },
+              {
+                  title: 'Groupes & niveaux',
+                  href: '/admin/groups',
+                  icon: UsersRound,
+              },
+              {
+                  title: 'Matières',
+                  href: '/admin/subjects',
+                  icon: BookMarked,
               },
               {
                   title: 'Étudiants',
