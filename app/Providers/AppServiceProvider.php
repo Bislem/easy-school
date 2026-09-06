@@ -6,6 +6,7 @@ use App\Enums\StaffPermission;
 use App\Enums\BadgePermission;
 use App\Enums\ManagementPermission;
 use App\Enums\AttendancePermission;
+use App\Enums\TimetablePermission;
 use App\Models\AuditLog;
 use App\Models\Badge;
 use App\Models\Certificate;
@@ -25,6 +26,10 @@ use App\Observers\PortalNotificationObserver;
 use App\Models\Staff;
 use App\Models\User;
 use App\Policies\StaffPolicy;
+use App\Models\TimetableSession;
+use App\Policies\TimetableSessionPolicy;
+use App\Tenancy\TenantContext;
+use App\Tenancy\TenantScope;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 
@@ -35,7 +40,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->singleton(TenantContext::class);
     }
 
     /**
@@ -43,7 +48,11 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        foreach (TenantScope::MODELS as $model) {
+            TenantScope::boot($model);
+        }
         Gate::policy(Staff::class, StaffPolicy::class);
+        Gate::policy(TimetableSession::class, TimetableSessionPolicy::class);
         foreach (StaffPermission::cases() as $permission) {
             Gate::define($permission->value, fn (User $user) => $user->role->value === 'admin');
         }
@@ -52,6 +61,7 @@ class AppServiceProvider extends ServiceProvider
         }
         foreach (ManagementPermission::cases() as $permission) Gate::define($permission->value, fn(User $user)=>$user->role->value==='admin');
         foreach (AttendancePermission::cases() as $permission) Gate::define($permission->value, fn(User $user)=>$user->role->value==='admin');
+        foreach (TimetablePermission::cases() as $permission) Gate::define($permission->value, fn (User $user) => $user->role === \App\Enums\UserRole::ADMIN || ($permission === TimetablePermission::VIEW && $user->role === \App\Enums\UserRole::TEACHER));
         $created=[StudentPayment::class=>'student_payment.recorded',SalaryPayment::class=>'salary_payment.recorded',SalaryAdjustment::class=>'salary_adjustment.recorded',EnrollmentFinancialAdjustment::class=>'student_finance.adjusted',StudentHistory::class=>'student_history.recorded',Certificate::class=>'certificate.issued'];
         foreach($created as $model=>$event)$model::created(fn($item)=>self::audit($event,$item,null,$item->getAttributes()));
         TrainingSession::updated(fn($item)=>self::audit('session.changed',$item,$item->getOriginal(),$item->getChanges()));

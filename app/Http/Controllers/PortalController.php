@@ -19,6 +19,7 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use App\Tenancy\TenantRule;
 use Inertia\Inertia;
 use Inertia\Response;
 use Symfony\Component\HttpFoundation\Response as HttpResponse;
@@ -54,7 +55,7 @@ class PortalController extends Controller
 
  public function attendance(Request $request,TrainingSession $session,NotificationDispatcher $notifications): RedirectResponse
  {
-  abort_unless($session->teacher_id===$request->user()->id,403);$data=$request->validate(['records'=>['required','array'],'records.*.student_id'=>['required','exists:students,id'],'records.*.status'=>['required',Rule::in(['present','absent','late','excused','left_early'])],'records.*.justification'=>['nullable','string','max:2000'],'records.*.notes'=>['nullable','string','max:1000']]);
+  abort_unless($session->teacher_id===$request->user()->id,403);$data=$request->validate(['records'=>['required','array'],'records.*.student_id'=>['required',TenantRule::exists('students')],'records.*.status'=>['required',Rule::in(['present','absent','late','excused','left_early'])],'records.*.justification'=>['nullable','string','max:2000'],'records.*.notes'=>['nullable','string','max:1000']]);
   app(AttendanceService::class)->recordStudents($session,$data['records'],$request->user()->id);
   foreach($data['records'] as $record)if($record['status']==='absent'&&SessionAttendance::where('student_id',$record['student_id'])->where('status','absent')->count()>=3){$student=Student::with(['user','parents.user'])->find($record['student_id']);foreach(collect([$student->user])->merge($student->parents->pluck('user'))->filter()->unique('id') as $recipient)$notifications->send($recipient,'student.repeated_absence','Absences répétées','Trois absences ou plus ont été enregistrées.',$student);}
   return back()->with('success','Présences enregistrées.');
@@ -92,7 +93,7 @@ class PortalController extends Controller
   $parentOwns=$parent?->students()->whereKey($student->id)->exists()??false;
   $teacherHasStudent=$teacher&&$student->enrollments()->where('status','registered')->whereHas('trainingPlanGroup.plan',fn($plan)=>$plan->whereIn('status',['scheduled','in_progress'])->where(fn($plan)=>$plan->where('teacher_id',$user->id)->orWhereHas('teacherAccesses',fn($access)=>$access->where('teacher_id',$user->id))))->exists();
   abort_unless($admin||$parentOwns||$teacherHasStudent,403);
-  $data=$request->validate(['message'=>['required','string','max:5000'],'parent_id'=>['nullable','integer','exists:student_observations,id']]);
+  $data=$request->validate(['message'=>['required','string','max:5000'],'parent_id'=>['nullable','integer',TenantRule::exists('student_observations')]]);
   $thread=null;if($data['parent_id']??null){$thread=StudentObservation::where('student_id',$student->id)->whereNull('parent_id')->findOrFail($data['parent_id']);}else abort_unless($admin||$teacherHasStudent,403,'Seul un enseignant ou un administrateur peut ouvrir une observation.');
   $observation=$student->observations()->create(['author_id'=>$user->id,'parent_id'=>$thread?->id,'message'=>$data['message']]);
   if($parentOwns){$author=$thread?->author;if($author){$url=$author->role===UserRole::ADMIN?'/admin/students/'.$student->id:'/portal/students/'.$student->id;$notifications->send($author,'observation.parent_replied','Réponse d’un parent',$user->name.' a répondu à une observation concernant '.$student->full_name.'.',$observation,['url'=>$url]);}}

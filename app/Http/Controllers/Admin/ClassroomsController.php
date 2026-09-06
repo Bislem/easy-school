@@ -8,6 +8,8 @@ use App\Models\SchoolSite;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use App\Tenancy\TenantRule;
+use App\Enums\RoomType;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -63,13 +65,15 @@ class ClassroomsController extends Controller
     private function validateClassroom(Request $request, ?Classroom $classroom = null): array
     {
         return $request->validate([
-            'school_site_id' => ['required', 'exists:school_sites,id'],
+            'school_site_id' => ['required', TenantRule::exists('school_sites')],
             'name' => ['required', 'string', 'max:255'],
-            'code' => ['required', 'string', 'max:50', Rule::unique('classrooms')->ignore($classroom)],
+            'code' => ['required', 'string', 'max:50', TenantRule::unique('classrooms', 'code')->ignore($classroom)],
+            'type' => ['sometimes', Rule::enum(RoomType::class)],
             'capacity' => ['required', 'integer', 'min:1', 'max:10000'],
             'location' => ['nullable', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:2000'],
             'is_active' => ['required', 'boolean'],
+            'is_available' => ['sometimes', 'boolean'],
         ]);
     }
 }

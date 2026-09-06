@@ -15,10 +15,12 @@ class Message extends Model
         'ticket_id',
         'message',
         'is_admin',
+        'read_at',
     ];
 
     protected $casts = [
         'is_admin' => 'boolean',
+        'read_at' => 'datetime',
     ];
 
     // Relationships

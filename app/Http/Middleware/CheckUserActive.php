@@ -16,14 +16,19 @@ class CheckUserActive
      */
     public function handle(Request $request, Closure $next): Response
     {
-        if (Auth::check() && (! Auth::user()->is_active || Auth::user()->can_login === false)) {
+        $tenant = Auth::user()?->tenant;
+        if (Auth::check() && in_array($tenant?->status, ['pending', 'rejected'], true)) {
+            return redirect()->route('account.pending');
+        }
+
+        if (Auth::check() && (! Auth::user()->is_active || Auth::user()->can_login === false || $tenant?->status !== 'active' || $tenant?->demoExpired())) {
             Auth::logout();
             
             $request->session()->invalidate();
             $request->session()->regenerateToken();
             
             return redirect()->route('login')
-                ->with('error', "Votre accès au portail a été désactivé. Veuillez contacter l'administrateur.");
+                ->with('error', $tenant?->demoExpired() ? 'Votre démonstration est terminée.' : "Votre accès au portail a été désactivé. Veuillez contacter l'administrateur.");
         }
 
         return $next($request);

@@ -33,6 +33,7 @@ class CompanySettingsController extends Controller
 
     public function update(Request $request)
     {
+        abort_if($request->user()->tenant?->isDemo(), 403, "Les informations de l'école sont verrouillées pendant la démonstration.");
         $settings = CompanySetting::firstOrCreate([], CompanySetting::defaults());
 
         $validated = $request->validate([
@@ -48,7 +49,6 @@ class CompanySettingsController extends Controller
             'secondary_phone' => ['nullable', 'string', 'max:50'],
             'email' => ['nullable', 'email', 'max:255'],
             'website' => ['nullable', 'url', 'max:255'],
-            'primary_color' => ['required', 'regex:/^#[0-9A-Fa-f]{6}$/'],
             'teacher_login_disabled' => ['required', 'boolean'],
             'logo_temp_folders' => ['array'],
             'logo_temp_folders.*' => ['string'],

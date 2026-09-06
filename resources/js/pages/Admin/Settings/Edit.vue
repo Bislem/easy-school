@@ -21,7 +21,6 @@ interface SchoolSettings {
     secondary_phone?: string | null;
     email?: string | null;
     website?: string | null;
-    primary_color?: string | null;
     teacher_login_disabled?: boolean;
 }
 
@@ -44,7 +43,6 @@ const form = useForm({
     secondary_phone: props.settings.secondary_phone ?? '',
     email: props.settings.email ?? '',
     website: props.settings.website ?? '',
-    primary_color: props.settings.primary_color ?? '#f97316',
     teacher_login_disabled: Boolean(props.settings.teacher_login_disabled),
     logo_temp_folders: [] as string[],
     logo_removed_files: [] as number[],
@@ -200,28 +198,6 @@ function submit() {
                                         :message="
                                             form.errors.registration_number
                                         "
-                                        class="mt-1"
-                                    />
-                                </div>
-                                <div>
-                                    <Label for="primary_color"
-                                        >Couleur principale</Label
-                                    >
-                                    <div class="mt-1 flex items-center gap-3">
-                                        <input
-                                            id="primary_color"
-                                            v-model="form.primary_color"
-                                            type="color"
-                                            class="size-10 shrink-0 cursor-pointer rounded border p-1"
-                                        /><Input
-                                            v-model="form.primary_color"
-                                            class="font-mono uppercase"
-                                            maxlength="7"
-                                            pattern="#[0-9A-Fa-f]{6}"
-                                        />
-                                    </div>
-                                    <InputError
-                                        :message="form.errors.primary_color"
                                         class="mt-1"
                                     />
                                 </div>

@@ -23,17 +23,79 @@ use App\Http\Controllers\Admin\StaffController;
 use App\Http\Controllers\Admin\StudentFinanceController;
 use App\Http\Controllers\Admin\StudentsController;
 use App\Http\Controllers\Admin\TrainingPlansController;
+use App\Http\Controllers\Admin\TimetableController;
 use App\Http\Controllers\Admin\UsersController;
+use App\Http\Controllers\Auth\TenantRegistrationController;
+use App\Http\Controllers\SuperAdmin\AuthController as SuperAdminAuthController;
+use App\Http\Controllers\SuperAdmin\DashboardController as SuperAdminDashboardController;
+use App\Http\Controllers\SuperAdmin\DemoRequestsController as SuperAdminDemoRequestsController;
+use App\Http\Controllers\SuperAdmin\RegistrationRequestsController as SuperAdminRegistrationRequestsController;
+use App\Http\Controllers\SuperAdmin\SubscriptionPlansController as SuperAdminSubscriptionPlansController;
+use App\Http\Controllers\SuperAdmin\TenantsController as SuperAdminTenantsController;
+use App\Http\Controllers\SuperAdmin\ContactRequestsController as SuperAdminContactRequestsController;
 use App\Http\Controllers\BadgePortalController;
+use App\Http\Controllers\AccountStatusController;
 use App\Http\Controllers\CertificateVerificationController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\DemoRequestController;
+use App\Http\Controllers\ContactController;
+use App\Http\Controllers\PricingController;
 use App\Http\Controllers\FcmTokenController;
 use App\Http\Controllers\PortalController;
 use App\Http\Controllers\PublicEnrollmentController;
 use App\Http\Controllers\SalaryPortalController;
 use Illuminate\Support\Facades\Route;
+use Inertia\Inertia;
 
-Route::redirect('/', '/login')->name('home');
+Route::get('/', fn () => Inertia::render('Welcome'))->middleware('website-available')->name('home');
+Route::get('/demo', [DemoRequestController::class, 'create'])->middleware('website-available')->name('demo.create');
+Route::post('/demo', [DemoRequestController::class, 'store'])->middleware(['website-available', 'throttle:5,1'])->name('demo.store');
+Route::get('/demo/requested', [DemoRequestController::class, 'requested'])->middleware('website-available')->name('demo.requested');
+Route::get('/pricing', PricingController::class)->middleware('website-available')->name('pricing');
+Route::get('/contact', [ContactController::class, 'create'])->middleware('website-available')->name('contact.create');
+Route::post('/contact', [ContactController::class, 'store'])->middleware(['website-available', 'throttle:5,1'])->name('contact.store');
+
+Route::middleware('guest')->group(function () {
+    Route::get('/register-school', [TenantRegistrationController::class, 'create'])->name('tenant.register');
+    Route::post('/register-school', [TenantRegistrationController::class, 'store'])->middleware('throttle:5,1')->name('tenant.register.store');
+});
+
+$superAdminPath = trim((string) config('saas.super_admin_path'), '/');
+if ($superAdminPath !== '') {
+    Route::get("/{$superAdminPath}/login", [SuperAdminAuthController::class, 'create'])->name('super-admin.login');
+    Route::post("/{$superAdminPath}/login", [SuperAdminAuthController::class, 'store'])->middleware('throttle:5,1')->name('super-admin.authenticate');
+
+    Route::middleware('super-admin')->prefix($superAdminPath)->as('super-admin.')->group(function () {
+        Route::get('dashboard', SuperAdminDashboardController::class)->name('dashboard');
+        Route::post('logout', [SuperAdminAuthController::class, 'destroy'])->name('logout');
+        Route::get('schools', [SuperAdminTenantsController::class, 'index'])->name('tenants.index');
+        Route::post('schools', [SuperAdminTenantsController::class, 'store'])->name('tenants.store');
+        Route::get('schools/{tenant}', [SuperAdminTenantsController::class, 'show'])->name('tenants.show');
+        Route::post('schools/{tenant}', [SuperAdminTenantsController::class, 'update'])->name('tenants.update');
+        Route::patch('schools/{tenant}/status', [SuperAdminTenantsController::class, 'status'])->name('tenants.status');
+        Route::post('schools/{tenant}/subscription', [SuperAdminTenantsController::class, 'subscription'])->name('tenants.subscription');
+        Route::get('schools/{tenant}/payments/{payment}/proof', [SuperAdminTenantsController::class, 'paymentProof'])->name('tenants.payments.proof');
+        Route::put('schools/{tenant}/administrator', [SuperAdminTenantsController::class, 'administrator'])->name('tenants.administrator');
+        Route::delete('schools/{tenant}', [SuperAdminTenantsController::class, 'destroy'])->name('tenants.destroy');
+        Route::get('plans', [SuperAdminSubscriptionPlansController::class, 'index'])->name('plans.index');
+        Route::post('plans', [SuperAdminSubscriptionPlansController::class, 'store'])->name('plans.store');
+        Route::put('plans/{plan}', [SuperAdminSubscriptionPlansController::class, 'update'])->name('plans.update');
+        Route::delete('plans/{plan}', [SuperAdminSubscriptionPlansController::class, 'destroy'])->name('plans.destroy');
+        Route::put('plans/assign/school', [SuperAdminSubscriptionPlansController::class, 'assign'])->name('plans.assign');
+        Route::get('demo-requests', [SuperAdminDemoRequestsController::class, 'index'])->name('demo-requests.index');
+        Route::post('demo-requests', [SuperAdminDemoRequestsController::class, 'store'])->name('demo-requests.store');
+        Route::post('demo-requests/{demoRequest}/approve', [SuperAdminDemoRequestsController::class, 'approve'])->name('demo-requests.approve');
+        Route::post('demo-requests/{demoRequest}/reject', [SuperAdminDemoRequestsController::class, 'reject'])->name('demo-requests.reject');
+        Route::patch('demo-requests/{demoRequest}/extend', [SuperAdminDemoRequestsController::class, 'extend'])->name('demo-requests.extend');
+        Route::patch('demo-requests/{demoRequest}/suspend', [SuperAdminDemoRequestsController::class, 'suspend'])->name('demo-requests.suspend');
+        Route::get('registrations', [SuperAdminRegistrationRequestsController::class, 'index'])->name('registrations.index');
+        Route::post('registrations/{tenant}/approve', [SuperAdminRegistrationRequestsController::class, 'approve'])->name('registrations.approve');
+        Route::post('registrations/{tenant}/reject', [SuperAdminRegistrationRequestsController::class, 'reject'])->name('registrations.reject');
+        Route::get('registrations/{tenant}/payment-proof', [SuperAdminRegistrationRequestsController::class, 'proof'])->name('registrations.proof');
+        Route::get('contact-requests', [SuperAdminContactRequestsController::class, 'index'])->name('contact-requests.index');
+        Route::patch('contact-requests/{contactRequest}', [SuperAdminContactRequestsController::class, 'update'])->name('contact-requests.update');
+    });
+}
 
 Route::get('inscription/confirmer/{enrollment}/{token}', [PublicEnrollmentController::class, 'confirm'])->middleware('signed')->name('public.enrollment.confirm');
 Route::get('inscription/{enrollmentForm:public_token}', [PublicEnrollmentController::class, 'show'])->name('public.enrollment.show');
@@ -46,6 +108,7 @@ Route::get('/firebase/config', [FcmTokenController::class, 'configuration'])->na
 Route::get('/firebase-messaging-sw.js', [FcmTokenController::class, 'serviceWorker'])->name('firebase.service-worker');
 
 Route::middleware(['auth', 'verified', 'active'])->get('/dashboard', DashboardController::class)->name('dashboard');
+Route::middleware('auth')->get('/account/pending', AccountStatusController::class)->name('account.pending');
 Route::middleware(['auth', 'verified', 'active'])->get('/my/salary', SalaryPortalController::class)->name('salary.mine');
 Route::middleware(['auth', 'verified', 'active'])->get('/my/salary/statements/{statement}/download', [SalaryPortalController::class, 'statement'])->name('salary.mine.statement');
 Route::middleware(['auth', 'verified', 'active'])->get('/my/salary/payments/{payment}/receipt', [SalaryPortalController::class, 'receipt'])->name('salary.mine.receipt');
@@ -68,6 +131,7 @@ Route::middleware(['auth', 'verified', 'active', 'admin'])
     ->prefix('admin')
     ->as('admin.')
     ->group(function () {
+        Route::get('timetable', TimetableController::class)->name('timetable.index');
         Route::get('attendance', [AttendanceController::class, 'index'])->name('attendance.index');
         Route::put('attendance/sessions/{session}/students', [AttendanceController::class, 'students'])->name('attendance.students');
         Route::patch('attendance/sessions/{session}/validate', [AttendanceController::class, 'validateSheet'])->name('attendance.validate');
@@ -124,8 +188,10 @@ Route::middleware(['auth', 'verified', 'active', 'admin'])
         Route::get('students', [StudentsController::class, 'index'])->name('students.index');
         Route::get('parents', [ParentsController::class, 'index'])->name('parents.index');
         Route::post('parents', [ParentsController::class, 'store'])->name('parents.store');
+        Route::get('parents/lookup', [ParentsController::class, 'lookup'])->name('parents.lookup');
         Route::put('parents/{parent}', [ParentsController::class, 'update'])->name('parents.update');
         Route::patch('parents/{parent}/toggle', [ParentsController::class, 'toggle'])->name('parents.toggle');
+        Route::patch('parents/{parent}/children/{student}/visibility', [ParentsController::class, 'toggleChildVisibility'])->name('parents.children.visibility');
         Route::post('students', [StudentsController::class, 'store'])->name('students.store');
         Route::get('students/{student}', [StudentsController::class, 'show'])->name('students.show');
         Route::put('students/{student}', [StudentsController::class, 'update'])->name('students.update');

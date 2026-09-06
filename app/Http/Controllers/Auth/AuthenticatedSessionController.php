@@ -6,6 +6,7 @@ use App\Enums\UserRole;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\LoginRequest;
 use App\Models\CompanySetting;
+use App\Tenancy\TenantContext;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -34,7 +35,27 @@ class AuthenticatedSessionController extends Controller
     public function store(LoginRequest $request): SymfonyResponse
     {
         $user = $request->validateCredentials();
+        app(TenantContext::class)->set($user->tenant_id);
         $role = $user->getRawOriginal('role');
+
+        if (in_array($user->tenant?->status, ['pending', 'rejected'], true)) {
+            Auth::login($user, $request->boolean('remember'));
+            $request->session()->regenerate();
+
+            return Inertia::location(route('account.pending', absolute: false));
+        }
+
+        if ($user->tenant?->status !== 'active') {
+            Auth::logout();
+
+            return back()->withErrors(['email' => "L'accès de cette école est actuellement désactivé."])->onlyInput('email');
+        }
+
+        if ($user->tenant?->demoExpired()) {
+            Auth::logout();
+
+            return back()->withErrors(['email' => 'Votre période de démonstration est terminée. Contactez-nous pour activer votre abonnement.'])->onlyInput('email');
+        }
 
         if (! in_array($role, [UserRole::ADMIN->value, UserRole::TEACHER->value, UserRole::EMPLOYEE->value, UserRole::STUDENT->value, UserRole::PARENT->value], true) || ! $user->can_login) {
             Auth::logout();

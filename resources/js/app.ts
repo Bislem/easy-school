@@ -11,6 +11,9 @@ import { startFirebaseMessaging } from './lib/firebase-messaging';
 const appName = import.meta.env.VITE_APP_NAME || 'Gestion scolaire';
 
 const pages = import.meta.glob<DefineComponent>([
+    './pages/Welcome.vue',
+    './pages/PublicWebsiteDisabled.vue',
+    './pages/SuperAdmin/**/*.vue',
     './pages/Dashboard.vue',
     './pages/auth/**/*.vue',
     './pages/settings/Appearance.vue',
@@ -35,6 +38,7 @@ const pages = import.meta.glob<DefineComponent>([
     './pages/Admin/Audit/**/*.vue',
     './pages/Admin/Attendance/**/*.vue',
     './pages/Admin/Settings/**/*.vue',
+    './pages/Admin/Timetable/**/*.vue',
     './pages/Salary/**/*.vue',
     './pages/Badge/**/*.vue',
     './pages/Portal/**/*.vue',
@@ -44,14 +48,15 @@ const pages = import.meta.glob<DefineComponent>([
 
 type SchoolBrand =
     | {
-          primary_color?: string | null;
           favicon_url?: string | null;
       }
     | null
     | undefined;
 
+const EASY_SCHOOL_PRIMARY_COLOR = '#12cbb2';
+
 function applySchoolBrand(school: SchoolBrand) {
-    const color = school?.primary_color || '#f97316';
+    const color = EASY_SCHOOL_PRIMARY_COLOR;
     const hex = color.replace('#', '');
     const normalized =
         hex.length === 3
@@ -117,7 +122,7 @@ createInertiaApp({
             .mount(el);
     },
     progress: {
-        color: '#f56100',
+        color: EASY_SCHOOL_PRIMARY_COLOR,
     },
 });
 

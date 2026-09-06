@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Mail\EnrollmentConfirmationMail;
 use App\Models\CourseEnrollment;
 use App\Models\EnrollmentForm;
+use App\Tenancy\TenantContext;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
@@ -17,6 +18,7 @@ class PublicEnrollmentController extends Controller
 {
     public function show(EnrollmentForm $enrollmentForm): Response
     {
+        app(TenantContext::class)->set($enrollmentForm->tenant_id);
         $enrollmentForm->load(['course', 'teacher:id,name', 'classroom:id,name,code', 'files']);
         $confirmed = $enrollmentForm->enrollments()->where('status', 'registered')->count();
 
@@ -29,6 +31,7 @@ class PublicEnrollmentController extends Controller
 
     public function store(Request $request, EnrollmentForm $enrollmentForm): RedirectResponse
     {
+        app(TenantContext::class)->set($enrollmentForm->tenant_id);
         $confirmed = $enrollmentForm->enrollments()->where('status', 'registered')->count();
         abort_unless($enrollmentForm->is_active && $confirmed < $enrollmentForm->max_students, 422, 'Les inscriptions sont fermées.');
 
@@ -66,6 +69,7 @@ class PublicEnrollmentController extends Controller
 
     public function confirm(CourseEnrollment $enrollment, string $token): Response
     {
+        app(TenantContext::class)->set($enrollment->tenant_id);
         if (! hash_equals($enrollment->confirmation_token, $token)) {
             abort(403);
         }

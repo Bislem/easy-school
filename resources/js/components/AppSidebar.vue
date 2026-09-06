@@ -15,6 +15,7 @@ import {
     Bell,
     BookOpen,
     Building2,
+    CalendarClock,
     CalendarRange,
     ClipboardCheck,
     ClipboardList,
@@ -52,6 +53,11 @@ const mainNavItems: NavItem[] = [
                   title: 'Planifications',
                   href: '/admin/planifications',
                   icon: CalendarRange,
+              },
+              {
+                  title: 'Emploi du temps',
+                  href: '/admin/timetable',
+                  icon: CalendarClock,
               },
               {
                   title: 'Étudiants',
@@ -175,7 +181,7 @@ const mainNavItems: NavItem[] = [
                     <SidebarMenuButton
                         size="lg"
                         as-child
-                        class="h-12 rounded-xl bg-background/80 shadow-sm ring-1 ring-sidebar-border/60 transition hover:bg-background hover:shadow-md data-[state=open]:bg-background"
+                        class="h-12 rounded-xl bg-white/5 text-white shadow-sm ring-1 ring-white/10 transition hover:bg-white/10 hover:text-white hover:shadow-md data-[state=open]:bg-white/10"
                     >
                         <Link :href="home()">
                             <AppLogo />

@@ -38,11 +38,19 @@ class HandleInertiaRequests extends Middleware
     public function share(Request $request): array
     {
         [$message, $author] = str(Inspiring::quotes()->random())->explode('-');
-        $settings = CompanySetting::current();
+        $superAdminPath = trim((string) config('saas.super_admin_path'), '/');
+        $isPlatformAdmin = $superAdminPath !== '' && $request->is($superAdminPath.'/*');
+        $settings = $isPlatformAdmin
+            ? new CompanySetting(CompanySetting::defaults())
+            : CompanySetting::current();
 
         if ($settings->exists) {
             $settings->load('files');
         }
+
+        $authenticatedUser = $isPlatformAdmin
+            ? auth('super_admin')->user()
+            : $request->user();
 
         return [
             ...parent::share($request),
@@ -51,12 +59,14 @@ class HandleInertiaRequests extends Middleware
             'school' => $settings,
             'quote' => ['message' => trim($message), 'author' => trim($author)],
             'auth' => [
-                'user' => $request->user(),
+                'user' => $authenticatedUser,
+                'tenant' => $authenticatedUser?->tenant?->only(['id', 'name', 'slug', 'logo_url', 'status', 'account_type', 'demo_expires_at']),
             ],
-            'unread_notifications_count' => fn () => $request->user()?->portalNotifications()->whereNull('read_at')->count() ?? 0,
-            'auth_notifications' => fn () => $request->user()?->portalNotifications()
+            'superAdmin' => $isPlatformAdmin ? ['basePath' => '/'.$superAdminPath] : null,
+            'unread_notifications_count' => fn () => $isPlatformAdmin ? 0 : ($request->user()?->portalNotifications()->whereNull('read_at')->count() ?? 0),
+            'auth_notifications' => fn () => $isPlatformAdmin ? [] : ($request->user()?->portalNotifications()
                 ->limit(10)
-                ->get(['id', 'type', 'title', 'message', 'data', 'read_at', 'occurred_at']) ?? [],
+                ->get(['id', 'type', 'title', 'message', 'data', 'read_at', 'occurred_at']) ?? []),
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
             'csrf_token' => csrf_token(),
             'fileUploadConfig' => [

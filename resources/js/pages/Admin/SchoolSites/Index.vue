@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import InputError from '@/components/InputError.vue';
+import WilayaCommuneSelect from '@/components/WilayaCommuneSelect.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -273,20 +274,13 @@ function toggle(site: Site) {
                             /><InputError :message="form.errors.code" />
                         </div>
                     </div>
-                    <div class="grid gap-4 sm:grid-cols-2">
-                        <div>
-                            <Label>Wilaya</Label
-                            ><Input
-                                v-model="form.wilaya"
-                                class="mt-1"
-                                required
-                            /><InputError :message="form.errors.wilaya" />
-                        </div>
-                        <div>
-                            <Label>Commune</Label
-                            ><Input v-model="form.commune" class="mt-1" />
-                        </div>
-                    </div>
+                    <WilayaCommuneSelect
+                        v-model:wilaya="form.wilaya"
+                        v-model:commune="form.commune"
+                        :wilaya-error="form.errors.wilaya"
+                        :commune-error="form.errors.commune"
+                        required
+                    />
                     <div>
                         <Label>Adresse</Label
                         ><Input v-model="form.address" class="mt-1" />

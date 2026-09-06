@@ -93,7 +93,7 @@
 }
 
 :root {
-    --website-primary: #f97316;
+    --website-primary: #12cbb2;
     --background: hsl(0 0% 100%);
     --foreground: hsl(0 0% 3.9%);
     --card: hsl(0 0% 100%);
@@ -130,7 +130,7 @@
     --sidebar: hsl(0 0% 98%);
 }
 
-/* School navigation uses the configured primary color as a subtle tint. */
+/* Default sidebar surface. */
 [data-sidebar='sidebar'] {
     background-color: var(--sidebar-background);
     background-image:
@@ -146,30 +146,69 @@
         );
 }
 
-[data-sidebar='content'] {
+/* Authenticated school navigation mirrors the public Easy School brand. */
+.school-sidebar,
+.school-sidebar [data-sidebar='sidebar'],
+.school-sidebar[data-sidebar='sidebar'] {
+    --sidebar-background: #061d3b;
+    --sidebar-foreground: #eef7ff;
+    --sidebar-primary: #12cbb2;
+    --sidebar-primary-foreground: #032d32;
+    --sidebar-accent: #0b365e;
+    --sidebar-accent-foreground: #ffffff;
+    --sidebar-border: rgb(99 179 210 / 20%);
+    --sidebar-ring: #12cbb2;
+}
+
+.school-sidebar [data-sidebar='sidebar'],
+.school-sidebar[data-sidebar='sidebar'] {
+    background-color: #061d3b;
+    background-image:
+        radial-gradient(
+            circle at 10% 0%,
+            rgb(18 203 178 / 15%),
+            transparent 30%
+        ),
+        linear-gradient(180deg, #082848 0%, #061d3b 55%, #04172f 100%);
+}
+
+.school-sidebar [data-sidebar='group-label'] {
+    color: rgb(112 225 211 / 78%);
+}
+
+.school-sidebar [data-sidebar='menu-button'][data-active='true'] {
+    box-shadow: 0 8px 20px rgb(0 0 0 / 22%);
+}
+
+.school-sidebar [data-sidebar='menu-button']:focus-visible {
+    outline: 2px solid #12cbb2;
+    outline-offset: 2px;
+}
+
+.school-sidebar [data-sidebar='content'] {
     scrollbar-width: thin;
     scrollbar-color: color-mix(in srgb, var(--primary), transparent 45%)
         transparent;
 }
 
-[data-sidebar='content']::-webkit-scrollbar {
+.school-sidebar [data-sidebar='content']::-webkit-scrollbar {
     width: 5px;
 }
 
-[data-sidebar='content']::-webkit-scrollbar-track {
+.school-sidebar [data-sidebar='content']::-webkit-scrollbar-track {
     background: transparent;
 }
 
-[data-sidebar='content']::-webkit-scrollbar-thumb {
+.school-sidebar [data-sidebar='content']::-webkit-scrollbar-thumb {
     border-radius: 999px;
     background: color-mix(in srgb, var(--primary), transparent 45%);
 }
 
-[data-sidebar='content']::-webkit-scrollbar-thumb:hover {
+.school-sidebar [data-sidebar='content']::-webkit-scrollbar-thumb:hover {
     background: var(--primary);
 }
 
-/* Public-site branding. The color is set from the agency settings in HomeLayout. */
+/* Easy School uses one fixed product color across public and authenticated pages. */
 .public-site {
     /* Override Tailwind's orange palette itself so every existing orange
        utility, including gradients and text on every public page, is themed. */

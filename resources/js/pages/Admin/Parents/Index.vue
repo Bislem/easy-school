@@ -6,6 +6,9 @@ import AdminLayout from '@/layouts/AdminLayout.vue';
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
 import {
     Check,
+    Eye,
+    EyeOff,
+    FolderOpen,
     KeyRound,
     Pencil,
     Plus,
@@ -20,14 +23,14 @@ const search = ref(props.filters.search ?? '');
 const open = ref(false);
 const editing = ref<any>(null);
 const childSearch = ref('');
+const lookup = ref<any>(null);
+const lookupLoading = ref(false);
 const form = useForm({
     first_name: '',
     last_name: '',
     email: '',
     phone: '',
     relationship: '',
-    password: '',
-    password_confirmation: '',
     student_ids: [] as number[],
 });
 const filteredStudents = computed(() => {
@@ -51,6 +54,7 @@ function create() {
     editing.value = null;
     form.reset();
     form.clearErrors();
+    lookup.value = null;
     open.value = true;
 }
 function edit(p: any) {
@@ -60,11 +64,34 @@ function edit(p: any) {
     form.email = p.user.email;
     form.phone = p.phone ?? '';
     form.relationship = p.relationship ?? '';
-    form.password = '';
-    form.password_confirmation = '';
     form.student_ids = p.students.map((s: any) => s.id);
     form.clearErrors();
+    lookup.value = {
+        exists: true,
+        available: true,
+        message: 'Les coordonnées du compte parent sont gérées par le parent.',
+    };
     open.value = true;
+}
+async function lookupEmail() {
+    if (editing.value || !form.email) return;
+    lookupLoading.value = true;
+    try {
+        const response = await fetch(
+            `/admin/parents/lookup?email=${encodeURIComponent(form.email)}`,
+            { headers: { Accept: 'application/json' } },
+        );
+        lookup.value = await response.json();
+        if (lookup.value.exists && lookup.value.parent) {
+            const account = lookup.value.parent;
+            const names = (account.name || '').trim().split(/\s+/, 2);
+            form.first_name = account.first_name || names[0] || '';
+            form.last_name = account.last_name || names[1] || '';
+            form.phone = account.phone || '';
+        }
+    } finally {
+        lookupLoading.value = false;
+    }
 }
 function toggleChild(id: number) {
     form.student_ids = form.student_ids.includes(id)
@@ -84,6 +111,13 @@ function save() {
 }
 function toggle(p: any) {
     router.patch(`/admin/parents/${p.id}/toggle`, {}, { preserveScroll: true });
+}
+function toggleVisibility(parent: any, student: any) {
+    router.patch(
+        `/admin/parents/${parent.id}/children/${student.id}/visibility`,
+        {},
+        { preserveScroll: true },
+    );
 }
 </script>
 <template>
@@ -141,12 +175,12 @@ function toggle(p: any) {
                                         <span
                                             class="rounded-full px-2 py-0.5 text-xs"
                                             :class="
-                                                p.user.is_active
+                                                p.mobile_membership?.is_active
                                                     ? 'bg-emerald-100 text-emerald-700'
                                                     : 'bg-red-100 text-red-700'
                                             "
                                             >{{
-                                                p.user.is_active
+                                                p.mobile_membership?.is_active
                                                     ? 'Actif'
                                                     : 'Désactivé'
                                             }}</span
@@ -175,16 +209,67 @@ function toggle(p: any) {
                                 <Users class="size-4" />Enfants associés ·
                                 {{ p.students.length }}
                             </p>
-                            <div class="flex flex-wrap gap-2">
-                                <span
+                            <div class="space-y-2">
+                                <div
                                     v-for="s in p.students"
                                     :key="s.id"
-                                    class="rounded-lg border bg-muted/30 px-3 py-2 text-sm"
-                                    ><b>{{ s.first_name }} {{ s.last_name }}</b
-                                    ><small class="ml-1 text-muted-foreground"
-                                        >· {{ s.school_level || '—' }}</small
-                                    ></span
+                                    class="flex flex-col gap-2 rounded-lg border bg-muted/30 px-3 py-2 text-sm sm:flex-row sm:items-center sm:justify-between"
                                 >
+                                    <span>
+                                        <b
+                                            >{{ s.first_name }}
+                                            {{ s.last_name }}</b
+                                        >
+                                        <small
+                                            class="ml-1 text-muted-foreground"
+                                            >·
+                                            {{ s.school_level || '—' }}</small
+                                        >
+                                        <small
+                                            class="ml-2 rounded-full px-2 py-0.5"
+                                            :class="
+                                                s.pivot.is_visible
+                                                    ? 'bg-emerald-100 text-emerald-700'
+                                                    : 'bg-slate-200 text-slate-600'
+                                            "
+                                            >{{
+                                                s.pivot.is_visible
+                                                    ? 'Visible'
+                                                    : 'Masqué'
+                                            }}</small
+                                        >
+                                    </span>
+                                    <span class="flex gap-2">
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            @click="toggleVisibility(p, s)"
+                                        >
+                                            <EyeOff
+                                                v-if="s.pivot.is_visible"
+                                                class="mr-1 size-4"
+                                            />
+                                            <Eye v-else class="mr-1 size-4" />
+                                            {{
+                                                s.pivot.is_visible
+                                                    ? 'Masquer'
+                                                    : 'Rendre visible'
+                                            }}
+                                        </Button>
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            as-child
+                                        >
+                                            <Link
+                                                :href="`/admin/students/${s.id}`"
+                                                ><FolderOpen
+                                                    class="mr-1 size-4"
+                                                />Dossier</Link
+                                            >
+                                        </Button>
+                                    </span>
+                                </div>
                             </div>
                         </div>
                         <div class="mt-4 flex justify-end gap-2">
@@ -193,11 +278,15 @@ function toggle(p: any) {
                             ><Button
                                 size="sm"
                                 :variant="
-                                    p.user.is_active ? 'destructive' : 'default'
+                                    p.mobile_membership?.is_active
+                                        ? 'destructive'
+                                        : 'default'
                                 "
                                 @click="toggle(p)"
                                 >{{
-                                    p.user.is_active ? 'Désactiver' : 'Activer'
+                                    p.mobile_membership?.is_active
+                                        ? 'Désactiver'
+                                        : 'Activer'
                                 }}</Button
                             >
                         </div>
@@ -246,8 +335,8 @@ function toggle(p: any) {
                             }}
                         </h2>
                         <p class="text-sm text-muted-foreground">
-                            L’accès est créé manuellement et limité aux enfants
-                            sélectionnés.
+                            Saisissez d’abord l’adresse e-mail. Un compte
+                            existant sera lié sans modifier ses coordonnées.
                         </p>
                     </div>
                     <Button
@@ -259,42 +348,59 @@ function toggle(p: any) {
                     /></Button>
                 </div>
                 <div class="grid gap-3 sm:grid-cols-2">
-                    <label
-                        ><Label>Prénom</Label
-                        ><Input v-model="form.first_name" required /></label
-                    ><label
-                        ><Label>Nom</Label
-                        ><Input v-model="form.last_name" required /></label
-                    ><label
+                    <label class="sm:col-span-2"
                         ><Label>E-mail de connexion</Label
                         ><Input
                             v-model="form.email"
                             type="email"
-                            required /></label
+                            required
+                            :disabled="!!editing"
+                            @blur="lookupEmail"
+                    /></label>
+                    <p
+                        v-if="lookupLoading"
+                        class="text-sm text-muted-foreground sm:col-span-2"
+                    >
+                        Recherche du compte…
+                    </p>
+                    <p
+                        v-else-if="lookup"
+                        class="rounded-lg p-3 text-sm sm:col-span-2"
+                        :class="
+                            lookup.exists && lookup.available
+                                ? 'bg-emerald-50 text-emerald-800'
+                                : lookup.exists
+                                  ? 'bg-amber-50 text-amber-800'
+                                  : 'bg-blue-50 text-blue-800'
+                        "
+                    >
+                        {{
+                            lookup.message ||
+                            'Aucun compte existant : un compte sera créé et un mot de passe temporaire sera envoyé.'
+                        }}
+                    </p>
+                    <label
+                        ><Label>Prénom</Label
+                        ><Input
+                            v-model="form.first_name"
+                            required
+                            :disabled="!!editing || lookup?.exists" /></label
+                    ><label
+                        ><Label>Nom</Label
+                        ><Input
+                            v-model="form.last_name"
+                            required
+                            :disabled="!!editing || lookup?.exists" /></label
                     ><label
                         ><Label>Téléphone</Label
-                        ><Input v-model="form.phone" /></label
+                        ><Input
+                            v-model="form.phone"
+                            :disabled="!!editing || lookup?.exists" /></label
                     ><label class="sm:col-span-2"
                         ><Label>Lien avec les enfants</Label
                         ><Input
                             v-model="form.relationship"
-                            placeholder="Père, mère, tuteur légal…" /></label
-                    ><label
-                        ><Label>{{
-                            editing
-                                ? 'Nouveau mot de passe (facultatif)'
-                                : 'Mot de passe'
-                        }}</Label
-                        ><Input
-                            v-model="form.password"
-                            type="password"
-                            :required="!editing" /></label
-                    ><label
-                        ><Label>Confirmation</Label
-                        ><Input
-                            v-model="form.password_confirmation"
-                            type="password"
-                            :required="!editing"
+                            placeholder="Père, mère, tuteur légal…"
                     /></label>
                 </div>
                 <div class="rounded-xl border p-4">
@@ -367,11 +473,17 @@ function toggle(p: any) {
                 </p>
                 <Button
                     class="w-full"
-                    :disabled="form.processing || !form.student_ids.length"
+                    :disabled="
+                        form.processing ||
+                        !form.student_ids.length ||
+                        lookup?.available === false
+                    "
                     ><KeyRound class="mr-2 size-4" />{{
                         editing
                             ? 'Enregistrer les modifications'
-                            : 'Créer le compte et donner accès'
+                            : lookup?.exists
+                              ? 'Lier le compte et donner accès'
+                              : 'Créer le compte et envoyer le mot de passe'
                     }}</Button
                 >
             </form>

@@ -407,7 +407,7 @@ class TrainingPlansController extends Controller
 
     private function validateGroup(Request $request): array
     {
-        $validated = $request->validate(['name' => ['required', 'string', 'max:100'], 'classroom_id' => ['nullable', 'exists:classrooms,id'], 'capacity' => ['nullable', 'integer', 'min:1']]);
+        $validated = $request->validate(['name' => ['required', 'string', 'max:100'], 'school_level_id' => ['nullable', \App\Tenancy\TenantRule::exists('school_levels')], 'classroom_id' => ['nullable', \App\Tenancy\TenantRule::exists('classrooms')], 'capacity' => ['nullable', 'integer', 'min:1']]);
         if ($validated['classroom_id']) {
             $room = Classroom::findOrFail($validated['classroom_id']);
             if (($validated['capacity'] ?? $room->capacity) > $room->capacity) {

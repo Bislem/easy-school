@@ -2,12 +2,12 @@
 
 namespace App\Models;
 
+use App\Enums\StudentStatus;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use MohamedGaldi\ViltFilepond\Traits\HasFiles;
-use App\Enums\StudentStatus;
 
 class Student extends Model
 {
@@ -15,6 +15,7 @@ class Student extends Model
 
     protected $fillable = [
         'user_id', 'first_name',
+        'training_plan_group_id',
         'last_name',
         'photo_path',
         'email',
@@ -39,16 +40,60 @@ class Student extends Model
 
     protected $appends = ['full_name', 'photo_url'];
 
-    public function enrollments(): HasMany { return $this->hasMany(CourseEnrollment::class); }
-    public function payments(): HasMany { return $this->hasMany(StudentPayment::class)->latest('payment_date'); }
-    public function histories(): HasMany { return $this->hasMany(StudentHistory::class)->latest(); }
-    public function badges(): \Illuminate\Database\Eloquent\Relations\MorphMany { return $this->morphMany(Badge::class, 'badgeable')->latest('issue_date'); }
-    public function parents(): \Illuminate\Database\Eloquent\Relations\BelongsToMany { return $this->belongsToMany(SchoolParent::class,'parent_student','student_id','parent_id')->withPivot('is_primary')->withTimestamps(); }
-    public function attendances(): HasMany { return $this->hasMany(SessionAttendance::class); }
-    public function observations(): HasMany { return $this->hasMany(StudentObservation::class)->latest(); }
-    public function certificates(): HasMany { return $this->hasMany(Certificate::class)->latest('issue_date'); }
-    public function user(): BelongsTo { return $this->belongsTo(User::class); }
-    public function getPhotoUrlAttribute(): ?string { return $this->photo_path ? asset('storage/'.$this->photo_path) : null; }
+    public function enrollments(): HasMany
+    {
+        return $this->hasMany(CourseEnrollment::class);
+    }
+
+    public function payments(): HasMany
+    {
+        return $this->hasMany(StudentPayment::class)->latest('payment_date');
+    }
+
+    public function histories(): HasMany
+    {
+        return $this->hasMany(StudentHistory::class)->latest();
+    }
+
+    public function badges(): \Illuminate\Database\Eloquent\Relations\MorphMany
+    {
+        return $this->morphMany(Badge::class, 'badgeable')->latest('issue_date');
+    }
+
+    public function parents(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    {
+        return $this->belongsToMany(SchoolParent::class, 'parent_student', 'student_id', 'parent_id')->withPivot('is_primary', 'is_visible')->withTimestamps();
+    }
+
+    public function attendances(): HasMany
+    {
+        return $this->hasMany(SessionAttendance::class);
+    }
+
+    public function observations(): HasMany
+    {
+        return $this->hasMany(StudentObservation::class)->latest();
+    }
+
+    public function certificates(): HasMany
+    {
+        return $this->hasMany(Certificate::class)->latest('issue_date');
+    }
+
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
+    }
+
+    public function group(): BelongsTo
+    {
+        return $this->belongsTo(TrainingPlanGroup::class, 'training_plan_group_id');
+    }
+
+    public function getPhotoUrlAttribute(): ?string
+    {
+        return $this->photo_path ? asset('storage/'.$this->photo_path) : null;
+    }
 
     public function getFullNameAttribute(): string
     {

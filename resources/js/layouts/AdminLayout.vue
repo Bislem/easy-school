@@ -38,6 +38,18 @@ watch(
 <template>
     <AppSidebarLayout>
         <div
+            v-if="page.props.auth?.tenant?.account_type === 'demo'"
+            class="m-4 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950"
+        >
+            <strong>Compte de démonstration.</strong>
+            Votre accès expirera le
+            {{
+                new Date(page.props.auth.tenant.demo_expires_at).toLocaleString(
+                    'fr-DZ',
+                )
+            }}. Le mot de passe et les informations de l'école sont verrouillés.
+        </div>
+        <div
             v-if="message"
             class="fixed top-4 right-4 z-50 flex items-center gap-2 rounded-lg bg-yellow-500/90 px-4 py-2 text-sm font-medium text-white shadow-lg"
         >

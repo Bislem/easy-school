@@ -8,6 +8,7 @@ use App\Models\CourseLevel;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use App\Tenancy\TenantRule;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -93,13 +94,15 @@ class CoursesController extends Controller
     {
         return $request->validate([
             'title' => ['required', 'string', 'max:255'],
-            'code' => ['required', 'string', 'max:50', Rule::unique('courses')->ignore($course)],
+            'code' => ['required', 'string', 'max:50', TenantRule::unique('courses', 'code')->ignore($course)],
             'category' => ['nullable', 'string', 'max:100'],
             'duration_hours' => ['required', 'integer', 'min:1', 'max:100000'],
             'price' => ['required', 'numeric', 'min:0', 'max:9999999999.99'],
             'description' => ['nullable', 'string', 'max:5000'],
             'objectives' => ['nullable', 'string', 'max:5000'],
             'prerequisites' => ['nullable', 'string', 'max:5000'],
+            'required_room_types' => ['nullable', 'array'],
+            'required_room_types.*' => ['string', Rule::enum(\App\Enums\RoomType::class)],
             'is_certified' => ['required', 'boolean'],
             'is_active' => ['required', 'boolean'],
         ]);

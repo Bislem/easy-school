@@ -10,6 +10,7 @@ use App\Models\Staff;
 use App\Models\Student;
 use App\Services\BadgeQrCode;
 use App\Services\Code39Barcode;
+use App\Tenancy\TenantRule;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -32,7 +33,7 @@ class BadgesController extends Controller
     public function store(Request $request): RedirectResponse
     {
         Gate::authorize(BadgePermission::MANAGE->value);
-        $data=$request->validate(['person_type'=>['required',Rule::in(['student','staff'])],'person_id'=>['required','integer'],'badge_template_id'=>['nullable','exists:badge_templates,id'],'issue_date'=>['required','date'],'expiration_date'=>['nullable','date','after:issue_date'],'barcode_enabled'=>['boolean']]);
+        $data=$request->validate(['person_type'=>['required',Rule::in(['student','staff'])],'person_id'=>['required','integer'],'badge_template_id'=>['nullable',TenantRule::exists('badge_templates')],'issue_date'=>['required','date'],'expiration_date'=>['nullable','date','after:issue_date'],'barcode_enabled'=>['boolean']]);
         $person=$data['person_type']==='student'?Student::findOrFail($data['person_id']):Staff::with('employeeType')->findOrFail($data['person_id']);
         abort_if($person->badges()->where('status','active')->where(fn($q)=>$q->whereNull('expiration_date')->orWhereDate('expiration_date','>=',today()))->exists(),422,'Cette personne possède déjà une carte active.');
         $badge=$this->makeBadge($person,$data,$request);
@@ -66,7 +67,7 @@ class BadgesController extends Controller
     public function batch(Request $request, BadgeQrCode $qr, Code39Barcode $barcode): HttpResponse
     {
         Gate::authorize(BadgePermission::PRINT->value);
-        $ids=$request->validate(['ids'=>['required','array','min:1','max:100'],'ids.*'=>['integer','exists:badges,id']])['ids'];
+        $ids=$request->validate(['ids'=>['required','array','min:1','max:100'],'ids.*'=>['integer',TenantRule::exists('badges')]])['ids'];
         return $this->pdf(Badge::whereIn('id',$ids)->get(),$qr,$barcode)->download('badges-'.now()->format('Ymd-His').'.pdf');
     }
 

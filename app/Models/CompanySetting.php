@@ -25,7 +25,6 @@ class CompanySetting extends Model
         'secondary_phone',
         'email',
         'website',
-        'primary_color',
         'website_disabled',
         'booking_disabled',
         'teacher_login_disabled',
@@ -49,7 +48,6 @@ class CompanySetting extends Model
     {
         return [
             'trading_name' => 'Easy École',
-            'primary_color' => '#f97316',
             'teacher_login_disabled' => false,
             'tax_enabled' => false,
             'tax_rate' => 7,

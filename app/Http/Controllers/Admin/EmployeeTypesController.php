@@ -10,6 +10,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use App\Tenancy\TenantRule;
 
 class EmployeeTypesController extends Controller
 {
@@ -17,7 +18,7 @@ class EmployeeTypesController extends Controller
     {
         Gate::authorize(StaffPermission::MANAGE_TYPES->value);
         $validated = $request->validate([
-            'name' => ['required', 'string', 'max:100', 'unique:employee_types,name'],
+            'name' => ['required', 'string', 'max:100', TenantRule::unique('employee_types', 'name')],
             'is_teacher' => ['sometimes', 'boolean'],
         ]);
         EmployeeType::create([
@@ -32,7 +33,7 @@ class EmployeeTypesController extends Controller
     {
         Gate::authorize(StaffPermission::MANAGE_TYPES->value);
         $validated = $request->validate([
-            'name' => ['required', 'string', 'max:100', Rule::unique('employee_types', 'name')->ignore($employeeType)],
+            'name' => ['required', 'string', 'max:100', TenantRule::unique('employee_types', 'name')->ignore($employeeType)],
             'is_teacher' => ['required', 'boolean'], 'is_active' => ['required', 'boolean'],
         ]);
         if ($employeeType->is_teacher && ! $validated['is_teacher'] && $employeeType->staff()->exists()) {
