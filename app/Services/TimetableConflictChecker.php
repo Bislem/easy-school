@@ -173,8 +173,5 @@ class TimetableConflictChecker
                 $conflicts[] = ['type' => 'school_break', 'field' => 'start_time', 'message' => 'The session overlaps the school break '.($break['name'] ?? '').'.'];
             }
         }
-        if ($settings->time_slots && ! collect($settings->time_slots)->contains(fn ($slot) => ($slot['start_time'] ?? null) === substr($data['start_time'], 0, 5) && ($slot['end_time'] ?? null) === substr($data['end_time'], 0, 5))) {
-            $conflicts[] = ['type' => 'invalid_time_slot', 'field' => 'start_time', 'message' => 'The session does not match a configured school time slot.'];
-        }
     }
 }

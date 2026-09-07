@@ -24,6 +24,7 @@ use App\Http\Controllers\Admin\ReportsController;
 use App\Http\Controllers\Admin\SalariesController;
 use App\Http\Controllers\Admin\SchoolAttendanceController;
 use App\Http\Controllers\Admin\SchoolAttendanceReportController;
+use App\Http\Controllers\Admin\SchoolDocumentsController;
 use App\Http\Controllers\Admin\SchoolSitesController;
 use App\Http\Controllers\Admin\SickLeavesController;
 use App\Http\Controllers\Admin\StaffController;
@@ -174,6 +175,8 @@ Route::middleware(['auth', 'verified', 'active', 'admin'])
             Route::get('school-attendance/reports', [SchoolAttendanceReportController::class, 'index'])->name('school-attendance.reports');
             Route::get('school-attendance/reports/export/{format}', [SchoolAttendanceReportController::class, 'export'])->whereIn('format', ['csv', 'pdf'])->name('school-attendance.reports.export');
             Route::put('school-attendance/settings', [SchoolAttendanceReportController::class, 'updateSettings'])->name('school-attendance.settings.update');
+            Route::get('school-documents', [SchoolDocumentsController::class, 'index'])->name('school-documents.index');
+            Route::post('school-documents/download', [SchoolDocumentsController::class, 'download'])->name('school-documents.download');
         });
         Route::get('timetable', TimetableController::class)->name('timetable.index');
         Route::prefix('timetable-api')->as('timetable-api.')->group(function () {
