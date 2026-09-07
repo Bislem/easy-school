@@ -1,19 +1,22 @@
 <?php
 
+use App\Http\Controllers\Api\AcademicPeriodController;
 use App\Http\Controllers\Api\Mobile\V1\AuthController;
 use App\Http\Controllers\Api\Mobile\V1\CommunicationController;
 use App\Http\Controllers\Api\Mobile\V1\DeviceController;
 use App\Http\Controllers\Api\Mobile\V1\NotificationController;
 use App\Http\Controllers\Api\Mobile\V1\ParentController;
 use App\Http\Controllers\Api\Mobile\V1\SchoolController;
-use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Api\TeacherAvailabilityController;
 use App\Http\Controllers\Api\TimetableCatalogueController;
 use App\Http\Controllers\Api\TimetableSessionController;
-use App\Http\Controllers\Api\AcademicPeriodController;
-use App\Http\Controllers\Api\TeacherAvailabilityController;
 use App\Http\Controllers\Api\TimetableSettingController;
+use Illuminate\Support\Facades\Route;
 
-Route::middleware(['auth:sanctum', \App\Http\Middleware\SetTenantContext::class])->prefix('v1/timetable')->name('api.v1.timetable.')->group(function () {
+// The timetable is a first-party admin SPA. Load the web session explicitly so
+// authentication does not depend on SANCTUM_STATEFUL_DOMAINS matching the
+// deployment hostname (a common source of production-only 401 responses).
+Route::middleware(['web', 'auth:sanctum,web', \App\Http\Middleware\SetTenantContext::class])->prefix('v1/timetable')->name('api.v1.timetable.')->group(function () {
     Route::get('catalogue', TimetableCatalogueController::class)->name('catalogue');
     Route::get('settings', [TimetableSettingController::class, 'show'])->name('settings.show');
     Route::put('settings', [TimetableSettingController::class, 'update'])->name('settings.update');

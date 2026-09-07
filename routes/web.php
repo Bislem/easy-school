@@ -162,6 +162,7 @@ Route::middleware(['auth', 'verified', 'active', 'admin'])
             Route::patch('school-inscriptions/{inscription}/status', [PrivateSchoolInscriptionsController::class, 'updateStatus'])->name('private-school-inscriptions.status');
             Route::get('school-attendance', [SchoolAttendanceController::class, 'index'])->name('school-attendance.index');
             Route::post('school-attendance/exceptions', [SchoolAttendanceController::class, 'store'])->name('school-attendance.store');
+            Route::post('school-attendance/students/bulk', [SchoolAttendanceController::class, 'bulkStudents'])->name('school-attendance.students.bulk');
             Route::delete('school-attendance/exceptions/{attendanceException}', [SchoolAttendanceController::class, 'destroy'])->name('school-attendance.destroy');
             Route::get('school-attendance/teacher-preview', [SchoolAttendanceController::class, 'teacherPreview'])->name('school-attendance.teacher-preview');
         });

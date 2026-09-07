@@ -24,7 +24,9 @@ class AttendanceService
     {
         [$session, $targetDate] = $this->context($sessionOrDate, $date);
         $year = $this->academicYear($targetDate, $session, $student);
-        if (! $year) return null;
+        if (! $year) {
+            return null;
+        }
 
         return AttendanceException::query()
             ->where('academic_year_id', $year->id)
@@ -33,7 +35,9 @@ class AttendanceService
             ->whereDate('date', $targetDate)
             ->where(function ($query) use ($session) {
                 $query->whereNull('timetable_session_id');
-                if ($session) $query->orWhere('timetable_session_id', $session->id);
+                if ($session) {
+                    $query->orWhere('timetable_session_id', $session->id);
+                }
             })
             ->orderByRaw('timetable_session_id is null asc')
             ->first();
@@ -48,7 +52,9 @@ class AttendanceService
     {
         [$session, $targetDate] = $this->context($sessionOrDate, $date);
         $year = $this->academicYear($targetDate, $session);
-        if (! $year) return null;
+        if (! $year) {
+            return null;
+        }
 
         return AttendanceException::query()
             ->where('academic_year_id', $year->id)
@@ -58,7 +64,9 @@ class AttendanceService
             ->where(fn ($query) => $query->whereNull('end_date')->whereDate('date', $targetDate)->orWhereDate('end_date', '>=', $targetDate))
             ->where(function ($query) use ($session) {
                 $query->whereNull('timetable_session_id');
-                if ($session) $query->orWhere('timetable_session_id', $session->id);
+                if ($session) {
+                    $query->orWhere('timetable_session_id', $session->id);
+                }
             })
             ->orderByRaw('timetable_session_id is null asc')
             ->first();
@@ -74,7 +82,9 @@ class AttendanceService
 
     private function academicYear(string $date, ?TimetableSession $session, ?Student $student = null): ?AcademicYear
     {
-        if ($session) return $session->academicYear;
+        if ($session) {
+            return $session->academicYear;
+        }
 
         $query = AcademicYear::whereDate('start_date', '<=', $date)->whereDate('end_date', '>=', $date);
         if ($student) {

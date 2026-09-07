@@ -16,9 +16,28 @@ class AttendanceException extends Model
         return ['date' => 'date:Y-m-d', 'end_date' => 'date:Y-m-d', 'justified_at' => 'datetime', 'person_type' => AttendancePersonType::class, 'status' => AttendanceExceptionStatus::class, 'minutes_late' => 'integer'];
     }
 
-    public function academicYear(): BelongsTo { return $this->belongsTo(AcademicYear::class); }
-    public function timetableSession(): BelongsTo { return $this->belongsTo(TimetableSession::class); }
-    public function student(): BelongsTo { return $this->belongsTo(Student::class); }
-    public function teacher(): BelongsTo { return $this->belongsTo(User::class, 'teacher_id'); }
-    public function creator(): BelongsTo { return $this->belongsTo(User::class, 'created_by'); }
+    public function academicYear(): BelongsTo
+    {
+        return $this->belongsTo(AcademicYear::class);
+    }
+
+    public function timetableSession(): BelongsTo
+    {
+        return $this->belongsTo(TimetableSession::class);
+    }
+
+    public function student(): BelongsTo
+    {
+        return $this->belongsTo(Student::class);
+    }
+
+    public function teacher(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'teacher_id');
+    }
+
+    public function creator(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
 }
