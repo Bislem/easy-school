@@ -33,7 +33,7 @@ class SchoolLevel extends Model
 
     public function subjects(): BelongsToMany
     {
-        $relation = $this->belongsToMany(SchoolSubject::class, 'course_school_level')->withPivot(['school_stream_id', 'curriculum_code', 'is_optional', 'is_active', 'display_order', 'choice_group'])->withTimestamps();
+        $relation = $this->belongsToMany(SchoolSubject::class, 'course_school_level', 'school_level_id', 'course_id')->withPivot(['school_stream_id', 'curriculum_code', 'is_optional', 'is_active', 'display_order', 'choice_group'])->withTimestamps();
         $tenantId = app(\App\Tenancy\TenantContext::class)->id();
 
         return $tenantId ? $relation->withPivotValue('tenant_id', $tenantId) : $relation;

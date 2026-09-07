@@ -6,16 +6,21 @@ use App\Enums\AttendanceExceptionStatus;
 use App\Enums\AttendancePersonType;
 use App\Enums\SchoolAttendancePermission;
 use App\Enums\UserRole;
+use App\Events\StudentAbsent;
+use App\Events\StudentLate;
+use App\Events\TeacherAbsent;
 use App\Http\Controllers\Controller;
 use App\Models\AcademicYear;
 use App\Models\AcademicYearCalendarEvent;
 use App\Models\AttendanceException;
+use App\Models\AttendanceSetting;
 use App\Models\SchoolCycle;
 use App\Models\SchoolGroup;
 use App\Models\Student;
 use App\Models\StudentAcademicEnrollment;
 use App\Models\TimetableSession;
 use App\Models\User;
+use App\Services\AttendanceReportingService;
 use App\Services\AttendanceService;
 use App\Tenancy\TenantRule;
 use Carbon\Carbon;
@@ -31,7 +36,7 @@ use Inertia\Response;
 
 class SchoolAttendanceController extends Controller
 {
-    public function index(Request $request, AttendanceService $attendance): Response
+    public function index(Request $request, AttendanceService $attendance, AttendanceReportingService $reporting): Response
     {
         Gate::authorize(SchoolAttendancePermission::VIEW->value);
         $year = $this->year($request);
@@ -67,6 +72,12 @@ class SchoolAttendanceController extends Controller
                 }));
             }
         });
+        $teacherImpacts = $view === 'teachers' ? $sessions->filter(fn ($session) => in_array($session->attendance_status, ['ABSENT', 'EXCUSED'], true))
+            ->groupBy('teacher_id')->map(fn ($items) => [
+                'teacher' => $items->first()->teacher?->name,
+                'sessions' => $items->map(fn ($session) => ['id' => $session->id, 'group' => $session->group?->name, 'subject' => $session->subject?->title,
+                    'start_time' => substr($session->start_time, 0, 5), 'substitution' => ['status' => 'UNASSIGNED', 'can_assign' => false]])->values(),
+            ])->values() : collect();
 
         return Inertia::render('Admin/SchoolAttendance/Index', [
             'academicYears' => AcademicYear::orderByDesc('start_date')->get(['id', 'name', 'start_date', 'end_date', 'status']),
@@ -75,6 +86,10 @@ class SchoolAttendanceController extends Controller
             'cycles' => SchoolCycle::with(['levels' => fn ($q) => $q->where('is_active', true)])->where('is_active', true)->orderBy('sort_order')->get(),
             'groups' => $groups, 'sessions' => $sessions,
             'statuses' => array_column(AttendanceExceptionStatus::cases(), 'value'),
+            'dashboard' => $reporting->todayDashboard($year, $date),
+            'warnings' => $reporting->warnings($year, $date),
+            'attendanceSettings' => AttendanceSetting::current(),
+            'teacherImpacts' => $teacherImpacts,
         ]);
     }
 
@@ -197,6 +212,16 @@ class SchoolAttendanceController extends Controller
         }
         $identity = ['academic_year_id' => $year->id, 'date' => $data['date'], 'timetable_session_id' => $session?->id, 'person_type' => $type->value, 'student_id' => $data['student_id'] ?? null, 'teacher_id' => $data['teacher_id'] ?? null];
 
-        return AttendanceException::updateOrCreate($identity, [...$data, 'end_date' => $data['end_date'] ?? null, 'created_by' => $creator->id, 'justified_at' => ! empty($data['justification']) ? now() : null]);
+        $exception = AttendanceException::updateOrCreate($identity, [...$data, 'end_date' => $data['end_date'] ?? null, 'created_by' => $creator->id, 'justified_at' => ! empty($data['justification']) ? now() : null]);
+        if ($exception->wasRecentlyCreated || $exception->wasChanged()) {
+            match (true) {
+                $type === AttendancePersonType::STUDENT && $exception->status->value === 'LATE' => StudentLate::dispatch($exception),
+                $type === AttendancePersonType::STUDENT && in_array($exception->status->value, ['ABSENT', 'EXCUSED'], true) => StudentAbsent::dispatch($exception),
+                $type === AttendancePersonType::TEACHER && in_array($exception->status->value, ['ABSENT', 'EXCUSED'], true) => TeacherAbsent::dispatch($exception),
+                default => null,
+            };
+        }
+
+        return $exception;
     }
 }

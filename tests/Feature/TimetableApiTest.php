@@ -54,9 +54,11 @@ test('the school week includes sunday as its first displayed working day', funct
 test('timetable browser api accepts the authenticated web session', function () {
     $tenant = Tenant::factory()->create();
     $admin = User::factory()->create(['tenant_id' => $tenant->id, 'role' => UserRole::ADMIN]);
+    $fixture = timetableFixture($tenant);
 
-    $this->actingAs($admin)->getJson('/api/v1/timetable/catalogue')->assertOk();
-    $this->actingAs($admin)->getJson('/api/v1/timetable/settings')->assertOk();
+    $this->actingAs($admin)->getJson('/admin/timetable-api/catalogue')->assertOk();
+    $this->actingAs($admin)->getJson('/admin/timetable-api/settings')->assertOk();
+    $this->actingAs($admin)->getJson("/admin/timetable-api/calendar?from=2026-08-31&to=2026-09-06&group_id={$fixture['group']->id}&template=1")->assertOk();
 });
 
 test('admin can create a session using the groups default classroom', function () {

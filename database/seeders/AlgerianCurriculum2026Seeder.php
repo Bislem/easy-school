@@ -12,7 +12,7 @@ class AlgerianCurriculum2026Seeder extends Seeder
     public function run(): void
     {
         $context = app(TenantContext::class);
-        Tenant::query()->each(function (Tenant $tenant) use ($context): void {
+        Tenant::query()->where('organization_type', 'private_school')->each(function (Tenant $tenant) use ($context): void {
             try {
                 $context->set($tenant);
                 app(AlgerianCurriculum2026::class)->initialize();

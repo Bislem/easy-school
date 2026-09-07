@@ -34,7 +34,7 @@ final class TenantScope
         \App\Models\SalaryPayment::class, \App\Models\SalaryStatement::class,
         \App\Models\SchoolParent::class, \App\Models\SchoolSite::class,
         \App\Models\PrivateSchoolInscriptionCampaign::class, \App\Models\PrivateSchoolCampaignLevel::class, \App\Models\PrivateSchoolInscription::class,
-        \App\Models\AcademicYear::class, \App\Models\AcademicYearCalendarEvent::class, \App\Models\AttendanceException::class, \App\Models\StudentAcademicEnrollment::class, \App\Models\TeacherAcademicAssignment::class,
+        \App\Models\AcademicYear::class, \App\Models\AcademicYearCalendarEvent::class, \App\Models\AttendanceException::class, \App\Models\AttendanceSetting::class, \App\Models\StudentAcademicEnrollment::class, \App\Models\TeacherAcademicAssignment::class,
         \App\Models\SchoolCycle::class, \App\Models\SchoolLevel::class, \App\Models\SchoolGroup::class, \App\Models\SchoolStream::class,
         \App\Models\AcademicPeriod::class, \App\Models\TimetableSession::class,
         \App\Models\RoomReservation::class, \App\Models\TeacherAvailability::class,

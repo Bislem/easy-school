@@ -98,8 +98,15 @@ type Settings = {
         type?: 'break' | 'meal';
         start_time: string;
         end_time: string;
+        start?: string;
+        end?: string;
     }>;
-    time_slots: Array<{ start_time: string; end_time: string }>;
+    time_slots: Array<{
+        start_time: string;
+        end_time: string;
+        start?: string;
+        end?: string;
+    }>;
 };
 
 const loading = ref(true);
@@ -438,8 +445,8 @@ async function loadFoundation() {
     loading.value = true;
     try {
         [catalogue.value, settings.value] = await Promise.all([
-            api('/api/v1/timetable/catalogue'),
-            api('/api/v1/timetable/settings'),
+            api('/admin/timetable-api/catalogue'),
+            api('/admin/timetable-api/settings'),
         ]);
         if (catalogue.value.academic_year?.start_date)
             weekStart.value = startOfWeek(
@@ -518,7 +525,7 @@ async function loadWeek() {
     error.value = '';
     try {
         const response = await api(
-            `/api/v1/timetable/calendar?from=${iso(weekStart.value)}&to=${iso(addDays(weekStart.value, 6))}&group_id=${filters.group}&template=1`,
+            `/admin/timetable-api/calendar?from=${iso(weekStart.value)}&to=${iso(addDays(weekStart.value, 6))}&group_id=${filters.group}&template=1`,
         );
         sessions.value = response.data;
         void auditConflicts();
@@ -531,7 +538,7 @@ async function loadWeek() {
 async function auditConflicts() {
     const checks = await Promise.allSettled(
         sessions.value.map((session) =>
-            api('/api/v1/timetable/sessions/check-conflicts', {
+            api('/admin/timetable-api/sessions/check-conflicts', {
                 method: 'POST',
                 body: JSON.stringify({
                     school_group_id: session.group.id,
@@ -539,8 +546,8 @@ async function auditConflicts() {
                     teacher_id: session.teacher.id,
                     classroom_id: session.room.id,
                     day: dayOfWeek(session.occurrence_date),
-                    start_time: session.start_time.slice(0, 5),
-                    end_time: session.end_time.slice(0, 5),
+                    start_time: shortTime(session.start_time, '08:00'),
+                    end_time: shortTime(session.end_time, '09:00'),
                     status: session.status,
                     except_session_id: session.id,
                 }),
@@ -558,8 +565,8 @@ function sessionsAt(
     return visibleSessions.value.filter(
         (item) =>
             item.occurrence_date === day &&
-            item.start_time.slice(0, 5) >= slot.start_time &&
-            item.start_time.slice(0, 5) < slot.end_time,
+            shortTime(item.start_time) >= slot.start_time &&
+            shortTime(item.start_time) < slot.end_time,
     );
 }
 function sessionsOccupying(
@@ -569,8 +576,8 @@ function sessionsOccupying(
     return visibleSessions.value.filter(
         (item) =>
             item.occurrence_date === day &&
-            item.start_time.slice(0, 5) < slot.end_time &&
-            item.end_time.slice(0, 5) > slot.start_time,
+            shortTime(item.start_time) < slot.end_time &&
+            shortTime(item.end_time) > slot.start_time,
     );
 }
 function sessionSpan(session: Session) {
@@ -578,8 +585,8 @@ function sessionSpan(session: Session) {
         1,
         slots.value.filter(
             (slot) =>
-                session.start_time.slice(0, 5) < slot.end_time &&
-                session.end_time.slice(0, 5) > slot.start_time,
+                shortTime(session.start_time) < slot.end_time &&
+                shortTime(session.end_time) > slot.start_time,
         ).length,
     );
 }
@@ -635,7 +642,7 @@ async function saveGroupDefaults() {
     saving.value = true;
     try {
         const updated = await api(
-            `/api/v1/timetable/groups/${selectedGroup.value.id}/defaults`,
+            `/admin/timetable-api/groups/${selectedGroup.value.id}/defaults`,
             {
                 method: 'PUT',
                 body: JSON.stringify({
@@ -668,7 +675,7 @@ function addBreak(type: 'break' | 'meal' = 'break') {
 async function saveSettings() {
     saving.value = true;
     try {
-        settings.value = await api('/api/v1/timetable/settings', {
+        settings.value = await api('/admin/timetable-api/settings', {
             method: 'PUT',
             body: JSON.stringify(settingsForm),
         });
@@ -688,18 +695,24 @@ function breakAt(slot: { start_time: string; end_time: string }) {
     );
 }
 function normalizeSettings(value: Settings) {
-    value.day_starts_at = value.day_starts_at.slice(0, 5);
-    value.day_ends_at = value.day_ends_at.slice(0, 5);
+    value.day_starts_at = shortTime(value.day_starts_at, '08:00');
+    value.day_ends_at = shortTime(value.day_ends_at, '17:00');
     value.breaks = (value.breaks ?? []).map((item) => ({
         ...item,
         type: item.type ?? 'break',
-        start_time: item.start_time.slice(0, 5),
-        end_time: item.end_time.slice(0, 5),
+        start_time: shortTime(item.start_time ?? item.start, '12:00'),
+        end_time: shortTime(item.end_time ?? item.end, '13:00'),
     }));
     value.time_slots = (value.time_slots ?? []).map((item) => ({
-        start_time: item.start_time.slice(0, 5),
-        end_time: item.end_time.slice(0, 5),
+        start_time: shortTime(item.start_time ?? item.start, '08:00'),
+        end_time: shortTime(item.end_time ?? item.end, '09:00'),
     }));
+}
+
+function shortTime(value: unknown, fallback = '—') {
+    return typeof value === 'string' && value.length >= 5
+        ? value.slice(0, 5)
+        : fallback;
 }
 function openSession(session: Session) {
     selected.value = session;
@@ -713,8 +726,8 @@ function openSession(session: Session) {
         teacher: String(session.teacher.id),
         room: String(session.room.id),
         day: dayOfWeek(session.occurrence_date),
-        start: session.start_time.slice(0, 5),
-        end: session.end_time.slice(0, 5),
+        start: shortTime(session.start_time, '08:00'),
+        end: shortTime(session.end_time, '09:00'),
         status: session.status,
         notes: '',
     });
@@ -743,7 +756,7 @@ function payload() {
 async function validateForm() {
     error.value = '';
     warnings.value = [];
-    const result = await api('/api/v1/timetable/sessions/check-conflicts', {
+    const result = await api('/admin/timetable-api/sessions/check-conflicts', {
         method: 'POST',
         body: JSON.stringify(payload()),
     });
@@ -762,12 +775,12 @@ async function saveSession() {
     try {
         if (!(await validateForm())) return;
         if (selected.value)
-            await api(`/api/v1/timetable/sessions/${selected.value.id}`, {
+            await api(`/admin/timetable-api/sessions/${selected.value.id}`, {
                 method: 'PUT',
                 body: JSON.stringify({ ...payload(), scope: 'all' }),
             });
         else
-            await api('/api/v1/timetable/sessions', {
+            await api('/admin/timetable-api/sessions', {
                 method: 'POST',
                 body: JSON.stringify(payload()),
             });
@@ -783,7 +796,7 @@ async function cancelSession() {
     if (!selected.value || !confirm('Annuler cette séance ?')) return;
     saving.value = true;
     try {
-        await api(`/api/v1/timetable/sessions/${selected.value.id}/cancel`, {
+        await api(`/admin/timetable-api/sessions/${selected.value.id}/cancel`, {
             method: 'PATCH',
             body: JSON.stringify({
                 scope: 'all',
@@ -802,13 +815,16 @@ async function duplicateSession() {
     saving.value = true;
     try {
         if (!(await validateForm())) return;
-        await api(`/api/v1/timetable/sessions/${selected.value.id}/duplicate`, {
-            method: 'POST',
-            body: JSON.stringify({
-                ...payload(),
-                recurrence: 'weekly',
-            }),
-        });
+        await api(
+            `/admin/timetable-api/sessions/${selected.value.id}/duplicate`,
+            {
+                method: 'POST',
+                body: JSON.stringify({
+                    ...payload(),
+                    recurrence: 'weekly',
+                }),
+            },
+        );
         drawerOpen.value = false;
         await loadWeek();
     } catch (e: any) {
@@ -838,15 +854,18 @@ async function dropSession(
         except_session_id: session.id,
     };
     try {
-        const check = await api('/api/v1/timetable/sessions/check-conflicts', {
-            method: 'POST',
-            body: JSON.stringify(move),
-        });
+        const check = await api(
+            '/admin/timetable-api/sessions/check-conflicts',
+            {
+                method: 'POST',
+                body: JSON.stringify(move),
+            },
+        );
         if (!check.available)
             throw new Error(
                 check.conflicts.map((item: any) => item.message).join('\n'),
             );
-        await api(`/api/v1/timetable/sessions/${session.id}/move`, {
+        await api(`/admin/timetable-api/sessions/${session.id}/move`, {
             method: 'PATCH',
             body: JSON.stringify({ ...move, scope: 'all' }),
         });
@@ -870,14 +889,14 @@ async function copyGroupWeek() {
             const targetGroup = catalogue.value.groups.find(
                 (group) => group.id === target,
             );
-            await api(`/api/v1/timetable/sessions/${item.id}/duplicate`, {
+            await api(`/admin/timetable-api/sessions/${item.id}/duplicate`, {
                 method: 'POST',
                 body: JSON.stringify({
                     school_group_id: target,
                     classroom_id: targetGroup?.classroom_id || item.room.id,
                     day: dayOfWeek(item.occurrence_date),
-                    start_time: item.start_time.slice(0, 5),
-                    end_time: item.end_time.slice(0, 5),
+                    start_time: shortTime(item.start_time, '08:00'),
+                    end_time: shortTime(item.end_time, '09:00'),
                     recurrence: 'weekly',
                 }),
             });
@@ -970,8 +989,8 @@ function iso(date: Date) {
 function dayOfWeek(date: string) {
     return new Date(`${date}T12:00:00`).getDay() || 7;
 }
-function timeMinutes(value: string) {
-    const [h, m] = value.slice(0, 5).split(':').map(Number);
+function timeMinutes(value: unknown) {
+    const [h, m] = shortTime(value, '00:00').split(':').map(Number);
     return h * 60 + m;
 }
 function addMinutesToTime(value: string, amount: number) {
@@ -1393,8 +1412,8 @@ function buildSlots(
                                             session.room.name
                                         }}</span
                                     ><small
-                                        >{{ session.start_time.slice(0, 5) }}–{{
-                                            session.end_time.slice(0, 5)
+                                        >{{ shortTime(session.start_time) }}–{{
+                                            shortTime(session.end_time)
                                         }}</small
                                     >
                                 </button>

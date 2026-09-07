@@ -1,8 +1,12 @@
 <?php
 
 use App\Enums\UserRole;
+use App\Events\StudentAbsent;
+use App\Events\StudentLate;
+use App\Events\TeacherAbsent;
 use App\Models\AcademicYear;
 use App\Models\AttendanceException;
+use App\Models\AttendanceSetting;
 use App\Models\Classroom;
 use App\Models\SchoolCycle;
 use App\Models\SchoolGroup;
@@ -14,8 +18,10 @@ use App\Models\StudentAcademicEnrollment;
 use App\Models\Tenant;
 use App\Models\TimetableSession;
 use App\Models\User;
+use App\Services\AttendanceReportingService;
 use App\Services\AttendanceService;
 use App\Tenancy\TenantContext;
+use Illuminate\Support\Facades\Event;
 
 function schoolAttendanceFixture(Tenant $tenant, string $yearName = '2026-2027'): array
 {
@@ -96,4 +102,66 @@ test('private school admin can open attendance screen defaulting to today', func
     $this->travelTo('2026-09-07');
     $this->actingAs($f['admin'])->get('/admin/school-attendance')->assertOk()->assertInertia(fn ($page) => $page
         ->component('Admin/SchoolAttendance/Index')->where('date', '2026-09-07')->where('view', 'students'));
+});
+
+test('student statistics derive implicit presence from scheduled sessions', function () {
+    $f = schoolAttendanceFixture(Tenant::factory()->create());
+    app(TenantContext::class)->set($f['tenant']);
+    $stats = app(AttendanceReportingService::class)->student($f['student'], $f['year'], '2026-09-07', '2026-09-07');
+
+    expect($stats)->toMatchArray(['scheduled_sessions' => 1, 'present_sessions' => 1, 'absences' => 0, 'late_arrivals' => 0, 'attendance_percentage' => 100.0])
+        ->and(AttendanceException::count())->toBe(0);
+});
+
+test('student report expands a justified full day absence over timetable sessions', function () {
+    $f = schoolAttendanceFixture(Tenant::factory()->create());
+    app(TenantContext::class)->set($f['tenant']);
+    AttendanceException::create(['academic_year_id' => $f['year']->id, 'date' => '2026-09-07', 'person_type' => 'STUDENT', 'student_id' => $f['student']->id, 'status' => 'EXCUSED', 'justification' => 'Certificat', 'justified_at' => now(), 'created_by' => $f['admin']->id]);
+    $stats = app(AttendanceReportingService::class)->student($f['student'], $f['year'], '2026-09-07', '2026-09-07');
+
+    expect($stats)->toMatchArray(['scheduled_sessions' => 1, 'present_sessions' => 0, 'absences' => 1, 'justified_absences' => 1, 'unjustified_absences' => 0, 'attendance_percentage' => 0.0]);
+});
+
+test('teacher report identifies affected teaching sessions and prepares substitution state', function () {
+    $f = schoolAttendanceFixture(Tenant::factory()->create());
+    app(TenantContext::class)->set($f['tenant']);
+    AttendanceException::create(['academic_year_id' => $f['year']->id, 'date' => '2026-09-07', 'person_type' => 'TEACHER', 'teacher_id' => $f['teacher']->id, 'status' => 'ABSENT', 'created_by' => $f['admin']->id]);
+    $stats = app(AttendanceReportingService::class)->teacher($f['teacher'], $f['year'], '2026-09-07', '2026-09-07');
+
+    expect($stats['scheduled_sessions'])->toBe(1)->and($stats['absences'])->toBe(1)
+        ->and($stats['affected_teaching_sessions'][0])->toMatchArray(['group' => '1AP-A', 'subject' => 'Mathématiques', 'start_time' => '08:00', 'substitution' => ['status' => 'UNASSIGNED', 'can_assign' => false]]);
+});
+
+test('repeated absence warning thresholds are tenant configurable', function () {
+    $f = schoolAttendanceFixture(Tenant::factory()->create());
+    app(TenantContext::class)->set($f['tenant']);
+    AttendanceSetting::current()->update(['monthly_absence_threshold' => 1, 'consecutive_days_threshold' => 10]);
+    AttendanceException::create(['academic_year_id' => $f['year']->id, 'date' => '2026-09-07', 'person_type' => 'STUDENT', 'student_id' => $f['student']->id, 'status' => 'ABSENT', 'created_by' => $f['admin']->id]);
+
+    expect(app(AttendanceReportingService::class)->warnings($f['year'], '2026-09-07'))->toHaveCount(1)
+        ->and(AttendanceSetting::current()->monthly_absence_threshold)->toBe(1);
+});
+
+test('attendance writes emit uncoupled domain events', function () {
+    Event::fake([StudentAbsent::class, StudentLate::class, TeacherAbsent::class]);
+    $f = schoolAttendanceFixture(Tenant::factory()->create());
+
+    $this->actingAs($f['admin'])->post('/admin/school-attendance/exceptions', [
+        'academic_year_id' => $f['year']->id, 'date' => '2026-09-07', 'timetable_session_id' => $f['session']->id,
+        'person_type' => 'STUDENT', 'student_id' => $f['student']->id, 'status' => 'ABSENT',
+    ])->assertRedirect();
+
+    Event::assertDispatched(StudentAbsent::class);
+    Event::assertNotDispatched(StudentLate::class);
+    Event::assertNotDispatched(TeacherAbsent::class);
+});
+
+test('attendance reports are available as screen csv and pdf', function () {
+    $f = schoolAttendanceFixture(Tenant::factory()->create());
+    $query = '?academic_year_id='.$f['year']->id.'&scope=student&entity_id='.$f['student']->id.'&period_type=month&month=2026-09';
+
+    $this->actingAs($f['admin'])->get('/admin/school-attendance/reports'.$query)->assertOk()
+        ->assertInertia(fn ($page) => $page->component('Admin/SchoolAttendance/Reports')->has('rows', 1));
+    $this->get('/admin/school-attendance/reports/export/csv'.$query)->assertOk()->assertHeader('content-type', 'text/csv; charset=UTF-8');
+    $this->get('/admin/school-attendance/reports/export/pdf'.$query)->assertOk()->assertHeader('content-type', 'application/pdf');
 });

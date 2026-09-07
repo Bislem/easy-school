@@ -7,6 +7,7 @@ import {
     CalendarCheck,
     Check,
     Clock3,
+    FileText,
     UserRoundCheck,
     Users,
     X,
@@ -54,6 +55,31 @@ const props = defineProps<{
     cycles: Cycle[];
     groups: Group[];
     sessions: Session[];
+    dashboard: {
+        students_absent: number;
+        students_late: number;
+        teachers_absent: number;
+        affected_classes: number;
+    };
+    warnings: Array<{
+        student_id: number;
+        student: string;
+        monthly_absences: number;
+        consecutive_days: number;
+    }>;
+    attendanceSettings: {
+        monthly_absence_threshold: number;
+        consecutive_days_threshold: number;
+    };
+    teacherImpacts: Array<{
+        teacher: string;
+        sessions: Array<{
+            id: number;
+            group: string;
+            subject: string;
+            start_time: string;
+        }>;
+    }>;
 }>();
 
 const filters = reactive({
@@ -189,6 +215,12 @@ const preview = ref<
     }>
 >([]);
 const previewing = ref(false);
+const warningSettings = reactive({ ...props.attendanceSettings });
+function saveWarningSettings() {
+    router.put('/admin/school-attendance/settings', warningSettings, {
+        preserveScroll: true,
+    });
+}
 async function openTeacherRange(session: Session) {
     if (!session.teacher) return;
     Object.assign(teacherForm, {
@@ -253,32 +285,151 @@ function saveTeacherRange() {
                         exceptions.
                     </p>
                 </div>
-                <div class="flex rounded-xl border bg-white p-1">
-                    <button
-                        class="flex items-center gap-2 rounded-lg px-4 py-2 text-sm"
-                        :class="
-                            view === 'students' ? 'bg-blue-600 text-white' : ''
-                        "
-                        @click="
-                            filters.view = 'students';
-                            applyFilters();
-                        "
+                <div class="flex flex-wrap items-center gap-2">
+                    <a href="/admin/school-attendance/reports"
+                        ><Button variant="outline"
+                            ><FileText class="size-4" />Rapports</Button
+                        ></a
                     >
-                        <Users class="size-4" />Élèves</button
-                    ><button
-                        class="flex items-center gap-2 rounded-lg px-4 py-2 text-sm"
-                        :class="
-                            view === 'teachers' ? 'bg-blue-600 text-white' : ''
-                        "
-                        @click="
-                            filters.view = 'teachers';
-                            applyFilters();
-                        "
-                    >
-                        <UserRoundCheck class="size-4" />Enseignants
-                    </button>
+                    <div class="flex rounded-xl border bg-white p-1">
+                        <button
+                            class="flex items-center gap-2 rounded-lg px-4 py-2 text-sm"
+                            :class="
+                                view === 'students'
+                                    ? 'bg-blue-600 text-white'
+                                    : ''
+                            "
+                            @click="
+                                filters.view = 'students';
+                                applyFilters();
+                            "
+                        >
+                            <Users class="size-4" />Élèves</button
+                        ><button
+                            class="flex items-center gap-2 rounded-lg px-4 py-2 text-sm"
+                            :class="
+                                view === 'teachers'
+                                    ? 'bg-blue-600 text-white'
+                                    : ''
+                            "
+                            @click="
+                                filters.view = 'teachers';
+                                applyFilters();
+                            "
+                        >
+                            <UserRoundCheck class="size-4" />Enseignants
+                        </button>
+                    </div>
                 </div>
             </header>
+
+            <section class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <article
+                    v-for="indicator in [
+                        {
+                            label: 'Élèves absents',
+                            value: dashboard.students_absent,
+                            color: 'text-red-700',
+                        },
+                        {
+                            label: 'Élèves en retard',
+                            value: dashboard.students_late,
+                            color: 'text-amber-700',
+                        },
+                        {
+                            label: 'Enseignants absents',
+                            value: dashboard.teachers_absent,
+                            color: 'text-red-700',
+                        },
+                        {
+                            label: 'Classes affectées',
+                            value: dashboard.affected_classes,
+                            color: 'text-violet-700',
+                        },
+                    ]"
+                    :key="indicator.label"
+                    class="rounded-2xl border bg-white p-4"
+                >
+                    <p
+                        class="text-xs font-medium text-muted-foreground uppercase"
+                    >
+                        {{ date }} · {{ indicator.label }}
+                    </p>
+                    <p
+                        class="mt-2 text-3xl font-semibold"
+                        :class="indicator.color"
+                    >
+                        {{ indicator.value }}
+                    </p>
+                </article>
+            </section>
+
+            <section
+                class="rounded-2xl border border-amber-200 bg-amber-50/70 p-4"
+            >
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                        <h2 class="font-semibold text-amber-900">
+                            Alertes d’absences répétées
+                        </h2>
+                        <p class="text-xs text-amber-800">
+                            Seuils :
+                            {{ attendanceSettings.monthly_absence_threshold }}
+                            absences/mois ou
+                            {{ attendanceSettings.consecutive_days_threshold }}
+                            jours consécutifs.
+                        </p>
+                    </div>
+                    <details class="relative">
+                        <summary
+                            class="cursor-pointer text-sm font-medium text-amber-900"
+                        >
+                            Configurer les seuils
+                        </summary>
+                        <div
+                            class="mt-3 grid gap-2 rounded-xl border border-amber-200 bg-white p-3 sm:grid-cols-3"
+                        >
+                            <label class="text-xs"
+                                >Absences par mois<Input
+                                    v-model="
+                                        warningSettings.monthly_absence_threshold
+                                    "
+                                    type="number"
+                                    min="1" /></label
+                            ><label class="text-xs"
+                                >Jours consécutifs<Input
+                                    v-model="
+                                        warningSettings.consecutive_days_threshold
+                                    "
+                                    type="number"
+                                    min="1" /></label
+                            ><Button
+                                class="self-end"
+                                size="sm"
+                                @click="saveWarningSettings"
+                                >Enregistrer</Button
+                            >
+                        </div>
+                    </details>
+                </div>
+                <p v-if="!warnings.length" class="mt-3 text-sm text-amber-800">
+                    Aucune alerte pour la période actuelle.
+                </p>
+                <div v-else class="mt-3 grid gap-2 md:grid-cols-2">
+                    <div
+                        v-for="warning in warnings"
+                        :key="warning.student_id"
+                        class="rounded-lg border border-amber-200 bg-white px-3 py-2 text-sm"
+                    >
+                        <strong>{{ warning.student }}</strong
+                        ><span class="ml-2 text-amber-800"
+                            >{{ warning.monthly_absences }} absence(s) ce mois ·
+                            {{ warning.consecutive_days }} jour(s)
+                            consécutif(s)</span
+                        >
+                    </div>
+                </div>
+            </section>
 
             <section
                 class="grid gap-3 rounded-2xl border bg-white p-4 sm:grid-cols-2 lg:grid-cols-5"
@@ -585,6 +736,33 @@ function saveTeacherRange() {
             </template>
 
             <template v-else>
+                <section
+                    v-if="teacherImpacts.length"
+                    class="grid gap-3 lg:grid-cols-2"
+                >
+                    <article
+                        v-for="impact in teacherImpacts"
+                        :key="impact.teacher"
+                        class="rounded-2xl border border-red-200 bg-red-50/60 p-4"
+                    >
+                        <h2 class="font-semibold text-red-800">
+                            {{ impact.teacher }} absent
+                        </h2>
+                        <div class="mt-2 space-y-1">
+                            <p
+                                v-for="session in impact.sessions"
+                                :key="session.id"
+                                class="text-sm text-red-900"
+                            >
+                                → {{ session.group }} · {{ session.subject }} ·
+                                {{ session.start_time }}
+                            </p>
+                        </div>
+                        <p class="mt-3 text-xs text-muted-foreground">
+                            Remplacement : non assigné — fonctionnalité à venir
+                        </p>
+                    </article>
+                </section>
                 <section
                     v-if="sessions.length"
                     class="grid gap-3 lg:grid-cols-2"
