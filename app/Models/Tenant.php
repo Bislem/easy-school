@@ -13,7 +13,7 @@ class Tenant extends Model
 {
     use HasFactory, SoftDeletes;
 
-    protected $fillable = ['name', 'slug', 'logo', 'phone', 'email', 'address', 'wilaya', 'commune', 'status', 'account_type', 'demo_expires_at', 'subscription_plan_id', 'payment_proof_path', 'registration_submitted_at', 'registration_reviewed_at', 'registration_rejection_reason', 'plan_started_at', 'plan_expires_at', 'settings'];
+    protected $fillable = ['name', 'slug', 'logo', 'phone', 'email', 'address', 'wilaya', 'commune', 'status', 'account_type', 'organization_type', 'demo_expires_at', 'subscription_plan_id', 'payment_proof_path', 'registration_submitted_at', 'registration_reviewed_at', 'registration_rejection_reason', 'plan_started_at', 'plan_expires_at', 'settings'];
 
     protected $appends = ['logo_url'];
 

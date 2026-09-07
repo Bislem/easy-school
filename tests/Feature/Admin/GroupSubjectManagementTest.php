@@ -3,14 +3,15 @@
 use App\Enums\RoomType;
 use App\Enums\UserRole;
 use App\Models\AcademicPeriod;
+use App\Models\AcademicYear;
 use App\Models\Classroom;
 use App\Models\Course;
 use App\Models\SchoolCycle;
+use App\Models\SchoolGroup;
 use App\Models\SchoolLevel;
 use App\Models\SchoolSite;
 use App\Models\Student;
 use App\Models\Tenant;
-use App\Models\TrainingPlanGroup;
 use App\Models\User;
 use App\Tenancy\TenantContext;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -27,7 +28,8 @@ function schoolManagementFixture(Tenant $tenant): array
     app(TenantContext::class)->set($tenant);
     $cycle = SchoolCycle::create(['name' => 'CEM', 'code' => 'CEM', 'sort_order' => 1]);
     $level = SchoolLevel::create(['school_cycle_id' => $cycle->id, 'name' => '2AM', 'code' => '2AM', 'sort_order' => 1]);
-    $period = AcademicPeriod::create(['name' => 'Année scolaire', 'academic_year' => '2026-2027', 'starts_on' => '2026-09-01', 'ends_on' => '2027-06-30', 'is_current' => true]);
+    $year = AcademicYear::create(['name' => '2026-2027', 'start_date' => '2026-09-01', 'end_date' => '2027-06-30', 'status' => 'draft']);
+    $period = AcademicPeriod::create(['academic_year_id' => $year->id, 'name' => 'Trimestre 1', 'number' => 1, 'academic_year' => '2026-2027', 'starts_on' => '2026-09-01', 'ends_on' => '2026-12-31', 'is_current' => true]);
     $site = SchoolSite::create(['name' => 'Principal', 'code' => 'MAIN', 'wilaya' => 'Alger', 'is_active' => true]);
     $room = Classroom::create(['school_site_id' => $site->id, 'name' => 'Salle 12', 'code' => 'S12', 'capacity' => 30, 'is_active' => true, 'is_available' => true]);
     $teacher = User::factory()->create(['tenant_id' => $tenant->id, 'role' => UserRole::TEACHER]);
@@ -41,8 +43,8 @@ test('admin creates an independent group with a principal teacher', function () 
     $admin = User::factory()->create(['tenant_id' => $tenant->id, 'role' => UserRole::ADMIN]);
     $f = schoolManagementFixture($tenant);
     $this->actingAs($admin)->post('/admin/groups', ['name' => '2AM-B', 'code' => '2AM-B', 'school_level_id' => $f['level']->id, 'academic_period_id' => $f['period']->id, 'classroom_id' => $f['room']->id, 'capacity' => 25, 'is_active' => true, 'teacher_ids' => [], 'principal_teacher_id' => $f['teacher']->id])->assertSessionHasNoErrors();
-    $group = TrainingPlanGroup::where('code', '2AM-B')->first();
-    expect($group->training_plan_id)->toBeNull()->and($group->principal_teacher_id)->toBe($f['teacher']->id)->and($group->teachers()->whereKey($f['teacher']->id)->exists())->toBeTrue();
+    $group = SchoolGroup::where('code', '2AM-B')->first();
+    expect($group->principal_teacher_id)->toBe($f['teacher']->id)->and($group->teachers()->whereKey($f['teacher']->id)->exists())->toBeTrue();
 });
 
 test('group roster enforces capacity and one group per student', function () {
@@ -50,16 +52,16 @@ test('group roster enforces capacity and one group per student', function () {
     $admin = User::factory()->create(['tenant_id' => $tenant->id, 'role' => UserRole::ADMIN]);
     $f = schoolManagementFixture($tenant);
     app(TenantContext::class)->set($tenant);
-    $first = TrainingPlanGroup::create(['school_level_id' => $f['level']->id, 'academic_period_id' => $f['period']->id, 'group_number' => 1, 'name' => 'A', 'code' => 'A', 'capacity' => 1]);
-    $second = TrainingPlanGroup::create(['school_level_id' => $f['level']->id, 'academic_period_id' => $f['period']->id, 'group_number' => 2, 'name' => 'B', 'code' => 'B', 'capacity' => 20]);
+    $first = SchoolGroup::create(['school_level_id' => $f['level']->id, 'academic_period_id' => $f['period']->id, 'name' => 'A', 'code' => 'A', 'capacity' => 1]);
+    $second = SchoolGroup::create(['school_level_id' => $f['level']->id, 'academic_period_id' => $f['period']->id, 'name' => 'B', 'code' => 'B', 'capacity' => 20]);
     $student = Student::create(['first_name' => 'Lina', 'last_name' => 'Ali', 'email' => 'lina@school.test', 'phone' => '0550000000', 'is_active' => true]);
     app(TenantContext::class)->clear();
     $this->actingAs($admin)->post("/admin/groups/{$first->id}/students", ['student_ids' => [$student->id]])->assertSessionHasNoErrors();
     $this->post("/admin/groups/{$second->id}/students", ['student_ids' => [$student->id]])->assertSessionHasErrors('student_ids');
-    expect($student->fresh()->training_plan_group_id)->toBe($first->id);
+    expect($student->fresh()->school_group_id)->toBe($first->id);
 
     $this->post("/admin/groups/{$second->id}/students", ['student_ids' => [$student->id], 'move_existing' => true])->assertSessionHasNoErrors();
-    expect($student->fresh()->training_plan_group_id)->toBe($second->id);
+    expect($student->fresh()->school_group_id)->toBe($second->id);
 });
 
 test('levels support configurable specializations sharing the same base code', function () {
@@ -76,7 +78,7 @@ test('levels support configurable specializations sharing the same base code', f
     $this->actingAs($admin)->post('/admin/school-levels', [...$payload, 'specialization' => 'Sciences expérimentales'])->assertSessionHasNoErrors();
     $this->post('/admin/school-levels', [...$payload, 'specialization' => 'Mathématiques'])->assertSessionHasNoErrors();
 
-    expect(SchoolLevel::where('code', '2AS')->whereNotNull('specialization')->count())->toBe(2);
+    expect(SchoolLevel::where('tenant_id', $tenant->id)->where('code', '2AS')->whereNotNull('specialization')->count())->toBe(2);
 });
 
 test('subjects are assigned to levels teachers and room requirements', function () {
@@ -117,10 +119,9 @@ test('group management route model binding remains tenant isolated', function ()
     $foreign = schoolManagementFixture($otherTenant);
 
     app(TenantContext::class)->set($otherTenant);
-    $foreignGroup = TrainingPlanGroup::create([
+    $foreignGroup = SchoolGroup::create([
         'school_level_id' => $foreign['level']->id,
         'academic_period_id' => $foreign['period']->id,
-        'group_number' => 1,
         'name' => 'Groupe étranger',
         'code' => 'FOREIGN',
         'capacity' => 20,

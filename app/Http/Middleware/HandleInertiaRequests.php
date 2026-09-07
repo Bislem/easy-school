@@ -2,10 +2,12 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\AcademicYear;
+use App\Models\CompanySetting;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 use Inertia\Middleware;
-use App\Models\CompanySetting;
 
 class HandleInertiaRequests extends Middleware
 {
@@ -51,6 +53,15 @@ class HandleInertiaRequests extends Middleware
         $authenticatedUser = $isPlatformAdmin
             ? auth('super_admin')->user()
             : $request->user();
+        $academicYears = collect();
+        $selectedAcademicYear = null;
+        if (! $isPlatformAdmin && $authenticatedUser?->tenant?->organization_type === 'private_school' && Schema::hasTable('academic_years')) {
+            $academicYears = AcademicYear::orderByDesc('start_date')->get(['id', 'name', 'status', 'start_date', 'end_date']);
+            $selectedId = $request->session()->get('academic_year_id');
+            $selectedAcademicYear = $academicYears->firstWhere('id', (int) $selectedId)
+                ?? $academicYears->first(fn ($year) => $year->status->value === 'active')
+                ?? $academicYears->first();
+        }
 
         return [
             ...parent::share($request),
@@ -60,8 +71,10 @@ class HandleInertiaRequests extends Middleware
             'quote' => ['message' => trim($message), 'author' => trim($author)],
             'auth' => [
                 'user' => $authenticatedUser,
-                'tenant' => $authenticatedUser?->tenant?->only(['id', 'name', 'slug', 'logo_url', 'status', 'account_type', 'demo_expires_at']),
+                'tenant' => $authenticatedUser?->tenant?->only(['id', 'name', 'slug', 'logo_url', 'status', 'account_type', 'organization_type', 'demo_expires_at']),
             ],
+            'academic_years' => $academicYears,
+            'current_academic_year' => $selectedAcademicYear,
             'superAdmin' => $isPlatformAdmin ? ['basePath' => '/'.$superAdminPath] : null,
             'unread_notifications_count' => fn () => $isPlatformAdmin ? 0 : ($request->user()?->portalNotifications()->whereNull('read_at')->count() ?? 0),
             'auth_notifications' => fn () => $isPlatformAdmin ? [] : ($request->user()?->portalNotifications()
@@ -73,7 +86,7 @@ class HandleInertiaRequests extends Middleware
                 'locale' => config('vilt-filepond.locale'),
                 'chunkSize' => config('vilt-filepond.chunk_size'),
             ],
-            'currency' =>[
+            'currency' => [
                 'symbol' => config('app.currency_symbol'),
                 'code' => config('app.currency_code'),
             ],
@@ -81,6 +94,7 @@ class HandleInertiaRequests extends Middleware
                 'restricted_action' => $request->session()->get('restricted_action'),
                 'success' => $request->session()->get('success'),
                 'enrollment_pending' => $request->session()->get('enrollment_pending'),
+                'private_school_inscription_submitted' => $request->session()->get('private_school_inscription_submitted'),
             ],
         ];
     }

@@ -15,6 +15,13 @@ class CourseLevel extends Model
         return ['duration_hours' => 'integer', 'price' => 'decimal:2', 'is_active' => 'boolean'];
     }
 
-    public function course(): BelongsTo { return $this->belongsTo(Course::class); }
-    public function trainingPlans(): HasMany { return $this->hasMany(TrainingPlan::class); }
+    public function course(): BelongsTo
+    {
+        return $this->belongsTo(Formation::class, 'course_id');
+    }
+
+    public function trainingPlans(): HasMany
+    {
+        return $this->hasMany(TrainingPlan::class);
+    }
 }

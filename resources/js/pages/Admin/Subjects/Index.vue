@@ -12,6 +12,7 @@ import {
     Pencil,
     Plus,
     Search,
+    Sparkles,
     Trash2,
     Users,
     X,
@@ -23,13 +24,22 @@ type Level = {
     id: number;
     name: string;
     code: string;
+    specialization?: string | null;
     cycle?: { id: number; name: string };
+    pivot?: {
+        id?: number;
+        school_stream_id?: number | null;
+        curriculum_code?: string | null;
+        is_optional?: boolean;
+        is_active?: boolean;
+    };
 };
-type Cycle = { id: number; name: string; levels: Level[] };
+type Cycle = { id: number; name: string; code: string; levels: Level[] };
 type RoomType = { value: string; label: string };
 type Subject = {
     id: number;
     title: string;
+    title_ar?: string | null;
     code: string;
     category?: string | null;
     color: string;
@@ -62,6 +72,7 @@ const teacherFilter = ref(props.filters.teacher_id || '');
 const statusFilter = ref(props.filters.status || '');
 const form = useForm({
     title: '',
+    title_ar: '',
     code: '',
     category: '',
     color: '#2563eb',
@@ -106,6 +117,7 @@ function openEdit(subject: Subject) {
     form.clearErrors();
     Object.assign(form, {
         title: subject.title,
+        title_ar: subject.title_ar || '',
         code: subject.code,
         category: subject.category || '',
         color: subject.color || '#2563eb',
@@ -114,8 +126,14 @@ function openEdit(subject: Subject) {
         required_room_types: subject.required_room_types || [],
         is_specialized: subject.is_specialized,
         is_active: subject.is_active,
-        school_level_ids: subject.school_levels.map((l) => l.id),
-        teacher_ids: subject.teachers.map((t) => t.id),
+        school_level_ids: [
+            ...new Set(
+                subject.school_levels
+                    .filter((level) => level.pivot?.is_active !== false)
+                    .map((level) => level.id),
+            ),
+        ],
+        teacher_ids: [...new Set(subject.teachers.map((t) => t.id))],
     });
     modalOpen.value = true;
 }
@@ -144,6 +162,21 @@ function toggleActive(subject: Subject) {
         { preserveScroll: true },
     );
 }
+function loadDefaultCurriculum() {
+    if (
+        confirm(
+            'Charger le programme algérien 2026-2027 ? Vos matières personnalisées ne seront pas modifiées.',
+        )
+    )
+        router.post(
+            '/admin/subjects/load-default-curriculum',
+            {},
+            { preserveScroll: true },
+        );
+}
+const assignmentLabel = (level: Level) => {
+    return `${level.name}${level.specialization ? ` · ${level.specialization}` : ''}${level.pivot?.is_optional ? ' · Option' : ''}`;
+};
 function destroySubject(subject: Subject) {
     if (confirm(`Supprimer la matière ${subject.title} ?`))
         router.delete(`/admin/subjects/${subject.id}`, {
@@ -177,9 +210,14 @@ const roomTypeLabel = (value: string) =>
                         habilités et salles adaptées.
                     </p>
                 </div>
-                <Button @click="openCreate"
-                    ><Plus class="mr-2 size-4" />Nouvelle matière</Button
-                >
+                <div class="flex flex-wrap gap-2">
+                    <Button variant="outline" @click="loadDefaultCurriculum"
+                        ><Sparkles class="mr-2 size-4" />Charger le programme
+                        algérien</Button
+                    ><Button @click="openCreate"
+                        ><Plus class="mr-2 size-4" />Nouvelle matière</Button
+                    >
+                </div>
             </header>
             <section class="grid gap-3 sm:grid-cols-3">
                 <div class="stat">
@@ -271,6 +309,13 @@ const roomTypeLabel = (value: string) =>
                                 <h2 class="mt-1 text-lg font-semibold">
                                     {{ subject.title }}
                                 </h2>
+                                <p
+                                    v-if="subject.title_ar"
+                                    class="text-sm text-slate-600"
+                                    dir="rtl"
+                                >
+                                    {{ subject.title_ar }}
+                                </p>
                                 <p class="text-xs text-slate-500">
                                     {{ subject.category || 'Matière générale' }}
                                 </p>
@@ -289,10 +334,17 @@ const roomTypeLabel = (value: string) =>
                         </div>
                         <div class="mt-4 flex flex-wrap gap-1.5">
                             <span
-                                v-for="level in subject.school_levels"
+                                v-for="level in subject.school_levels.filter(
+                                    (item) => item.pivot?.is_active !== false,
+                                )"
                                 :key="level.id"
-                                class="rounded-full bg-blue-50 px-2 py-1 text-[11px] font-medium text-blue-700"
-                                >{{ level.name }}</span
+                                class="rounded-full px-2 py-1 text-[11px] font-medium"
+                                :class="
+                                    level.pivot?.is_active === false
+                                        ? 'bg-slate-100 text-slate-400 line-through'
+                                        : 'bg-blue-50 text-blue-700'
+                                "
+                                >{{ assignmentLabel(level) }}</span
                             >
                         </div>
                         <div class="mt-4 grid grid-cols-3 gap-2">
@@ -392,6 +444,13 @@ const roomTypeLabel = (value: string) =>
                             placeholder="Mathématiques" /><InputError
                             :message="form.errors.title" /></label
                     ><label class="field"
+                        ><span>Nom arabe</span
+                        ><Input
+                            v-model="form.title_ar"
+                            dir="rtl"
+                            placeholder="الرياضيات" /><InputError
+                            :message="form.errors.title_ar" /></label
+                    ><label class="field"
                         ><span>Code</span
                         ><Input
                             v-model="form.code"
@@ -446,7 +505,7 @@ const roomTypeLabel = (value: string) =>
                                         @change="
                                             toggle('school_level_ids', level.id)
                                         "
-                                    />{{ level.name }}</label
+                                    />{{ assignmentLabel(level) }}</label
                                 >
                             </div>
                         </div>

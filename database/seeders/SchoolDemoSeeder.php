@@ -4,10 +4,10 @@ namespace Database\Seeders;
 
 use App\Enums\UserRole;
 use App\Models\Classroom;
-use App\Models\Course;
 use App\Models\CourseEnrollment;
-use App\Models\EnrollmentForm;
 use App\Models\EmployeeType;
+use App\Models\EnrollmentForm;
+use App\Models\Formation;
 use App\Models\SchoolSite;
 use App\Models\Staff;
 use App\Models\Student;
@@ -121,6 +121,7 @@ class SchoolDemoSeeder extends Seeder
             ]);
             $result[$email] = $user;
         }
+
         return $result;
     }
 
@@ -153,6 +154,7 @@ class SchoolDemoSeeder extends Seeder
                 'description' => 'Salle équipée pour les activités pédagogiques.', 'is_active' => true,
             ]);
         }
+
         return $rooms;
     }
 
@@ -166,13 +168,14 @@ class SchoolDemoSeeder extends Seeder
         ];
         $courses = [];
         foreach ($definitions as [$code, $title, $category, $duration, $price, $certified]) {
-            $courses[$code] = Course::updateOrCreate(['code' => $code], [
+            $courses[$code] = Formation::updateOrCreate(['code' => $code], [
                 'title' => $title, 'category' => $category, 'duration_hours' => $duration, 'price' => $price,
                 'description' => "Formation pratique en {$title} avec projets et accompagnement personnalisé.",
                 'objectives' => 'Acquérir des compétences directement applicables en contexte professionnel.',
                 'prerequisites' => 'Motivation et connaissances de base.', 'is_certified' => $certified, 'is_active' => true,
             ]);
         }
+
         return $courses;
     }
 
@@ -192,6 +195,7 @@ class SchoolDemoSeeder extends Seeder
             $status = $statuses[$faker->numberBetween(0, count($statuses) - 1)];
 
             $number = $index + 1;
+
             return Student::updateOrCreate(['email' => "apprenant{$number}@demo.ecole.test"], [
                 'first_name' => $firstName,
                 'last_name' => $lastNames[$faker->numberBetween(0, count($lastNames) - 1)],
@@ -208,7 +212,7 @@ class SchoolDemoSeeder extends Seeder
         });
     }
 
-    private function seedPlan(EnrollmentForm $form, Course $course, User $teacher, array $rooms, array $definition): void
+    private function seedPlan(EnrollmentForm $form, Formation $course, User $teacher, array $rooms, array $definition): void
     {
         $level = $course->levels()->updateOrCreate(
             ['code' => 'GENERAL'],

@@ -73,7 +73,7 @@ return new class extends Migration
             $table->timestamps();
         });
         foreach (DB::table('tenants')->pluck('id') as $tenantId) DB::table('timetable_settings')->insert([
-            'tenant_id' => $tenantId, 'working_days' => json_encode([1, 2, 3, 4, 5]),
+            'tenant_id' => $tenantId, 'working_days' => json_encode([7, 1, 2, 3, 4]),
             'day_starts_at' => '08:00', 'day_ends_at' => '17:00', 'default_session_duration' => 60,
             'breaks' => json_encode([]), 'time_slots' => json_encode([]), 'created_at' => now(), 'updated_at' => now(),
         ]);

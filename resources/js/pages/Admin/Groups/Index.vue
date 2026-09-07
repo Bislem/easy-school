@@ -44,27 +44,22 @@ type Student = {
     email?: string;
     school_level?: string;
     is_active?: boolean;
-    training_plan_group_id?: number | null;
+    school_group_id?: number | null;
     group?: { id: number; name: string } | null;
 };
-type Period = {
-    id: number;
-    name: string;
-    academic_year: string;
-    is_current: boolean;
-};
+type AcademicYear = { id: number; name: string };
 type Group = {
     id: number;
     name: string;
     code: string;
     school_level_id: number;
-    academic_period_id: number;
+    academic_period_id?: number | null;
     classroom_id?: number | null;
     principal_teacher_id?: number | null;
     capacity: number;
     is_active: boolean;
     level: Level;
-    academic_period?: Period;
+    academic_year?: AcademicYear;
     classroom?: Room | null;
     principal_teacher?: Person | null;
     teachers: Person[];
@@ -80,7 +75,7 @@ type Page<T> = {
 const props = defineProps<{
     groups: Page<Group>;
     cycles: Cycle[];
-    periods: Period[];
+    academicYear?: AcademicYear;
     classrooms: Room[];
     teachers: Person[];
     students: Student[];
@@ -96,13 +91,12 @@ const current = ref<(Group & { students: Student[] }) | null>(null);
 const search = ref(props.filters.search || '');
 const cycleFilter = ref(props.filters.cycle_id || '');
 const levelFilter = ref(props.filters.level_id || '');
-const periodFilter = ref(props.filters.academic_period_id || '');
 const statusFilter = ref(props.filters.status || '');
+const studentSearch = ref('');
 const form = useForm({
     name: '',
     code: '',
     school_level_id: '',
-    academic_period_id: '',
     classroom_id: '',
     capacity: 30,
     is_active: true,
@@ -134,18 +128,33 @@ const selectedRoom = computed(() =>
 const assignableStudents = computed(() =>
     props.students.filter(
         (student) =>
-            student.training_plan_group_id !== current.value?.id &&
-            (!student.training_plan_group_id || rosterForm.move_existing),
+            student.school_group_id !== current.value?.id &&
+            (!student.school_group_id || rosterForm.move_existing),
     ),
 );
+const visibleAssignableStudents = computed(() => {
+    const query = studentSearch.value.trim().toLocaleLowerCase('fr');
+    if (!query) return assignableStudents.value;
+
+    return assignableStudents.value.filter((student) =>
+        [
+            student.first_name,
+            student.last_name,
+            student.first_name + ' ' + student.last_name,
+            student.last_name + ' ' + student.first_name,
+            student.email,
+            student.school_level,
+            student.group?.name,
+        ].some((value) => value?.toLocaleLowerCase('fr').includes(query)),
+    );
+});
 watch(
     () => rosterForm.move_existing,
     (canMove) => {
         if (!canMove) {
             rosterForm.student_ids = rosterForm.student_ids.filter((id) =>
                 props.students.some(
-                    (student) =>
-                        student.id === id && !student.training_plan_group_id,
+                    (student) => student.id === id && !student.school_group_id,
                 ),
             );
         }
@@ -159,7 +168,6 @@ function applyFilters() {
             search: search.value,
             cycle_id: cycleFilter.value,
             level_id: levelFilter.value,
-            academic_period_id: periodFilter.value,
             status: statusFilter.value,
         },
         { preserveState: true, replace: true },
@@ -172,11 +180,6 @@ function openCreate() {
     Object.assign(form, {
         capacity: 30,
         is_active: true,
-        academic_period_id: String(
-            props.periods.find((p) => p.is_current)?.id ||
-                props.periods[0]?.id ||
-                '',
-        ),
         teacher_ids: [],
         principal_teacher_id: '',
     });
@@ -189,7 +192,6 @@ function openEdit(group: Group) {
         name: group.name,
         code: group.code,
         school_level_id: String(group.school_level_id || ''),
-        academic_period_id: String(group.academic_period_id || ''),
         classroom_id: String(group.classroom_id || ''),
         capacity: group.capacity,
         is_active: group.is_active,
@@ -226,11 +228,20 @@ async function showGroup(group: Group) {
 }
 function destroyGroup(group: Group) {
     if (confirm(`Supprimer le groupe ${group.name} ?`))
-        router.delete(`/admin/groups/${group.id}`, { preserveScroll: true });
+        router.delete(`/admin/groups/${group.id}`, {
+            preserveScroll: true,
+            onError: (errors) =>
+                alert(
+                    String(
+                        errors.group || 'Impossible de supprimer ce groupe.',
+                    ),
+                ),
+        });
 }
 function openRoster() {
     rosterForm.reset();
     rosterForm.clearErrors();
+    studentSearch.value = '';
     rosterOpen.value = true;
 }
 function assignStudents() {
@@ -382,15 +393,6 @@ const paginationLabel = (label: string) =>
                     >
                         {{ level.name }} {{ level.specialization || '' }}
                     </option></select
-                ><select v-model="periodFilter" class="control">
-                    <option value="">Toutes les années</option>
-                    <option
-                        v-for="period in periods"
-                        :key="period.id"
-                        :value="period.id"
-                    >
-                        {{ period.academic_year }}
-                    </option></select
                 ><select v-model="statusFilter" class="control">
                     <option value="">Tous les statuts</option>
                     <option value="active">Groupes actifs</option>
@@ -408,17 +410,26 @@ const paginationLabel = (label: string) =>
                 >
                     <div class="flex items-start justify-between">
                         <div>
-                            <span
-                                class="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700"
-                                >{{ group.level?.cycle?.name }} ·
-                                {{ group.level?.name }}</span
+                            <div
+                                class="inline-flex flex-col rounded-xl bg-blue-50 px-3 py-1.5 text-blue-700"
                             >
+                                <span class="text-xs font-semibold"
+                                    >{{ group.level?.cycle?.name }} ·
+                                    {{ group.level?.name }}</span
+                                >
+                                <span
+                                    v-if="group.level?.specialization"
+                                    class="mt-0.5 text-[11px] font-medium text-blue-600"
+                                >
+                                    {{ group.level.specialization }}
+                                </span>
+                            </div>
                             <h2 class="mt-3 text-lg font-semibold">
                                 {{ group.name }}
                             </h2>
                             <p class="text-xs text-slate-500">
                                 {{ group.code }} ·
-                                {{ group.academic_period?.academic_year }}
+                                {{ group.academic_year?.name }}
                             </p>
                         </div>
                         <span
@@ -622,18 +633,6 @@ const paginationLabel = (label: string) =>
                             </optgroup></select
                         ><InputError
                             :message="form.errors.school_level_id" /></label
-                    ><label class="field"
-                        ><span>Année / période</span
-                        ><select v-model="form.academic_period_id" required>
-                            <option
-                                v-for="period in periods"
-                                :key="period.id"
-                                :value="period.id"
-                            >
-                                {{ period.academic_year }} · {{ period.name }}
-                            </option></select
-                        ><InputError
-                            :message="form.errors.academic_period_id" /></label
                     ><label class="field"
                         ><span>Salle par défaut</span
                         ><select v-model="form.classroom_id">
@@ -855,11 +854,22 @@ const paginationLabel = (label: string) =>
                         <X />
                     </button>
                 </div>
+                <div class="relative mb-3">
+                    <Search
+                        class="absolute top-2.5 left-3 size-4 text-slate-400"
+                    />
+                    <Input
+                        v-model="studentSearch"
+                        class="pl-9"
+                        placeholder="Rechercher par nom, e-mail ou niveau…"
+                        autofocus
+                    />
+                </div>
                 <div
                     class="max-h-80 space-y-1 overflow-auto rounded-xl border p-2"
                 >
                     <label
-                        v-for="student in assignableStudents"
+                        v-for="student in visibleAssignableStudents"
                         :key="student.id"
                         class="flex cursor-pointer items-center gap-3 rounded-lg p-2 hover:bg-blue-50"
                         ><input
@@ -879,10 +889,14 @@ const paginationLabel = (label: string) =>
                         ></label
                     >
                     <p
-                        v-if="!assignableStudents.length"
+                        v-if="!visibleAssignableStudents.length"
                         class="p-6 text-center text-sm text-slate-400"
                     >
-                        Aucun élève disponible.
+                        {{
+                            studentSearch
+                                ? 'Aucun élève ne correspond à la recherche.'
+                                : 'Aucun élève disponible.'
+                        }}
                     </p>
                 </div>
                 <InputError :message="rosterForm.errors.student_ids" />

@@ -3,12 +3,12 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\Course;
 use App\Models\CourseLevel;
+use App\Models\Formation;
+use App\Tenancy\TenantRule;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
-use App\Tenancy\TenantRule;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -16,7 +16,7 @@ class CoursesController extends Controller
 {
     public function index(Request $request): Response
     {
-        $courses = Course::query()->with(['levels' => fn ($query) => $query->orderBy('name')])
+        $courses = Formation::query()->with(['levels' => fn ($query) => $query->orderBy('name')])
             ->when($request->string('search')->trim()->toString(), function ($query, string $search) {
                 $query->where(function ($query) use ($search) {
                     $query->where('title', 'like', "%{$search}%")
@@ -37,19 +37,19 @@ class CoursesController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
-        Course::create($this->validateCourse($request));
+        Formation::create($this->validateCourse($request));
 
         return back()->with('success', 'Formation créée avec succès.');
     }
 
-    public function update(Request $request, Course $course): RedirectResponse
+    public function update(Request $request, Formation $course): RedirectResponse
     {
         $course->update($this->validateCourse($request, $course));
 
         return back()->with('success', 'Formation mise à jour avec succès.');
     }
 
-    public function toggleActive(Course $course): RedirectResponse
+    public function toggleActive(Formation $course): RedirectResponse
     {
         $course->update(['is_active' => ! $course->is_active]);
 
@@ -58,27 +58,30 @@ class CoursesController extends Controller
             : 'La formation a été désactivée.');
     }
 
-    public function storeLevel(Request $request, Course $course): RedirectResponse
+    public function storeLevel(Request $request, Formation $course): RedirectResponse
     {
         $course->levels()->create($this->validateLevel($request, $course));
+
         return back()->with('success', 'Niveau créé avec succès.');
     }
 
-    public function updateLevel(Request $request, Course $course, CourseLevel $level): RedirectResponse
+    public function updateLevel(Request $request, Formation $course, CourseLevel $level): RedirectResponse
     {
         abort_unless($level->course_id === $course->id, 404);
         $level->update($this->validateLevel($request, $course, $level));
+
         return back()->with('success', 'Niveau mis à jour avec succès.');
     }
 
-    public function toggleLevel(Course $course, CourseLevel $level): RedirectResponse
+    public function toggleLevel(Formation $course, CourseLevel $level): RedirectResponse
     {
         abort_unless($level->course_id === $course->id, 404);
         $level->update(['is_active' => ! $level->is_active]);
+
         return back()->with('success', $level->is_active ? 'Le niveau a été activé.' : 'Le niveau a été désactivé.');
     }
 
-    private function validateLevel(Request $request, Course $course, ?CourseLevel $level = null): array
+    private function validateLevel(Request $request, Formation $course, ?CourseLevel $level = null): array
     {
         return $request->validate([
             'name' => ['required', 'string', 'max:255'],
@@ -90,11 +93,11 @@ class CoursesController extends Controller
         ]);
     }
 
-    private function validateCourse(Request $request, ?Course $course = null): array
+    private function validateCourse(Request $request, ?Formation $course = null): array
     {
         return $request->validate([
             'title' => ['required', 'string', 'max:255'],
-            'code' => ['required', 'string', 'max:50', TenantRule::unique('courses', 'code')->ignore($course)],
+            'code' => ['required', 'string', 'max:50', TenantRule::unique('courses', 'code')->where('entity_type', 'formation')->ignore($course)],
             'category' => ['nullable', 'string', 'max:100'],
             'duration_hours' => ['required', 'integer', 'min:1', 'max:100000'],
             'price' => ['required', 'numeric', 'min:0', 'max:9999999999.99'],

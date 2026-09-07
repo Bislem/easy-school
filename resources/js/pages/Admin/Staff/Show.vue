@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import BadgeCard from '@/components/BadgeCard.vue';
 import AnnualLeaveTab from '@/components/hr/AnnualLeaveTab.vue';
-import SickLeaveTab from '@/components/hr/SickLeaveTab.vue';
-import HrRecordsTab from '@/components/hr/HrRecordsTab.vue';
 import EmployeeTimeline from '@/components/hr/EmployeeTimeline.vue';
+import HrRecordsTab from '@/components/hr/HrRecordsTab.vue';
+import SickLeaveTab from '@/components/hr/SickLeaveTab.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -81,7 +81,14 @@ const tabs = computed(() => [
 const activeSection = computed(
     () => tabs.value.find((tab) => tab.id === activeTab.value) ?? tabs.value[0],
 );
-const recordTabCategories: Record<string, string> = { absences: 'absence', contracts: 'contract', training: 'training', evaluations: 'evaluation', discipline: 'discipline', notes: 'note' };
+const recordTabCategories: Record<string, string> = {
+    absences: 'absence',
+    contracts: 'contract',
+    training: 'training',
+    evaluations: 'evaluation',
+    discipline: 'discipline',
+    notes: 'note',
+};
 const currentSalary = computed(
     () => props.employee.salary_configurations?.[0] ?? null,
 );
@@ -280,12 +287,71 @@ const fileSize = (bytes: number) =>
                                     {{ employee.hire_date || '—' }}
                                 </dd>
                             </div>
-                            <div><dt class="text-muted-foreground">Lieu de naissance</dt><dd class="mt-1 font-medium">{{ employee.place_of_birth || '—' }}</dd></div>
-                            <div><dt class="text-muted-foreground">Nationalité</dt><dd class="mt-1 font-medium">{{ employee.nationality || '—' }}</dd></div>
-                            <div><dt class="text-muted-foreground">Sexe</dt><dd class="mt-1 font-medium">{{ { male: 'Homme', female: 'Femme', other: 'Autre' }[employee.gender] || '—' }}</dd></div>
-                            <div><dt class="text-muted-foreground">Situation familiale</dt><dd class="mt-1 font-medium">{{ { single: 'Célibataire', married: 'Marié(e)', divorced: 'Divorcé(e)', widowed: 'Veuf / Veuve' }[employee.marital_status] || '—' }}</dd></div>
-                            <div><dt class="text-muted-foreground">N° sécurité sociale</dt><dd class="mt-1 font-medium">{{ employee.social_security_number || '—' }}</dd></div>
-                            <div><dt class="text-muted-foreground">Compte bancaire / RIP</dt><dd class="mt-1 font-medium">{{ employee.bank_account || '—' }}</dd></div>
+                            <div>
+                                <dt class="text-muted-foreground">
+                                    Lieu de naissance
+                                </dt>
+                                <dd class="mt-1 font-medium">
+                                    {{ employee.place_of_birth || '—' }}
+                                </dd>
+                            </div>
+                            <div>
+                                <dt class="text-muted-foreground">
+                                    Nationalité
+                                </dt>
+                                <dd class="mt-1 font-medium">
+                                    {{ employee.nationality || '—' }}
+                                </dd>
+                            </div>
+                            <div>
+                                <dt class="text-muted-foreground">Sexe</dt>
+                                <dd class="mt-1 font-medium">
+                                    {{
+                                        {
+                                            male: 'Homme',
+                                            female: 'Femme',
+                                            other: 'Autre',
+                                        }[employee.gender] || '—'
+                                    }}
+                                </dd>
+                            </div>
+                            <div>
+                                <dt class="text-muted-foreground">
+                                    Situation familiale
+                                </dt>
+                                <dd class="mt-1 font-medium">
+                                    {{
+                                        {
+                                            single: 'Célibataire',
+                                            married: 'Marié(e)',
+                                            divorced: 'Divorcé(e)',
+                                            widowed: 'Veuf / Veuve',
+                                        }[employee.marital_status] || '—'
+                                    }}
+                                </dd>
+                            </div>
+                            <div>
+                                <dt class="text-muted-foreground">
+                                    N° sécurité sociale
+                                </dt>
+                                <dd class="mt-1 font-medium">
+                                    {{ employee.social_security_number || '—' }}
+                                </dd>
+                            </div>
+                            <div>
+                                <dt class="text-muted-foreground">NIN</dt>
+                                <dd class="mt-1 font-medium">
+                                    {{ employee.nin || '—' }}
+                                </dd>
+                            </div>
+                            <div>
+                                <dt class="text-muted-foreground">
+                                    Compte bancaire / RIP
+                                </dt>
+                                <dd class="mt-1 font-medium">
+                                    {{ employee.bank_account || '—' }}
+                                </dd>
+                            </div>
                             <div>
                                 <dt class="text-muted-foreground">E-mail</dt>
                                 <dd class="mt-1 font-medium">
@@ -339,7 +405,34 @@ const fileSize = (bytes: number) =>
                                 </p>
                             </div>
                         </div>
-                        <div class="rounded-xl border bg-card p-5"><h2 class="font-semibold">Contact d’urgence</h2><div class="mt-4 space-y-2 text-sm"><p><span class="text-muted-foreground">Nom :</span> {{ employee.emergency_contact_name || '—' }}</p><p><span class="text-muted-foreground">Lien :</span> {{ employee.emergency_contact_relationship || '—' }}</p><p><span class="text-muted-foreground">Téléphone :</span> {{ employee.emergency_contact_phone || '—' }}</p></div></div>
+                        <div class="rounded-xl border bg-card p-5">
+                            <h2 class="font-semibold">Contact d’urgence</h2>
+                            <div class="mt-4 space-y-2 text-sm">
+                                <p>
+                                    <span class="text-muted-foreground"
+                                        >Nom :</span
+                                    >
+                                    {{ employee.emergency_contact_name || '—' }}
+                                </p>
+                                <p>
+                                    <span class="text-muted-foreground"
+                                        >Lien :</span
+                                    >
+                                    {{
+                                        employee.emergency_contact_relationship ||
+                                        '—'
+                                    }}
+                                </p>
+                                <p>
+                                    <span class="text-muted-foreground"
+                                        >Téléphone :</span
+                                    >
+                                    {{
+                                        employee.emergency_contact_phone || '—'
+                                    }}
+                                </p>
+                            </div>
+                        </div>
                         <div class="rounded-xl border bg-card p-5">
                             <h2 class="font-semibold">Identification</h2>
                             <div class="mt-4 space-y-3 text-sm">
@@ -633,9 +726,24 @@ const fileSize = (bytes: number) =>
                     :employee="employee"
                     :summary="annualLeaveSummary"
                 />
-                <SickLeaveTab v-else-if="activeTab === 'sick-leave'" :employee="employee" :summary="sickLeaveSummary" />
-                <HrRecordsTab v-else-if="recordTabCategories[activeTab]" :key="activeTab" :employee="employee" :category="recordTabCategories[activeTab]" :definition="hrRecordCategories[recordTabCategories[activeTab]]" />
-                <EmployeeTimeline v-else-if="activeTab === 'history'" :items="employeeTimeline" />
+                <SickLeaveTab
+                    v-else-if="activeTab === 'sick-leave'"
+                    :employee="employee"
+                    :summary="sickLeaveSummary"
+                />
+                <HrRecordsTab
+                    v-else-if="recordTabCategories[activeTab]"
+                    :key="activeTab"
+                    :employee="employee"
+                    :category="recordTabCategories[activeTab]"
+                    :definition="
+                        hrRecordCategories[recordTabCategories[activeTab]]
+                    "
+                />
+                <EmployeeTimeline
+                    v-else-if="activeTab === 'history'"
+                    :items="employeeTimeline"
+                />
 
                 <section
                     v-else-if="activeTab === 'attendance'"

@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AccountStatusController;
+use App\Http\Controllers\Admin\AcademicYearsController;
 use App\Http\Controllers\Admin\AnnouncementsController;
 use App\Http\Controllers\Admin\AnnualLeavesController;
 use App\Http\Controllers\Admin\AttendanceController;
@@ -17,9 +18,12 @@ use App\Http\Controllers\Admin\ExpensesController;
 use App\Http\Controllers\Admin\GroupsController;
 use App\Http\Controllers\Admin\ParentsController;
 use App\Http\Controllers\Admin\PortalAccountsController;
+use App\Http\Controllers\Admin\PrivateSchoolCampaignsController;
+use App\Http\Controllers\Admin\PrivateSchoolInscriptionsController;
 use App\Http\Controllers\Admin\ReportsController;
 use App\Http\Controllers\Admin\SalariesController;
 use App\Http\Controllers\Admin\SchoolSitesController;
+use App\Http\Controllers\Admin\SchoolAttendanceController;
 use App\Http\Controllers\Admin\SickLeavesController;
 use App\Http\Controllers\Admin\StaffController;
 use App\Http\Controllers\Admin\StudentFinanceController;
@@ -38,6 +42,7 @@ use App\Http\Controllers\FcmTokenController;
 use App\Http\Controllers\PortalController;
 use App\Http\Controllers\PricingController;
 use App\Http\Controllers\PublicEnrollmentController;
+use App\Http\Controllers\PublicPrivateSchoolInscriptionController;
 use App\Http\Controllers\SalaryPortalController;
 use App\Http\Controllers\SuperAdmin\AuthController as SuperAdminAuthController;
 use App\Http\Controllers\SuperAdmin\ContactRequestsController as SuperAdminContactRequestsController;
@@ -102,6 +107,8 @@ if ($superAdminPath !== '') {
 Route::get('inscription/confirmer/{enrollment}/{token}', [PublicEnrollmentController::class, 'confirm'])->middleware('signed')->name('public.enrollment.confirm');
 Route::get('inscription/{enrollmentForm:public_token}', [PublicEnrollmentController::class, 'show'])->name('public.enrollment.show');
 Route::post('inscription/{enrollmentForm:public_token}', [PublicEnrollmentController::class, 'store'])->middleware('throttle:10,1')->name('public.enrollment.store');
+Route::get('ecole/inscription/{campaign:public_token}', [PublicPrivateSchoolInscriptionController::class, 'show'])->name('public.private-school-inscription.show');
+Route::post('ecole/inscription/{campaign:public_token}', [PublicPrivateSchoolInscriptionController::class, 'store'])->middleware('throttle:10,1')->name('public.private-school-inscription.store');
 Route::get('carte/verifier/{token}', [BadgePortalController::class, 'verify'])->name('badges.verify');
 Route::get('carte/qr/{token}', [BadgePortalController::class, 'qr'])->name('badges.qr');
 Route::get('carte/barcode/{token}', [BadgePortalController::class, 'barcode'])->name('badges.barcode');
@@ -110,6 +117,9 @@ Route::get('/firebase/config', [FcmTokenController::class, 'configuration'])->na
 Route::get('/firebase-messaging-sw.js', [FcmTokenController::class, 'serviceWorker'])->name('firebase.service-worker');
 
 Route::middleware(['auth', 'verified', 'active'])->get('/dashboard', DashboardController::class)->name('dashboard');
+Route::middleware(['auth', 'verified', 'active', 'admin', 'private-school'])
+    ->get('/school-inscription', [PrivateSchoolInscriptionsController::class, 'index'])
+    ->name('school-inscription');
 Route::middleware('auth')->get('/account/pending', AccountStatusController::class)->name('account.pending');
 Route::middleware(['auth', 'verified', 'active'])->get('/my/salary', SalaryPortalController::class)->name('salary.mine');
 Route::middleware(['auth', 'verified', 'active'])->get('/my/salary/statements/{statement}/download', [SalaryPortalController::class, 'statement'])->name('salary.mine.statement');
@@ -133,6 +143,28 @@ Route::middleware(['auth', 'verified', 'active', 'admin'])
     ->prefix('admin')
     ->as('admin.')
     ->group(function () {
+        Route::middleware('private-school')->group(function () {
+            Route::get('academic-years', [AcademicYearsController::class, 'index'])->name('academic-years.index');
+            Route::post('academic-years', [AcademicYearsController::class, 'store'])->name('academic-years.store');
+            Route::put('academic-years/{academicYear}', [AcademicYearsController::class, 'update'])->name('academic-years.update');
+            Route::patch('academic-years/{academicYear}/activate', [AcademicYearsController::class, 'activate'])->name('academic-years.activate');
+            Route::patch('academic-years/{academicYear}/close', [AcademicYearsController::class, 'close'])->name('academic-years.close');
+            Route::patch('academic-years/{academicYear}/archive', [AcademicYearsController::class, 'archive'])->name('academic-years.archive');
+            Route::post('academic-years/select', [AcademicYearsController::class, 'select'])->name('academic-years.select');
+            Route::post('academic-years/{academicYear}/calendar-events', [AcademicYearsController::class, 'storeCalendarEvent'])->name('academic-years.calendar-events.store');
+            Route::put('academic-years/{academicYear}/calendar-events/{calendarEvent}', [AcademicYearsController::class, 'updateCalendarEvent'])->name('academic-years.calendar-events.update');
+            Route::delete('academic-years/{academicYear}/calendar-events/{calendarEvent}', [AcademicYearsController::class, 'destroyCalendarEvent'])->name('academic-years.calendar-events.destroy');
+            Route::get('inscription-campaigns', [PrivateSchoolCampaignsController::class, 'index'])->name('private-school-campaigns.index');
+            Route::post('inscription-campaigns', [PrivateSchoolCampaignsController::class, 'store'])->name('private-school-campaigns.store');
+            Route::put('inscription-campaigns/{campaign}', [PrivateSchoolCampaignsController::class, 'update'])->name('private-school-campaigns.update');
+            Route::patch('inscription-campaigns/{campaign}/status', [PrivateSchoolCampaignsController::class, 'status'])->name('private-school-campaigns.status');
+            Route::get('school-inscriptions', [PrivateSchoolInscriptionsController::class, 'index'])->name('private-school-inscriptions.index');
+            Route::patch('school-inscriptions/{inscription}/status', [PrivateSchoolInscriptionsController::class, 'updateStatus'])->name('private-school-inscriptions.status');
+            Route::get('school-attendance', [SchoolAttendanceController::class, 'index'])->name('school-attendance.index');
+            Route::post('school-attendance/exceptions', [SchoolAttendanceController::class, 'store'])->name('school-attendance.store');
+            Route::delete('school-attendance/exceptions/{attendanceException}', [SchoolAttendanceController::class, 'destroy'])->name('school-attendance.destroy');
+            Route::get('school-attendance/teacher-preview', [SchoolAttendanceController::class, 'teacherPreview'])->name('school-attendance.teacher-preview');
+        });
         Route::get('timetable', TimetableController::class)->name('timetable.index');
         Route::get('groups', [GroupsController::class, 'index'])->name('groups.index');
         Route::post('groups', [GroupsController::class, 'store'])->name('groups.store');
@@ -146,6 +178,7 @@ Route::middleware(['auth', 'verified', 'active', 'admin'])
         Route::delete('school-levels/{level}', [GroupsController::class, 'destroyLevel'])->name('school-levels.destroy');
         Route::get('subjects', [SubjectsController::class, 'index'])->name('subjects.index');
         Route::post('subjects', [SubjectsController::class, 'store'])->name('subjects.store');
+        Route::post('subjects/load-default-curriculum', [SubjectsController::class, 'loadDefaultCurriculum'])->name('subjects.curriculum.load');
         Route::put('subjects/{subject}', [SubjectsController::class, 'update'])->name('subjects.update');
         Route::delete('subjects/{subject}', [SubjectsController::class, 'destroy'])->name('subjects.destroy');
         Route::patch('subjects/{subject}/toggle', [SubjectsController::class, 'toggle'])->name('subjects.toggle');
@@ -252,8 +285,14 @@ Route::middleware(['auth', 'verified', 'active', 'admin'])
         Route::put('expenses/{expense}', [ExpensesController::class, 'update'])->name('expenses.update');
         Route::delete('expenses/{expense}', [ExpensesController::class, 'destroy'])->name('expenses.destroy');
         Route::get('salaries', [SalariesController::class, 'index'])->name('salaries.index');
+        Route::get('salaries/declarations', [\App\Http\Controllers\Admin\PayrollDeclarationsController::class, 'index'])->name('salaries.declarations.index');
+        Route::post('salaries/declarations', [\App\Http\Controllers\Admin\PayrollDeclarationsController::class, 'store'])->name('salaries.declarations.store');
+        Route::patch('salaries/declarations/{declaration}/declared', [\App\Http\Controllers\Admin\PayrollDeclarationsController::class, 'declared'])->name('salaries.declarations.declared');
         Route::post('salaries', [SalariesController::class, 'storeLegacy'])->name('salaries.store');
         Route::get('salaries/configurations', [SalariesController::class, 'configurations'])->name('salaries.configurations.index');
+        Route::post('salaries/items', [SalariesController::class, 'storeItem'])->name('salaries.items.store');
+        Route::put('salaries/items/{item}', [SalariesController::class, 'updateItem'])->name('salaries.items.update');
+        Route::delete('salaries/items/{item}', [SalariesController::class, 'destroyItem'])->name('salaries.items.destroy');
         Route::post('salaries/configurations', [SalariesController::class, 'storeConfiguration'])->name('salaries.configurations.store');
         Route::put('salaries/configurations/{configuration}', [SalariesController::class, 'updateConfiguration'])->name('salaries.configurations.update');
         Route::delete('salaries/configurations/{configuration}', [SalariesController::class, 'destroyConfiguration'])->name('salaries.configurations.destroy');

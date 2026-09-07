@@ -12,6 +12,12 @@ interface SchoolSettings {
     trading_name: string;
     legal_name?: string | null;
     registration_number?: string | null;
+    tax_number?: string | null;
+    cnas_employer_number?: string | null;
+    nis?: string | null;
+    legal_activity?: string | null;
+    cnas_portal_url?: string | null;
+    dgi_portal_url?: string | null;
     address_line_1?: string | null;
     address_line_2?: string | null;
     city?: string | null;
@@ -34,6 +40,12 @@ const form = useForm({
     trading_name: props.settings.trading_name ?? '',
     legal_name: props.settings.legal_name ?? '',
     registration_number: props.settings.registration_number ?? '',
+    tax_number: props.settings.tax_number ?? '',
+    cnas_employer_number: props.settings.cnas_employer_number ?? '',
+    nis: props.settings.nis ?? '',
+    legal_activity: props.settings.legal_activity ?? '',
+    cnas_portal_url: props.settings.cnas_portal_url ?? '',
+    dgi_portal_url: props.settings.dgi_portal_url ?? '',
     address_line_1: props.settings.address_line_1 ?? '',
     address_line_2: props.settings.address_line_2 ?? '',
     city: props.settings.city ?? '',
@@ -201,6 +213,59 @@ function submit() {
                                         class="mt-1"
                                     />
                                 </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="rounded-xl border bg-card p-4 sm:p-6">
+                        <h2 class="font-semibold">
+                            Informations légales de paie
+                        </h2>
+                        <p class="mt-1 text-sm text-muted-foreground">
+                            Utilisées sur les bulletins et pour valider les
+                            déclarations.
+                        </p>
+                        <div class="mt-5 grid gap-4 sm:grid-cols-2">
+                            <div>
+                                <Label>N° employeur CNAS</Label
+                                ><Input
+                                    v-model="form.cnas_employer_number"
+                                    class="mt-1"
+                                />
+                            </div>
+                            <div>
+                                <Label>NIF</Label
+                                ><Input
+                                    v-model="form.tax_number"
+                                    class="mt-1"
+                                />
+                            </div>
+                            <div>
+                                <Label>NIS</Label
+                                ><Input v-model="form.nis" class="mt-1" />
+                            </div>
+                            <div>
+                                <Label>Activité légale</Label
+                                ><Input
+                                    v-model="form.legal_activity"
+                                    class="mt-1"
+                                />
+                            </div>
+                            <div>
+                                <Label>Portail CNAS</Label
+                                ><Input
+                                    v-model="form.cnas_portal_url"
+                                    type="url"
+                                    class="mt-1"
+                                />
+                            </div>
+                            <div>
+                                <Label>Portail DGI / Jibayatic</Label
+                                ><Input
+                                    v-model="form.dgi_portal_url"
+                                    type="url"
+                                    class="mt-1"
+                                />
                             </div>
                         </div>
                     </section>

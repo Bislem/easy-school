@@ -2,10 +2,10 @@
 
 namespace App\Http\Controllers\Admin;
 
-use App\Http\Controllers\Controller;
-use App\Models\Student;
-use App\Models\Course;
 use App\Enums\StudentStatus;
+use App\Http\Controllers\Controller;
+use App\Models\Formation;
+use App\Models\Student;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -30,14 +30,14 @@ class StudentsController extends Controller
             })
             ->when($request->filled('status'), fn ($query) => $query->where('is_active', $request->boolean('status')))
             ->when($request->string('student_status')->toString(), fn ($query, string $status) => $query->where('status', $status))
-            ->when($request->filled('course_id'), fn ($query) => $query->whereHas('enrollments', fn ($query) => $query->where('status', 'registered')->where(fn($enrollment)=>$enrollment
+            ->when($request->filled('course_id'), fn ($query) => $query->whereHas('enrollments', fn ($query) => $query->where('status', 'registered')->where(fn ($enrollment) => $enrollment
                 ->whereHas('form', fn ($form) => $form->where('course_id', $request->integer('course_id')))
-                ->orWhereHas('trainingPlanGroup.plan.level', fn($level)=>$level->where('course_id',$request->integer('course_id'))))))
+                ->orWhereHas('trainingPlanGroup.plan.level', fn ($level) => $level->where('course_id', $request->integer('course_id'))))))
             ->when($request->string('level')->trim()->toString(), fn ($query, string $level) => $query->whereHas('enrollments', fn ($query) => $query->where('status', 'registered')->where('level', $level)))
             ->when($request->filled('group'), fn ($query) => $query->whereHas('enrollments', fn ($query) => $query->where('status', 'registered')->where('group_number', $request->integer('group'))))
             ->when($request->date('registered_from'), fn ($query, $date) => $query->whereDate('registration_date', '>=', $date))
             ->when($request->date('registered_to'), fn ($query, $date) => $query->whereDate('registration_date', '<=', $date))
-            ->with(['enrollments' => fn ($query) => $query->where('status', 'registered')->with(['form.course:id,title','trainingPlanGroup.plan.level.course:id,title'])->latest('registered_at')])
+            ->with(['enrollments' => fn ($query) => $query->where('status', 'registered')->with(['form.course:id,title', 'trainingPlanGroup.plan.level.course:id,title'])->latest('registered_at')])
             ->orderBy('last_name')
             ->orderBy('first_name')
             ->paginate(15)
@@ -45,7 +45,7 @@ class StudentsController extends Controller
 
         return Inertia::render('Admin/Students/Index', [
             'students' => $students,
-            'courses' => Course::orderBy('title')->get(['id', 'title']),
+            'courses' => Formation::orderBy('title')->get(['id', 'title']),
             'levels' => \App\Models\CourseEnrollment::whereNotNull('level')->distinct()->orderBy('level')->pluck('level'),
             'groups' => \App\Models\CourseEnrollment::whereNotNull('group_number')->distinct()->orderBy('group_number')->pluck('group_number'),
             'studentStatuses' => collect(StudentStatus::cases())->map(fn ($status) => $status->value),
@@ -58,7 +58,9 @@ class StudentsController extends Controller
         $data = $this->validateStudent($request);
         $data['registration_date'] ??= now()->toDateString();
         $data['status'] ??= $request->boolean('is_active', true) ? StudentStatus::ACTIVE : StudentStatus::STOPPED;
-        if ($request->hasFile('photo')) $data['photo_path'] = $request->file('photo')->store('students', 'public');
+        if ($request->hasFile('photo')) {
+            $data['photo_path'] = $request->file('photo')->store('students', 'public');
+        }
         unset($data['photo']);
         $student = Student::create($data);
         $student->histories()->create(['user_id' => $request->user()->id, 'event' => 'created', 'to_status' => $student->status->value, 'description' => 'Dossier créé manuellement.']);
@@ -71,13 +73,17 @@ class StudentsController extends Controller
         $data = $this->validateStudent($request, $student);
         $requestedStatus = isset($data['status']) ? StudentStatus::from($data['status'] instanceof StudentStatus ? $data['status']->value : $data['status']) : $student->status;
         unset($data['status']);
-        if ($request->hasFile('photo')) $data['photo_path'] = $request->file('photo')->store('students', 'public');
+        if ($request->hasFile('photo')) {
+            $data['photo_path'] = $request->file('photo')->store('students', 'public');
+        }
         unset($data['photo']);
         $student->fill($data);
         $changed = $student->getDirty();
         $student->save();
         $student->histories()->create(['user_id' => $request->user()->id, 'event' => 'profile_updated', 'description' => 'Informations générales mises à jour.', 'metadata' => ['fields' => array_keys($changed)]]);
-        if ($requestedStatus !== $student->status) $this->recordStatusChange($student, $requestedStatus, $request, 'Statut modifié pendant la mise à jour du dossier.');
+        if ($requestedStatus !== $student->status) {
+            $this->recordStatusChange($student, $requestedStatus, $request, 'Statut modifié pendant la mise à jour du dossier.');
+        }
 
         return back()->with('success', 'Étudiant mis à jour avec succès.');
     }
@@ -96,11 +102,19 @@ class StudentsController extends Controller
 
     public function show(Student $student): Response
     {
-        $student->load(['enrollments.form.course', 'enrollments.trainingPlanGroup.plan.level.course', 'enrollments.installments', 'enrollments.payments.recorder:id,name', 'badges.template', 'certificates.enrollment.form.course', 'histories.user:id,name', 'files', 'user:id,email,is_active', 'observations'=>fn($query)=>$query->whereNull('parent_id')->with(['author:id,name,role','replies.author:id,name,role']), 'attendances.session.group.plan.level.course', 'attendances.session.teacher:id,name']);
-        $expected=\App\Models\TrainingSession::whereHas('group.enrollments',fn($q)=>$q->where('student_id',$student->id)->where('status','registered'))->count();
-        $records=$student->attendances;$present=$records->whereIn('status',['present','late'])->count();$consecutive=0;
-        foreach($records->sortByDesc(fn($a)=>$a->session?->starts_at) as $record){if($record->status!=='absent')break;$consecutive++;}
-        $rate=$expected?round($present/$expected*100,1):null;$student->setAttribute('attendance_stats',['expected'=>$expected,'recorded'=>$records->count(),'present'=>$present,'absent'=>$records->where('status','absent')->count(),'late'=>$records->where('status','late')->count(),'excused'=>$records->where('status','excused')->count(),'rate'=>$rate,'consecutive_absences'=>$consecutive,'warning'=>$consecutive>=config('attendance.consecutive_absence_warning',2)||($rate!==null&&$rate<config('attendance.warning_threshold',75))]);
+        $student->load(['enrollments.form.course', 'enrollments.trainingPlanGroup.plan.level.course', 'enrollments.installments', 'enrollments.payments.recorder:id,name', 'badges.template', 'certificates.enrollment.form.course', 'histories.user:id,name', 'files', 'user:id,email,is_active', 'observations' => fn ($query) => $query->whereNull('parent_id')->with(['author:id,name,role', 'replies.author:id,name,role']), 'attendances.session.group.plan.level.course', 'attendances.session.teacher:id,name']);
+        $expected = \App\Models\TrainingSession::whereHas('group.enrollments', fn ($q) => $q->where('student_id', $student->id)->where('status', 'registered'))->count();
+        $records = $student->attendances;
+        $present = $records->whereIn('status', ['present', 'late'])->count();
+        $consecutive = 0;
+        foreach ($records->sortByDesc(fn ($a) => $a->session?->starts_at) as $record) {
+            if ($record->status !== 'absent') {
+                break;
+            }$consecutive++;
+        }
+        $rate = $expected ? round($present / $expected * 100, 1) : null;
+        $student->setAttribute('attendance_stats', ['expected' => $expected, 'recorded' => $records->count(), 'present' => $present, 'absent' => $records->where('status', 'absent')->count(), 'late' => $records->where('status', 'late')->count(), 'excused' => $records->where('status', 'excused')->count(), 'rate' => $rate, 'consecutive_absences' => $consecutive, 'warning' => $consecutive >= config('attendance.consecutive_absence_warning', 2) || ($rate !== null && $rate < config('attendance.warning_threshold', 75))]);
+
         return Inertia::render('Admin/Students/Show', ['student' => $student, 'statuses' => collect(StudentStatus::cases())->map(fn ($status) => $status->value)]);
     }
 
@@ -112,6 +126,7 @@ class StudentsController extends Controller
         if ($from !== $to) {
             $this->recordStatusChange($student, $to, $request, $validated['observation'] ?? null);
         }
+
         return back()->with('success', 'Statut étudiant mis à jour.');
     }
 

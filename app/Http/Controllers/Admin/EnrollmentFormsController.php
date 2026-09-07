@@ -2,22 +2,22 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Enums\ApplicationStatus;
+use App\Enums\StudentStatus;
 use App\Enums\UserRole;
 use App\Http\Controllers\Controller;
 use App\Models\Classroom;
-use App\Models\Course;
-use App\Models\EnrollmentForm;
 use App\Models\CourseEnrollment;
+use App\Models\EnrollmentForm;
+use App\Models\Formation;
 use App\Models\Student;
 use App\Models\User;
-use App\Enums\ApplicationStatus;
-use App\Enums\StudentStatus;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
-use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 use MohamedGaldi\ViltFilepond\Services\FilePondService;
@@ -44,7 +44,7 @@ class EnrollmentFormsController extends Controller
 
         return Inertia::render('Admin/EnrollmentForms/Index', [
             'forms' => $forms,
-            'courses' => Course::where('is_active', true)->orderBy('title')->get(['id', 'title', 'code']),
+            'courses' => Formation::where('is_active', true)->orderBy('title')->get(['id', 'title', 'code']),
             'teachers' => User::where('role', UserRole::TEACHER->value)->where('is_active', true)->orderBy('name')->get(['id', 'name']),
             'classrooms' => Classroom::where('is_active', true)->orderBy('name')->get(['id', 'name', 'code', 'capacity']),
             'filters' => $request->only('search'),
@@ -205,8 +205,11 @@ class EnrollmentFormsController extends Controller
         abort_unless($enrollment->enrollment_form_id === $enrollmentForm->id, 404);
         $validated = $request->validate(['status' => ['required', Rule::enum(ApplicationStatus::class)], 'notes' => ['nullable', 'string', 'max:3000']]);
         $target = ApplicationStatus::from($validated['status']);
-        if ($target === ApplicationStatus::REGISTERED) return back()->withErrors(['status' => 'Utilisez l’action Inscrire pour créer le dossier étudiant.']);
+        if ($target === ApplicationStatus::REGISTERED) {
+            return back()->withErrors(['status' => 'Utilisez l’action Inscrire pour créer le dossier étudiant.']);
+        }
         $this->transitionApplication($enrollment, $target, $request->user()->id, $validated['notes'] ?? null);
+
         return back()->with('success', 'Statut de la demande mis à jour.');
     }
 
@@ -223,26 +226,32 @@ class EnrollmentFormsController extends Controller
             abort_if(! $group, 422, 'Tous les groupes ont atteint leur capacité maximale.');
             abort_if($form->enrollments()->where('status', 'registered')->where('group_number', $group)->count() >= $form->groupCapacity(), 422, 'Ce groupe a atteint sa capacité maximale.');
             $student = Student::whereRaw('LOWER(email) = ?', [Str::lower($enrollment->email)])->first();
-            if (! $student) $student = Student::create([
-                'first_name' => $enrollment->first_name, 'last_name' => $enrollment->last_name,
-                'email' => Str::lower($enrollment->email), 'phone' => $enrollment->phone,
-                'parent_phone' => $enrollment->parent_phone, 'birth_date' => $enrollment->birth_date,
-                'registration_date' => now()->toDateString(), 'school_level' => $validated['level'] ?? $enrollment->level,
-                'status' => StudentStatus::ACTIVE, 'is_active' => true,
-            ]);
+            if (! $student) {
+                $student = Student::create([
+                    'first_name' => $enrollment->first_name, 'last_name' => $enrollment->last_name,
+                    'email' => Str::lower($enrollment->email), 'phone' => $enrollment->phone,
+                    'parent_phone' => $enrollment->parent_phone, 'birth_date' => $enrollment->birth_date,
+                    'registration_date' => now()->toDateString(), 'school_level' => $validated['level'] ?? $enrollment->level,
+                    'status' => StudentStatus::ACTIVE, 'is_active' => true,
+                ]);
+            }
             $enrollment->update(['student_id' => $student->id, 'group_number' => $group, 'level' => $validated['level'] ?? $enrollment->level, 'status' => ApplicationStatus::REGISTERED, 'registered_at' => now()]);
             $this->syncPlanningGroup($enrollment, $form, $group);
             $enrollment->histories()->create(['user_id' => $request->user()->id, 'event' => 'registered', 'from_status' => 'approved', 'to_status' => 'registered', 'description' => 'Candidat converti en étudiant inscrit.']);
             $student->histories()->create(['user_id' => $request->user()->id, 'event' => 'created_from_application', 'to_status' => $student->status->value, 'description' => 'Dossier créé depuis une demande approuvée.', 'metadata' => ['enrollment_id' => $enrollment->id]]);
+
             return $student;
         });
+
         return to_route('admin.students.show', $student)->with('success', 'Le candidat est maintenant inscrit.');
     }
 
     private function transitionApplication(CourseEnrollment $enrollment, ApplicationStatus $target, ?int $userId, ?string $description): void
     {
         $from = $enrollment->status;
-        $timestamps = match ($target) { ApplicationStatus::CONTACTED => ['contacted_at' => now()], ApplicationStatus::APPROVED => ['approved_at' => now()], ApplicationStatus::REJECTED => ['rejected_at' => now()], ApplicationStatus::CANCELLED => ['cancelled_at' => now()], default => [] };
+        $timestamps = match ($target) {
+            ApplicationStatus::CONTACTED => ['contacted_at' => now()], ApplicationStatus::APPROVED => ['approved_at' => now()], ApplicationStatus::REJECTED => ['rejected_at' => now()], ApplicationStatus::CANCELLED => ['cancelled_at' => now()], default => []
+        };
         $enrollment->update(['status' => $target, ...$timestamps]);
         $enrollment->histories()->create(['user_id' => $userId, 'event' => 'status_changed', 'from_status' => $from->value, 'to_status' => $target->value, 'description' => $description]);
     }
@@ -257,7 +266,7 @@ class EnrollmentFormsController extends Controller
     private function validated(Request $request): array
     {
         $validated = $request->validate([
-            'course_id' => ['required', Rule::exists('courses', 'id')->where('is_active', true)],
+            'course_id' => ['required', Rule::exists('courses', 'id')->where(fn ($query) => $query->where('is_active', true)->where('entity_type', 'formation'))],
             'teacher_id' => ['required', Rule::exists('users', 'id')->where(fn ($query) => $query->where('role', UserRole::TEACHER->value)->where('is_active', true))],
             'classroom_id' => ['nullable', Rule::exists('classrooms', 'id')->where('is_active', true)],
             'title' => ['required', 'string', 'max:255'],

@@ -26,6 +26,7 @@ const props = defineProps({
     statements: { type: Object, required: true },
     summary: { type: Object, required: true },
     configurations: { type: Array, required: true },
+    salaryItems: { type: Array, required: true },
     payments: { type: Array, required: true },
     employees: { type: Array, required: true },
     salaryTypes: { type: Array, required: true },
@@ -73,6 +74,7 @@ const statement = useForm({
     manual_amount: '',
     notes: '',
     adjustments: [] as any[],
+    items: [] as any[],
 });
 const payment = useForm({
     amount: '',
@@ -102,11 +104,16 @@ const selectedEmployee = computed(() =>
     ),
 );
 const attendanceBased = computed(() =>
-    ['hourly', 'daily', 'per_session'].includes(selected.value?.salary_type),
+    statement.items.some((row: any) =>
+        ['HOURLY', 'DAILY', 'PER_SESSION'].includes(
+            salaryItem(row.salary_item_id)?.calculation_type,
+        ),
+    ),
 );
 const canGenerate = computed(
     () =>
         !previewLoading.value &&
+        statement.items.length > 0 &&
         (!attendanceBased.value || (availableHours.value ?? 0) > 0),
 );
 const selectedFilterEmployee = computed(() =>
@@ -126,6 +133,12 @@ const filteredFilterEmployees = computed(() => {
 });
 function selectEmployee(employee: any) {
     statement.staff_id = String(employee.id);
+    statement.salary_configuration_id = '';
+    statement.items = (employee.salary_items ?? []).map((item: any) => ({
+        salary_item_id: item.id,
+        amount: String(item.pivot.amount_override ?? item.default_amount ?? 0),
+        source: item.pivot.source ?? 'DIRECT',
+    }));
     employeeSearch.value = '';
     employeeDropdownOpen.value = false;
 }
@@ -153,7 +166,6 @@ async function loadAttendancePreview() {
     try {
         const query = new URLSearchParams({
             staff_id: statement.staff_id,
-            salary_configuration_id: statement.salary_configuration_id,
             period: statement.period,
         });
         const response = await fetch(
@@ -173,10 +185,6 @@ async function loadAttendancePreview() {
         monthlyHours.value = Number(payload.monthly_worked_hours);
         availableHours.value = Number(payload.available_worked_hours);
         accountedHours.value = Number(payload.already_accounted_hours);
-        statement.worked_units =
-            payload.salary_type === 'hourly'
-                ? String(availableHours.value)
-                : '';
     } catch (error) {
         if (request !== previewRequest) return;
         monthlyHours.value = null;
@@ -192,12 +200,7 @@ async function loadAttendancePreview() {
     }
 }
 watch(
-    () => [
-        statement.staff_id,
-        statement.salary_configuration_id,
-        statement.period,
-        selected.value?.salary_type,
-    ],
+    () => [statement.staff_id, statement.period, attendanceBased.value],
     loadAttendancePreview,
 );
 const money = (v: any) =>
@@ -232,6 +235,42 @@ function addAdjustment() {
         notes: '',
     });
 }
+function salaryItem(id: any) {
+    return props.salaryItems.find(
+        (item: any) => String(item.id) === String(id),
+    );
+}
+function addSalaryItem() {
+    const used = new Set(
+        statement.items.map((row: any) => String(row.salary_item_id)),
+    );
+    const item = props.salaryItems.find(
+        (candidate: any) => !used.has(String(candidate.id)),
+    );
+    if (item)
+        statement.items.push({
+            salary_item_id: item.id,
+            amount: String(item.default_amount ?? 0),
+            source: 'DIRECT',
+        });
+}
+watch(
+    () => statement.salary_configuration_id,
+    (id) => {
+        if (!id) return;
+        const config = props.configurations.find(
+            (c: any) => String(c.id) === id,
+        );
+        if (config)
+            statement.items = config.items.map((item: any) => ({
+                salary_item_id: item.id,
+                amount: String(
+                    item.pivot.amount_override ?? item.default_amount ?? 0,
+                ),
+                source: 'CONFIG',
+            }));
+    },
+);
 function generate() {
     if (!includeAdjustments.value) statement.adjustments = [];
     statement.post('/admin/salaries/generate', {
@@ -325,6 +364,36 @@ async function dismissStatement(statementToDelete: any) {
                                 value: money(summary.remaining),
                                 icon: WalletCards,
                                 tone: 'text-amber-600 bg-amber-100',
+                            },
+                            {
+                                label: 'CNAS salarié',
+                                value: money(summary.employee_cnas),
+                                icon: Calculator,
+                                tone: 'text-violet-600 bg-violet-100',
+                            },
+                            {
+                                label: 'IRG',
+                                value: money(summary.irg),
+                                icon: FileText,
+                                tone: 'text-rose-600 bg-rose-100',
+                            },
+                            {
+                                label: 'Charges employeur',
+                                value: money(summary.employer_charges),
+                                icon: Banknote,
+                                tone: 'text-indigo-600 bg-indigo-100',
+                            },
+                            {
+                                label: 'Coût employeur',
+                                value: money(summary.employer_cost),
+                                icon: WalletCards,
+                                tone: 'text-cyan-700 bg-cyan-100',
+                            },
+                            {
+                                label: 'Dossiers légaux incomplets',
+                                value: summary.missing_legal_information,
+                                icon: FileText,
+                                tone: 'text-orange-700 bg-orange-100',
                             },
                         ]"
                         :key="item.label"
@@ -759,27 +828,100 @@ async function dismissStatement(statementToDelete: any) {
                     <InputError :message="statement.errors.staff_id" />
                 </label>
                 <label
-                    ><Label>Configuration salariale</Label
+                    ><Label>Configuration de salaire (facultative)</Label
                     ><select
                         v-model="statement.salary_configuration_id"
-                        required
                         class="h-9 w-full rounded-md border bg-background px-3"
                     >
-                        <option value="" disabled>Sélectionner</option>
+                        <option value="">
+                            Sans configuration — sélection manuelle
+                        </option>
                         <option
                             v-for="c in configurations"
                             :key="c.id"
                             :value="String(c.id)"
                         >
-                            {{ c.name }} — {{ labels[c.salary_type] }} ·
-                            {{ money(c.base_rate) }}
+                            {{ c.name }} — {{ c.items.length }} rubrique(s)
                         </option></select
                     ><small v-if="selected"
-                        >{{ labels[selected.salary_type] }} ·
-                        {{ money(selected.base_rate) }}</small
+                        >Les rubriques sont chargées ci-dessous et restent
+                        personnalisables.</small
                     ><InputError
                         :message="statement.errors.salary_configuration_id"
                 /></label>
+                <section class="space-y-2 rounded-xl border p-4">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <Label>Rubriques de salaire</Label>
+                            <p class="text-xs text-muted-foreground">
+                                Montants propres à cet employé.
+                            </p>
+                        </div>
+                        <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            @click="addSalaryItem"
+                            ><Plus class="mr-1 size-4" />Ajouter</Button
+                        >
+                    </div>
+                    <div
+                        class="grid grid-cols-[1fr_150px_auto] gap-2 text-xs font-semibold text-muted-foreground"
+                    >
+                        <span>Rubrique · Calcul</span><span>Montant / Taux</span
+                        ><span></span>
+                    </div>
+                    <div
+                        v-for="(row, index) in statement.items"
+                        :key="index"
+                        class="grid grid-cols-[1fr_150px_auto] items-center gap-2"
+                    >
+                        <select
+                            v-model="row.salary_item_id"
+                            class="h-9 rounded-md border bg-background px-2"
+                            @change="
+                                row.amount = String(
+                                    salaryItem(row.salary_item_id)
+                                        ?.default_amount ?? 0,
+                                );
+                                row.source = 'DIRECT';
+                            "
+                        >
+                            <option
+                                v-for="item in salaryItems"
+                                :key="item.id"
+                                :value="item.id"
+                            >
+                                {{ item.name }} ·
+                                {{
+                                    item.calculation_type === 'HOURLY'
+                                        ? 'Horaire'
+                                        : 'Mensuel'
+                                }}
+                            </option></select
+                        ><Input
+                            v-model="row.amount"
+                            type="number"
+                            min="0"
+                            step="0.01"
+                        /><Button
+                            type="button"
+                            size="icon"
+                            variant="ghost"
+                            class="text-destructive"
+                            @click="statement.items.splice(index, 1)"
+                            ><X class="size-4"
+                        /></Button>
+                    </div>
+                    <button
+                        v-if="!statement.items.length"
+                        type="button"
+                        class="w-full rounded-lg border border-dashed p-4 text-sm text-muted-foreground"
+                        @click="addSalaryItem"
+                    >
+                        + Ajouter une rubrique</button
+                    ><InputError :message="statement.errors.items" />
+                </section>
                 <div
                     v-if="Object.keys(statement.errors).length"
                     class="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900"
@@ -795,7 +937,7 @@ async function dismissStatement(statementToDelete: any) {
                         :message="statement.errors.period"
                 /></label>
                 <div
-                    v-if="selected"
+                    v-if="statement.staff_id && attendanceBased"
                     class="rounded-xl border border-primary/20 bg-primary/5 p-4"
                 >
                     <div class="flex items-center justify-between gap-3">
@@ -840,15 +982,12 @@ async function dismissStatement(statementToDelete: any) {
                         </div>
                     </div>
                     <p
-                        v-if="
-                            selected.salary_type === 'hourly' &&
-                            availableHours !== null
-                        "
+                        v-if="attendanceBased && availableHours !== null"
                         class="mt-3 text-xs font-medium text-primary"
                     >
                         Ce bulletin utilisera strictement
-                        {{ availableHours }} heure(s) ×
-                        {{ money(selected.base_rate) }}.
+                        {{ availableHours }} heure(s) × le(s) taux horaire(s)
+                        indiqué(s).
                     </p>
                     <p v-if="previewError" class="mt-2 text-xs text-red-600">
                         {{ previewError }}
@@ -862,21 +1001,6 @@ async function dismissStatement(statementToDelete: any) {
                         choisissez une configuration mensuelle fixe.
                     </p>
                 </div>
-                <label v-if="selected?.salary_type === 'daily'"
-                    ><Label>Jours travaillés</Label
-                    ><Input
-                        v-model="statement.worked_units"
-                        type="number"
-                        min="0"
-                        step="0.5" /></label
-                ><label v-if="selected?.salary_type === 'custom'"
-                    ><Label>Montant manuel</Label
-                    ><Input
-                        v-model="statement.manual_amount"
-                        type="number"
-                        min="0"
-                        step="0.01"
-                /></label>
                 <label
                     class="flex cursor-pointer items-start gap-3 rounded-xl border bg-muted/20 p-4"
                 >

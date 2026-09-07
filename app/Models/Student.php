@@ -15,7 +15,7 @@ class Student extends Model
 
     protected $fillable = [
         'user_id', 'first_name',
-        'training_plan_group_id',
+        'training_plan_group_id', 'school_group_id',
         'last_name',
         'photo_path',
         'email',
@@ -87,7 +87,17 @@ class Student extends Model
 
     public function group(): BelongsTo
     {
-        return $this->belongsTo(TrainingPlanGroup::class, 'training_plan_group_id');
+        return $this->belongsTo(SchoolGroup::class, 'school_group_id');
+    }
+
+    public function academicEnrollments(): HasMany
+    {
+        return $this->hasMany(StudentAcademicEnrollment::class);
+    }
+
+    public function privateSchoolInscriptions(): HasMany
+    {
+        return $this->hasMany(PrivateSchoolInscription::class);
     }
 
     public function getPhotoUrlAttribute(): ?string

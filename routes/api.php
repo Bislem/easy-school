@@ -17,6 +17,7 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\SetTenantContext::class]
     Route::get('catalogue', TimetableCatalogueController::class)->name('catalogue');
     Route::get('settings', [TimetableSettingController::class, 'show'])->name('settings.show');
     Route::put('settings', [TimetableSettingController::class, 'update'])->name('settings.update');
+    Route::put('groups/{group}/defaults', [TimetableSettingController::class, 'updateGroupDefaults'])->name('groups.defaults.update');
     Route::get('teachers/{teacher}/availability', [TeacherAvailabilityController::class, 'index'])->name('teachers.availability.index');
     Route::post('teachers/{teacher}/availability', [TeacherAvailabilityController::class, 'storeWeekly'])->name('teachers.availability.store');
     Route::post('teachers/{teacher}/unavailable-periods', [TeacherAvailabilityController::class, 'storeUnavailable'])->name('teachers.unavailable-periods.store');

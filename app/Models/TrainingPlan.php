@@ -11,13 +11,33 @@ class TrainingPlan extends Model
 {
     protected $fillable = ['course_level_id', 'enrollment_form_id', 'teacher_id', 'title', 'status', 'notes'];
 
-    public function level(): BelongsTo { return $this->belongsTo(CourseLevel::class, 'course_level_id'); }
+    public function level(): BelongsTo
+    {
+        return $this->belongsTo(CourseLevel::class, 'course_level_id');
+    }
+
     public function course(): HasOneThrough
     {
-        return $this->hasOneThrough(Course::class, CourseLevel::class, 'id', 'id', 'course_level_id', 'course_id');
+        return $this->hasOneThrough(Formation::class, CourseLevel::class, 'id', 'id', 'course_level_id', 'course_id');
     }
-    public function enrollmentForm(): BelongsTo { return $this->belongsTo(EnrollmentForm::class); }
-    public function teacher(): BelongsTo { return $this->belongsTo(User::class, 'teacher_id'); }
-    public function groups(): HasMany { return $this->hasMany(TrainingPlanGroup::class); }
-    public function teacherAccesses(): HasMany { return $this->hasMany(TrainingPlanTeacherAccess::class); }
+
+    public function enrollmentForm(): BelongsTo
+    {
+        return $this->belongsTo(EnrollmentForm::class);
+    }
+
+    public function teacher(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'teacher_id');
+    }
+
+    public function groups(): HasMany
+    {
+        return $this->hasMany(TrainingPlanGroup::class);
+    }
+
+    public function teacherAccesses(): HasMany
+    {
+        return $this->hasMany(TrainingPlanTeacherAccess::class);
+    }
 }

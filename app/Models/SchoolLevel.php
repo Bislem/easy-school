@@ -23,12 +23,17 @@ class SchoolLevel extends Model
 
     public function groups(): HasMany
     {
-        return $this->hasMany(TrainingPlanGroup::class);
+        return $this->hasMany(SchoolGroup::class);
+    }
+
+    public function privateSchoolInscriptions(): HasMany
+    {
+        return $this->hasMany(PrivateSchoolInscription::class);
     }
 
     public function subjects(): BelongsToMany
     {
-        $relation = $this->belongsToMany(Course::class, 'course_school_level')->withTimestamps();
+        $relation = $this->belongsToMany(SchoolSubject::class, 'course_school_level')->withPivot(['school_stream_id', 'curriculum_code', 'is_optional', 'is_active', 'display_order', 'choice_group'])->withTimestamps();
         $tenantId = app(\App\Tenancy\TenantContext::class)->id();
 
         return $tenantId ? $relation->withPivotValue('tenant_id', $tenantId) : $relation;

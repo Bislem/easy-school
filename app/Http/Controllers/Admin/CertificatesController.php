@@ -7,9 +7,9 @@ use App\Enums\ManagementPermission;
 use App\Http\Controllers\Controller;
 use App\Models\Certificate;
 use App\Models\CompanySetting;
-use App\Models\Course;
 use App\Models\CourseEnrollment;
 use App\Models\CourseLevel;
+use App\Models\Formation;
 use App\Models\Student;
 use App\Models\TrainingPlan;
 use App\Models\User;
@@ -52,7 +52,7 @@ class CertificatesController extends Controller
             'certificates' => $items,
             'students' => $students,
             'types' => collect(CertificateType::cases())->map(fn ($type) => ['value' => $type->value, 'label' => $type->label()]),
-            'courses' => Course::with(['levels:id,course_id,name,duration_hours'])->orderBy('title')->get(['id', 'title', 'code', 'duration_hours', 'is_certified'])->map(fn ($course) => [...$course->toArray(), 'label' => $course->title.' · '.$course->code]),
+            'courses' => Formation::with(['levels:id,course_id,name,duration_hours'])->orderBy('title')->get(['id', 'title', 'code', 'duration_hours', 'is_certified'])->map(fn ($course) => [...$course->toArray(), 'label' => $course->title.' · '.$course->code]),
             'teachers' => User::where('role', 'teacher')->orderBy('name')->get(['id', 'name'])->map(fn ($teacher) => [...$teacher->toArray(), 'label' => $teacher->name]),
             'completedPlans' => $this->completedPlans(),
             'filters' => $request->only(['search', 'type', 'date_from', 'date_to', 'course_id', 'student_id', 'teacher_id']),
@@ -65,7 +65,7 @@ class CertificatesController extends Controller
         $data = $request->validate([
             'student_id' => ['required', 'exists:students,id'],
             'course_enrollment_id' => ['nullable', 'exists:course_enrollments,id'],
-            'course_id' => ['nullable', 'exists:courses,id'], 'course_level_id' => ['nullable', 'exists:course_levels,id'],
+            'course_id' => ['nullable', Rule::exists('courses', 'id')->where('entity_type', 'formation')], 'course_level_id' => ['nullable', 'exists:course_levels,id'],
             'type' => ['required', Rule::enum(CertificateType::class)],
             'issue_date' => ['required', 'date'],
             'formation_start' => ['nullable', 'date'],
@@ -78,13 +78,14 @@ class CertificatesController extends Controller
         $enrollment = isset($data['course_enrollment_id'])
             ? CourseEnrollment::with(['student', 'form.course'])->findOrFail($data['course_enrollment_id']) : null;
         abort_if($enrollment && $enrollment->student_id !== $student->id, 422, 'Cette inscription ne correspond pas à l’étudiant.');
-        $course = $enrollment?->form?->course ?? (isset($data['course_id']) ? Course::findOrFail($data['course_id']) : null);
+        $course = $enrollment?->form?->course ?? (isset($data['course_id']) ? Formation::findOrFail($data['course_id']) : null);
         $level = isset($data['course_level_id']) ? CourseLevel::findOrFail($data['course_level_id']) : null;
         abort_if($level && (! $course || $level->course_id !== $course->id), 422, 'Ce niveau ne correspond pas à la formation choisie.');
         $type = CertificateType::from($data['type']);
         abort_if($course && $type === CertificateType::DIPLOMA && ! $course->is_certified, 422, 'Cette formation ne délivre pas de diplôme.');
 
         $certificate = $this->issue($student, $type, [...$data, 'course' => $course, 'level_record' => $level], $request->user()->id, $enrollment);
+
         return back()->with('success', $type->label().' '.$certificate->certificate_number.' généré(e).');
     }
 
@@ -110,23 +111,32 @@ class CertificatesController extends Controller
         $base = [...$data, 'course' => $plan->course, 'level_record' => $plan->level,
             'duration_hours' => $plan->level->duration_hours, 'formation_start' => $sessions->min('starts_at')?->toDateString(),
             'formation_end' => $sessions->max('ends_at')?->toDateString()];
-        $created = 0; $skipped = 0;
+        $created = 0;
+        $skipped = 0;
         DB::transaction(function () use ($enrollments, $type, $base, $request, &$created, &$skipped) {
             foreach ($enrollments as $enrollment) {
-                if (Certificate::where('course_enrollment_id', $enrollment->id)->where('type', $type->value)->exists()) { $skipped++; continue; }
-                $this->issue($enrollment->student, $type, $base, $request->user()->id, $enrollment); $created++;
+                if (Certificate::where('course_enrollment_id', $enrollment->id)->where('type', $type->value)->exists()) {
+                    $skipped++;
+
+                    continue;
+                }
+                $this->issue($enrollment->student, $type, $base, $request->user()->id, $enrollment);
+                $created++;
             }
         });
+
         return back()->with('success', "{$created} certificat(s) généré(s). {$skipped} doublon(s) ignoré(s).");
     }
 
     public function print(Certificate $certificate, BadgeQrCode $qr): HttpResponse
     {
         Gate::authorize(ManagementPermission::CERTIFICATES_PRINT->value);
-        $school = CompanySetting::current(); $qrCode = 'data:image/svg+xml;base64,'.base64_encode($qr->svg($certificate->verification_url, 260));
+        $school = CompanySetting::current();
+        $qrCode = 'data:image/svg+xml;base64,'.base64_encode($qr->svg($certificate->verification_url, 260));
         $schoolLogo = $this->localImage($school->logo_url);
         $landscape = in_array($certificate->type, [CertificateType::SUCCESS, CertificateType::DIPLOMA], true);
         $view = $landscape ? 'admin.certificates.print-landscape' : 'admin.certificates.print-portrait';
+
         return Pdf::loadView($view, compact('certificate', 'school', 'qrCode', 'schoolLogo'))
             ->setPaper('a4', $landscape ? 'landscape' : 'portrait')
             ->download($certificate->certificate_number.'.pdf');
@@ -138,6 +148,7 @@ class CertificatesController extends Controller
         $attended = $attendances->whereIn('status', ['present', 'late'])->count();
         $course = $enrollment?->form?->course ?? ($data['course'] ?? null);
         $levelRecord = $data['level_record'] ?? null;
+
         return Certificate::create([
             'student_id' => $student->id, 'course_enrollment_id' => $enrollment?->id, 'type' => $type,
             'course_id' => $course?->id, 'course_level_id' => $levelRecord?->id,
@@ -169,19 +180,29 @@ class CertificatesController extends Controller
                     $status = $enrollment->student->status?->value;
                     $profileValid = $enrollment->student->is_active && ! in_array($status, ['stopped', 'suspended', 'cancelled'], true);
                     $reason = ! $profileValid ? 'Profil inactif ou suspendu' : ($rate === null ? 'Présence non renseignée' : ($rate <= 0 ? 'Absent' : null));
+
                     return ['id' => $enrollment->id, 'student' => $enrollment->student, 'attendance_rate' => $rate, 'eligible' => $reason === null, 'warning' => $reason];
                 })->values();
+
                 return ['id' => $group->id, 'name' => $group->name, 'enrollments' => $enrollments];
             })->values();
+
             return ['id' => $plan->id, 'title' => $plan->title, 'course' => $plan->course, 'level' => $plan->level, 'teacher' => $plan->teacher, 'groups' => $groups, 'label' => $plan->title.' · '.$plan->course->title.' · '.$plan->teacher->name];
         })->values()->all();
     }
 
     private function localImage(?string $url): ?string
     {
-        if (! $url) return null; $path = parse_url($url, PHP_URL_PATH);
-        if (! str_starts_with((string) $path, '/storage/')) return null; $file = public_path(ltrim($path, '/'));
-        if (! is_file($file)) return null;
+        if (! $url) {
+            return null;
+        } $path = parse_url($url, PHP_URL_PATH);
+        if (! str_starts_with((string) $path, '/storage/')) {
+            return null;
+        } $file = public_path(ltrim($path, '/'));
+        if (! is_file($file)) {
+            return null;
+        }
+
         return 'data:'.(mime_content_type($file) ?: 'image/png').';base64,'.base64_encode(file_get_contents($file));
     }
 }

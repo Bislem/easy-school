@@ -10,16 +10,18 @@ import {
 } from '@/components/ui/sidebar';
 import { home } from '@/routes';
 import { type NavItem } from '@/types';
-import { Link, usePage } from '@inertiajs/vue3';
+import { Link, router, usePage } from '@inertiajs/vue3';
 import {
     Bell,
     BookMarked,
     BookOpen,
+    BriefcaseBusiness,
     Building2,
     CalendarClock,
     CalendarRange,
     ClipboardCheck,
     ClipboardList,
+    FileCheck2,
     GraduationCap,
     IdCard,
     LayoutDashboard,
@@ -33,6 +35,23 @@ import AppLogo from './AppLogo.vue';
 
 const page = usePage();
 const role = page.props.auth.user.role;
+const isPrivateSchool =
+    page.props.auth?.tenant?.organization_type === 'private_school';
+const academicYears = (page.props.academic_years || []) as Array<{
+    id: number;
+    name: string;
+}>;
+const currentAcademicYear = page.props.current_academic_year as {
+    id: number;
+    name: string;
+} | null;
+function selectAcademicYear(event: Event) {
+    router.post(
+        '/admin/academic-years/select',
+        { academic_year_id: Number((event.target as HTMLSelectElement).value) },
+        { preserveScroll: true },
+    );
+}
 const unreadNotifications = Number(page.props.unread_notifications_count ?? 0);
 const notificationsTitle = unreadNotifications
     ? `Notifications (${unreadNotifications})`
@@ -47,45 +66,106 @@ const mainNavItems: NavItem[] = [
     ...(role === 'admin'
         ? [
               {
-                  title: 'Inscriptions',
-                  href: '/admin/enrollment-forms',
-                  icon: ClipboardList,
-              },
-              {
-                  title: 'Planifications',
-                  href: '/admin/planifications',
-                  icon: CalendarRange,
-              },
-              {
-                  title: 'Emploi du temps',
-                  href: '/admin/timetable',
-                  icon: CalendarClock,
-              },
-              {
-                  title: 'Groupes & niveaux',
-                  href: '/admin/groups',
-                  icon: UsersRound,
-              },
-              {
-                  title: 'Matières',
-                  href: '/admin/subjects',
-                  icon: BookMarked,
-              },
-              {
                   title: 'Étudiants',
                   href: '/admin/students',
                   icon: GraduationCap,
               },
-              { title: 'Parents', href: '/admin/parents', icon: Users },
-              { title: 'Formations', href: '/admin/courses', icon: BookOpen },
-              { title: 'Sites', href: '/admin/sites', icon: Building2 },
+              ...(isPrivateSchool
+                  ? [
+                        {
+                            title: 'École privée',
+                            icon: Building2,
+                            children: [
+                                {
+                                    title: 'Années scolaires',
+                                    href: '/admin/academic-years',
+                                    icon: CalendarRange,
+                                },
+                                {
+                                    title: "Campagnes d'inscription",
+                                    href: '/admin/inscription-campaigns',
+                                    icon: ClipboardList,
+                                },
+                                {
+                                    title: 'Demandes d’inscription',
+                                    href: '/school-inscription',
+                                    icon: FileCheck2,
+                                },
+                                {
+                                    title: 'Emploi du temps',
+                                    href: '/admin/timetable',
+                                    icon: CalendarClock,
+                                },
+                                {
+                                    title: 'Présences',
+                                    href: '/admin/school-attendance',
+                                    icon: ClipboardCheck,
+                                },
+                                {
+                                    title: 'Groupes & niveaux',
+                                    href: '/admin/groups',
+                                    icon: UsersRound,
+                                },
+                                {
+                                    title: 'Matières',
+                                    href: '/admin/subjects',
+                                    icon: BookMarked,
+                                },
+                            ],
+                        },
+                    ]
+                  : []),
               {
-                  title: 'Présences',
-                  href: '/admin/attendance',
-                  icon: ClipboardCheck,
+                  title: 'Centre de formation & langues',
+                  icon: BookOpen,
+                  children: [
+                      {
+                          title: 'Formations',
+                          href: '/admin/courses',
+                          icon: BookOpen,
+                      },
+                      {
+                          title: 'Inscriptions',
+                          href: '/admin/enrollment-forms',
+                          icon: ClipboardList,
+                      },
+                      {
+                          title: 'Planifications',
+                          href: '/admin/planifications',
+                          icon: CalendarRange,
+                      },
+                  ],
               },
+              { title: 'Parents', href: '/admin/parents', icon: Users },
+              { title: 'Sites', href: '/admin/sites', icon: Building2 },
               { title: 'Salles', href: '/admin/classrooms', icon: Building2 },
-              { title: 'Personnel', href: '/admin/users', icon: Users },
+              {
+                  title: 'Ressources humaines',
+                  icon: BriefcaseBusiness,
+                  children: [
+                      { title: 'Personnel', href: '/admin/users', icon: Users },
+                      {
+                          title: 'Présences',
+                          href: '/admin/attendance',
+                          icon: ClipboardCheck,
+                      },
+                      {
+                          title: 'Salaires',
+                          href: '/admin/salaries',
+                          icon: WalletCards,
+                      },
+                      {
+                          title: 'Paramètres de paie',
+                          href: '/admin/salaries/configurations',
+                          icon: Settings,
+                      },
+                      {
+                          title: 'Déclarations sociales & fiscales',
+                          href: '/admin/salaries/declarations',
+                          icon: FileCheck2,
+                      },
+                  ],
+              },
               { title: 'Badges', href: '/admin/badges', icon: IdCard },
               {
                   title: 'Certificats',
@@ -98,7 +178,6 @@ const mainNavItems: NavItem[] = [
                   href: '/admin/audit',
                   icon: ClipboardList,
               },
-              { title: 'Salaires', href: '/admin/salaries', icon: WalletCards },
               {
                   title: 'Finance étudiants',
                   href: '/admin/finance',
@@ -199,6 +278,29 @@ const mainNavItems: NavItem[] = [
                             <AppLogo />
                         </Link>
                     </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem
+                    v-if="
+                        role === 'admin' &&
+                        isPrivateSchool &&
+                        academicYears.length
+                    "
+                    class="group-data-[collapsible=icon]:hidden"
+                >
+                    <select
+                        class="w-full rounded-lg border border-white/15 bg-white/10 px-2 py-2 text-xs text-white"
+                        :value="currentAcademicYear?.id"
+                        @change="selectAcademicYear"
+                    >
+                        <option
+                            v-for="year in academicYears"
+                            :key="year.id"
+                            :value="year.id"
+                            class="text-slate-900"
+                        >
+                            {{ year.name }}
+                        </option>
+                    </select>
                 </SidebarMenuItem>
             </SidebarMenu>
         </SidebarHeader>

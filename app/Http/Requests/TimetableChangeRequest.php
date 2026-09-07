@@ -18,8 +18,8 @@ class TimetableChangeRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'training_plan_group_id' => ['sometimes', 'integer', TenantRule::exists('training_plan_groups')],
-            'course_id' => ['sometimes', 'integer', TenantRule::exists('courses')],
+            'school_group_id' => ['sometimes', 'integer', TenantRule::exists('school_groups')],
+            'course_id' => ['sometimes', 'integer', TenantRule::exists('courses')->where('entity_type', 'subject')],
             'teacher_id' => ['sometimes', 'integer', TenantRule::exists('users')->where('role', UserRole::TEACHER->value)],
             'classroom_id' => ['sometimes', 'integer', TenantRule::exists('classrooms')],
             'academic_period_id' => ['sometimes', 'integer', TenantRule::exists('academic_periods')],

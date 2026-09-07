@@ -1,1 +1,0 @@
-import{a$ as i,r as n,a as r,aK as o}from"./app-DJDuppI7.js";function l(e){const t=i({dir:n("ltr")});return r(()=>e?.value||t.dir?.value||"ltr")}function u(){const e=n(),t=r(()=>["#text","#comment"].includes(e.value?.$el.nodeName)?e.value?.$el.nextElementSibling:o(e));return{primitiveElement:e,currentElement:t}}export{u as a,l as u};

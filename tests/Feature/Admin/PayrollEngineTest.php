@@ -2,6 +2,8 @@
 
 use App\Enums\UserRole;
 use App\Models\EmployeeType;
+use App\Models\AcademicYear;
+use App\Models\AcademicYearCalendarEvent;
 use App\Models\EmployeeAttendance;
 use App\Models\SalaryConfiguration;
 use App\Models\SalaryPayment;
@@ -9,6 +11,8 @@ use App\Models\Staff;
 use App\Models\TrainingSession;
 use App\Models\User;
 use App\Services\SalaryCalculator;
+use App\Tenancy\TenantContext;
+use Carbon\Carbon;
 
 test('monthly employee salary always uses the fixed configuration amount', function () {
     $staff=Staff::create(['employee_type_id'=>EmployeeType::where('slug','secretary')->value('id'),'first_name'=>'Nadia','last_name'=>'Benali','employee_code'=>'PAY-001','employment_status'=>'active']);
@@ -46,4 +50,21 @@ test('hourly teacher salary uses only completed session duration', function () {
 
 test('salary payments cannot be changed or deleted', function () {
     expect(method_exists(SalaryPayment::class,'booted'))->toBeTrue();
+});
+
+test('paid school closures count as payable days for daily-paid teachers', function () {
+    $teacher = User::factory()->create(['role' => UserRole::TEACHER]);
+    app(TenantContext::class)->set($teacher->tenant_id);
+    $type = EmployeeType::create(['name' => 'Enseignant calendrier', 'slug' => 'calendar-teacher', 'is_teacher' => true, 'is_active' => true]);
+    $staff = Staff::create(['user_id' => $teacher->id, 'employee_type_id' => $type->id, 'first_name' => 'Amine', 'last_name' => 'Saadi', 'employee_code' => 'PAY-CALENDAR', 'employment_status' => 'active']);
+    $configuration = SalaryConfiguration::create(['name' => 'Journalier', 'salary_type' => 'daily', 'base_rate' => 2000, 'effective_from' => '2026-01-01']);
+    $year = AcademicYear::create(['name' => '2026-2027', 'start_date' => '2026-09-01', 'end_date' => '2027-06-30', 'status' => 'draft']);
+    AcademicYearCalendarEvent::create(['academic_year_id' => $year->id, 'name' => "Vacances d'hiver", 'type' => 'winter_break', 'starts_on' => '2026-12-21', 'ends_on' => '2026-12-25', 'applies_to' => 'both', 'is_paid_for_teachers' => true]);
+
+    $result = app(SalaryCalculator::class)->calculate($staff, $configuration, Carbon::parse('2026-12-01'), Carbon::parse('2026-12-31'));
+
+    expect($result['units'])->toBe(5.0)
+        ->and($result['gross'])->toBe(10000.0)
+        ->and($result['details']['paid_calendar_days'])->toBe(5.0);
+    app(TenantContext::class)->clear();
 });

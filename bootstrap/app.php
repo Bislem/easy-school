@@ -44,6 +44,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'mobile-access' => \App\Http\Middleware\EnsureMobileAccess::class,
             'mobile-role' => \App\Http\Middleware\EnsureMobileRole::class,
             'mobile-context' => \App\Http\Middleware\SetMobileContext::class,
+            'private-school' => \App\Http\Middleware\EnsurePrivateSchool::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {

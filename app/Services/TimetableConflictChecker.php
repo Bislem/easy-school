@@ -2,14 +2,14 @@
 
 namespace App\Services;
 
-use App\Models\AcademicPeriod;
+use App\Models\AcademicYear;
 use App\Models\Classroom;
-use App\Models\Course;
+use App\Models\SchoolGroup;
+use App\Models\SchoolSubject;
 use App\Models\TeacherAvailability;
 use App\Models\TeacherUnavailablePeriod;
 use App\Models\TimetableSession;
 use App\Models\TimetableSetting;
-use App\Models\TrainingPlanGroup;
 use App\Models\User;
 use App\Support\TimetableConflictResult;
 use Carbon\Carbon;
@@ -19,29 +19,26 @@ class TimetableConflictChecker
 {
     public function check(array $data, ?TimetableSession $except = null, array $exceptIds = []): TimetableConflictResult
     {
-        $group = TrainingPlanGroup::with(['teachers:id', 'level'])->withCount(['students', 'enrollments'])->findOrFail($data['training_plan_group_id']);
+        $group = SchoolGroup::with(['teachers:id', 'level'])->withCount(['academicEnrollments as students_count'])->findOrFail($data['school_group_id']);
         $room = Classroom::findOrFail($data['classroom_id']);
-        $subject = Course::findOrFail($data['course_id']);
+        $subject = SchoolSubject::findOrFail($data['course_id']);
         $teacher = User::findOrFail($data['teacher_id']);
-        $period = AcademicPeriod::findOrFail($data['academic_period_id']);
+        $year = AcademicYear::findOrFail($group->academic_year_id);
         $conflicts = [];
         $warnings = [];
 
         if (! $group->is_active) {
-            $conflicts[] = ['type' => 'group_unavailable', 'field' => 'training_plan_group_id', 'message' => "Group {$group->name} is disabled."];
+            $conflicts[] = ['type' => 'group_unavailable', 'field' => 'school_group_id', 'message' => "Group {$group->name} is disabled."];
         }
         if (! $teacher->is_active) {
             $conflicts[] = ['type' => 'teacher_unavailable', 'field' => 'teacher_id', 'message' => "Teacher {$teacher->name} is disabled."];
-        }
-        if ($group->academic_period_id && (int) $group->academic_period_id !== (int) $data['academic_period_id']) {
-            $conflicts[] = ['type' => 'group_period', 'field' => 'academic_period_id', 'message' => "Group {$group->name} does not belong to the selected academic period."];
         }
         $subjectLevelIds = $subject->schoolLevels()->pluck('school_levels.id');
         if ($group->school_level_id && $subjectLevelIds->isNotEmpty() && ! $subjectLevelIds->contains((int) $group->school_level_id)) {
             $conflicts[] = ['type' => 'subject_level', 'field' => 'course_id', 'message' => "Subject {$subject->title} is not assigned to level {$group->level?->name}."];
         }
         $subjectTeacherIds = $subject->teachers()->pluck('users.id');
-        if ($subjectTeacherIds->isNotEmpty() && ! $subjectTeacherIds->contains((int) $data['teacher_id'])) {
+        if (! $subjectTeacherIds->contains((int) $data['teacher_id'])) {
             $conflicts[] = ['type' => 'teacher_subject', 'field' => 'teacher_id', 'message' => "The selected teacher is not assigned to subject {$subject->title}."];
         }
         if ($group->teachers->isNotEmpty() && ! $group->teachers->contains('id', (int) $data['teacher_id'])) {
@@ -53,8 +50,8 @@ class TimetableConflictChecker
         }
         if (! empty($data['effective_date'])) {
             $date = Carbon::parse($data['effective_date']);
-            if (! $date->betweenIncluded($period->starts_on, $period->ends_on)) {
-                $conflicts[] = ['type' => 'invalid_date', 'field' => 'effective_date', 'message' => 'The exceptional date must be inside the academic period.'];
+            if (! $date->betweenIncluded($year->start_date, $year->end_date)) {
+                $conflicts[] = ['type' => 'invalid_date', 'field' => 'effective_date', 'message' => "La date exceptionnelle doit appartenir à l'année scolaire."];
             }
             if ($date->dayOfWeekIso !== (int) $data['day']) {
                 $data['day'] = $date->dayOfWeekIso;
@@ -70,13 +67,13 @@ class TimetableConflictChecker
         if ($settings) {
             $this->checkSchoolHours($data, $settings, $conflicts);
         }
-        $this->checkTeacherAvailability($data, $period, $conflicts);
+        $this->checkTeacherAvailability($data, $year, $conflicts);
 
-        foreach ($this->overlappingSessions($data, $period, $except, $exceptIds) as $existing) {
+        foreach ($this->overlappingSessions($data, $year, $except, $exceptIds) as $existing) {
             $from = substr((string) $existing->start_time, 0, 5);
             $to = substr((string) $existing->end_time, 0, 5);
-            if ((int) $existing->training_plan_group_id === (int) $data['training_plan_group_id']) {
-                $conflicts[] = ['type' => 'group_conflict', 'field' => 'training_plan_group_id', 'message' => "Group {$existing->group->name} already has a session from {$from} to {$to}."];
+            if ((int) $existing->school_group_id === (int) $data['school_group_id']) {
+                $conflicts[] = ['type' => 'group_conflict', 'field' => 'school_group_id', 'message' => "Group {$existing->group->name} already has a session from {$from} to {$to}."];
             }
             if ((int) $existing->teacher_id === (int) $data['teacher_id']) {
                 $conflicts[] = ['type' => 'teacher_conflict', 'field' => 'teacher_id', 'message' => "Teacher {$existing->teacher->name} is already teaching {$existing->group->name} from {$from} to {$to}."];
@@ -86,7 +83,7 @@ class TimetableConflictChecker
             }
         }
 
-        $groupSize = max((int) $group->students_count, (int) $group->enrollments_count);
+        $groupSize = (int) $group->students_count;
         if ($room->capacity < $groupSize) {
             $warnings[] = ['type' => 'room_capacity', 'message' => "Room {$room->name} has capacity {$room->capacity}, below group size {$groupSize}."];
         }
@@ -98,18 +95,18 @@ class TimetableConflictChecker
         return new TimetableConflictResult(array_values(array_unique($conflicts, SORT_REGULAR)), $warnings);
     }
 
-    private function overlappingSessions(array $data, AcademicPeriod $period, ?TimetableSession $except, array $exceptIds): Collection
+    private function overlappingSessions(array $data, AcademicYear $year, ?TimetableSession $except, array $exceptIds): Collection
     {
         $query = TimetableSession::with(['group:id,name', 'teacher:id,name', 'room:id,name'])
-            ->where('academic_period_id', $data['academic_period_id'])->where('status', '!=', 'cancelled')
+            ->where('academic_year_id', $year->id)->where('status', '!=', 'cancelled')
             ->where('start_time', '<', $data['end_time'])->where('end_time', '>', $data['start_time'])
-            ->where(fn ($q) => $q->where('training_plan_group_id', $data['training_plan_group_id'])->orWhere('teacher_id', $data['teacher_id'])->orWhere('classroom_id', $data['classroom_id']))
+            ->where(fn ($q) => $q->where('school_group_id', $data['school_group_id'])->orWhere('teacher_id', $data['teacher_id'])->orWhere('classroom_id', $data['classroom_id']))
             ->when($except, fn ($q) => $q->whereKeyNot($except->id))->when($exceptIds, fn ($q) => $q->whereNotIn('id', $exceptIds));
 
-        return $query->lockForUpdate()->get()->filter(fn (TimetableSession $session) => $this->occurrencesOverlap($data, $session, $period));
+        return $query->lockForUpdate()->get()->filter(fn (TimetableSession $session) => $this->occurrencesOverlap($data, $session, $year));
     }
 
-    private function occurrencesOverlap(array $candidate, TimetableSession $existing, AcademicPeriod $period): bool
+    private function occurrencesOverlap(array $candidate, TimetableSession $existing, AcademicYear $year): bool
     {
         $candidateDate = $candidate['effective_date'] ?? null;
         $existingDate = $existing->effective_date?->toDateString();
@@ -120,13 +117,13 @@ class TimetableConflictChecker
             return Carbon::parse($candidateDate)->dayOfWeekIso === (int) $existing->day;
         }
         if ($existingDate) {
-            return Carbon::parse($existingDate)->dayOfWeekIso === (int) $candidate['day'] && Carbon::parse($existingDate)->betweenIncluded($period->starts_on, $period->ends_on);
+            return Carbon::parse($existingDate)->dayOfWeekIso === (int) $candidate['day'] && Carbon::parse($existingDate)->betweenIncluded($year->start_date, $year->end_date);
         }
 
         return (int) $candidate['day'] === (int) $existing->day;
     }
 
-    private function checkTeacherAvailability(array $data, AcademicPeriod $period, array &$conflicts): void
+    private function checkTeacherAvailability(array $data, AcademicYear $year, array &$conflicts): void
     {
         $windows = TeacherAvailability::where('teacher_id', $data['teacher_id'])->where('day', $data['day'])->get();
         $positive = $windows->where('is_available', true);
@@ -136,7 +133,7 @@ class TimetableConflictChecker
         if ($windows->where('is_available', false)->contains(fn ($w) => $w->start_time < $data['end_time'] && $w->end_time > $data['start_time'])) {
             $conflicts[] = ['type' => 'teacher_unavailable', 'field' => 'teacher_id', 'message' => 'The teacher is unavailable during this period.'];
         }
-        $dates = $data['effective_date'] ?? null ? [Carbon::parse($data['effective_date'])] : $this->occurrenceDates($period, (int) $data['day']);
+        $dates = $data['effective_date'] ?? null ? [Carbon::parse($data['effective_date'])] : $this->occurrenceDates($year, (int) $data['day']);
         foreach ($dates as $date) {
             $start = $date->copy()->setTimeFromTimeString($data['start_time']);
             $end = $date->copy()->setTimeFromTimeString($data['end_time']);
@@ -148,14 +145,14 @@ class TimetableConflictChecker
         }
     }
 
-    private function occurrenceDates(AcademicPeriod $period, int $day): array
+    private function occurrenceDates(AcademicYear $year, int $day): array
     {
-        $date = Carbon::parse($period->starts_on)->startOfDay();
+        $date = Carbon::parse($year->start_date)->startOfDay();
         while ($date->dayOfWeekIso !== $day) {
             $date->addDay();
         }
         $dates = [];
-        while ($date->lte($period->ends_on)) {
+        while ($date->lte($year->end_date)) {
             $dates[] = $date->copy();
             $date->addWeek();
         }

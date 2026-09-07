@@ -13,6 +13,7 @@ class Course extends Model
 
     protected $fillable = [
         'title',
+        'title_ar',
         'code',
         'category',
         'color',
@@ -43,12 +44,12 @@ class Course extends Model
 
     public function levels(): HasMany
     {
-        return $this->hasMany(CourseLevel::class);
+        return $this->hasMany(CourseLevel::class, 'course_id');
     }
 
     public function schoolLevels(): BelongsToMany
     {
-        $relation = $this->belongsToMany(SchoolLevel::class, 'course_school_level')->withTimestamps();
+        $relation = $this->belongsToMany(SchoolLevel::class, 'course_school_level', 'course_id', 'school_level_id')->withPivot(['id', 'school_stream_id', 'curriculum_code', 'is_optional', 'is_active', 'display_order', 'choice_group'])->withTimestamps();
         $tenantId = app(\App\Tenancy\TenantContext::class)->id();
 
         return $tenantId ? $relation->withPivotValue('tenant_id', $tenantId) : $relation;
@@ -64,6 +65,6 @@ class Course extends Model
 
     public function timetableSessions(): HasMany
     {
-        return $this->hasMany(TimetableSession::class);
+        return $this->hasMany(TimetableSession::class, 'course_id');
     }
 }

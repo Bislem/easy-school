@@ -2,8 +2,8 @@
 
 namespace App\Services;
 
+use App\Models\SchoolGroup;
 use App\Models\TimetableSession;
-use App\Models\TrainingPlanGroup;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -17,6 +17,7 @@ class TimetableService
         return DB::transaction(function () use ($data) {
             $data = $this->prepare($data);
             $data['series_id'] ??= (string) Str::uuid();
+
             return $this->persist(new TimetableSession, $data);
         }, 3);
     }
@@ -28,10 +29,13 @@ class TimetableService
 
     public function update(TimetableSession $session, array $data, string $scope = 'one'): TimetableSession
     {
-        if ($scope === 'all') return $this->updateSeries($session, $data);
+        if ($scope === 'all') {
+            return $this->updateSeries($session, $data);
+        }
         if ($session->recurrence->value === 'weekly' && empty($data['effective_date'])) {
             throw ValidationException::withMessages(['effective_date' => 'An occurrence date is required when editing one weekly session. Use scope=all to edit the full series.']);
         }
+
         return DB::transaction(function () use ($session, $data) {
             $merged = $this->prepare([...$session->only($session->getFillable()), ...$data]);
             if ($session->recurrence->value === 'weekly' && ! empty($data['effective_date'])) {
@@ -39,8 +43,10 @@ class TimetableService
                 $merged['recurrence'] = 'once';
                 $merged['change_type'] = $data['change_type'] ?? 'exception';
                 $merged['series_id'] = $session->series_id;
+
                 return $this->persist(new TimetableSession, $merged, null, [$session->id]);
             }
+
             return $this->persist($session, $merged, $session);
         }, 3);
     }
@@ -54,9 +60,15 @@ class TimetableService
             foreach ($members as $member) {
                 $data = $this->prepare([...$member->only($member->getFillable()), ...$changes]);
                 $prepared[$member->id] = $data;
-                if (($data['status'] ?? 'draft') !== 'cancelled') $this->throwConflicts($this->conflicts->check($data, $member, $exceptIds)->conflicts);
+                if (($data['status'] ?? 'draft') !== 'cancelled') {
+                    $this->throwConflicts($this->conflicts->check($data, $member, $exceptIds)->conflicts);
+                }
             }
-            foreach ($members as $member) { $member->update($prepared[$member->id]); $this->syncReservation($member->refresh()); }
+            foreach ($members as $member) {
+                $member->update($prepared[$member->id]);
+                $this->syncReservation($member->refresh());
+            }
+
             return $session->refresh()->load($this->relations());
         }, 3);
     }
@@ -67,15 +79,21 @@ class TimetableService
         unset($data['parent_session_id']);
         $data['series_id'] = (string) Str::uuid();
         $data['change_type'] = 'duplicate';
+
         return $this->create($data);
     }
 
     public function cancel(TimetableSession $session, ?string $effectiveDate = null, string $scope = 'one'): TimetableSession
     {
-        if ($scope === 'all') return $this->updateSeries($session, ['status' => 'cancelled', 'change_type' => 'cancelled']);
-        if ($session->recurrence->value === 'weekly' && $effectiveDate) return $this->update($session, ['effective_date' => $effectiveDate, 'status' => 'cancelled', 'change_type' => 'cancelled']);
+        if ($scope === 'all') {
+            return $this->updateSeries($session, ['status' => 'cancelled', 'change_type' => 'cancelled']);
+        }
+        if ($session->recurrence->value === 'weekly' && $effectiveDate) {
+            return $this->update($session, ['effective_date' => $effectiveDate, 'status' => 'cancelled', 'change_type' => 'cancelled']);
+        }
         $session->update(['status' => 'cancelled', 'change_type' => 'cancelled']);
         $this->syncReservation($session);
+
         return $session->refresh()->load($this->relations());
     }
 
@@ -85,30 +103,52 @@ class TimetableService
             $duration = \App\Models\TimetableSetting::first()?->default_session_duration ?? 60;
             $data['end_time'] = \Carbon\Carbon::createFromFormat('H:i', substr($data['start_time'], 0, 5))->addMinutes($duration)->format('H:i');
         }
-        if (! empty($data['effective_date'])) $data['day'] = \Carbon\Carbon::parse($data['effective_date'])->dayOfWeekIso;
+        if (! empty($data['effective_date'])) {
+            $data['day'] = \Carbon\Carbon::parse($data['effective_date'])->dayOfWeekIso;
+        }
+        $group = SchoolGroup::with('academicYear')->findOrFail($data['school_group_id']);
+        if ($group->academicYear && ! $group->academicYear->isWritable()) {
+            throw ValidationException::withMessages(['academic_year' => 'Cette année scolaire est clôturée et son emploi du temps ne peut plus être modifié.']);
+        }
+        if (! empty($data['academic_period_id'])) {
+            $period = \App\Models\AcademicPeriod::findOrFail($data['academic_period_id']);
+            if ((int) $period->academic_year_id !== (int) $group->academic_year_id) {
+                throw ValidationException::withMessages(['academic_period_id' => "Le trimestre et le groupe n'appartiennent pas à la même année scolaire."]);
+            }
+        }
+        $data['academic_year_id'] = $group->academic_year_id;
+        if (empty($data['effective_date'])) {
+            $data['academic_period_id'] = null;
+        }
         if (empty($data['classroom_id'])) {
-            $data['classroom_id'] = TrainingPlanGroup::findOrFail($data['training_plan_group_id'])->classroom_id;
+            $data['classroom_id'] = $group->classroom_id;
         }
         if (empty($data['classroom_id'])) {
             throw ValidationException::withMessages(['classroom_id' => 'Select a location because this group has no default classroom.']);
         }
+
         return $data;
     }
 
     private function persist(TimetableSession $session, array $data, ?TimetableSession $except = null, array $exceptIds = []): TimetableSession
     {
         $result = $this->conflicts->check($data, $except, $exceptIds);
-        if (($data['status'] ?? 'draft') !== 'cancelled') $this->throwConflicts($result->conflicts);
+        if (($data['status'] ?? 'draft') !== 'cancelled') {
+            $this->throwConflicts($result->conflicts);
+        }
         $session->fill($data)->save();
         $session->refresh();
         $this->syncReservation($session);
         $session->setAttribute('warnings', $result->warnings);
+
         return $session->load($this->relations());
     }
 
     private function throwConflicts(array $conflicts): void
     {
-        if ($conflicts) throw ValidationException::withMessages(['conflicts' => array_column($conflicts, 'message')]);
+        if ($conflicts) {
+            throw ValidationException::withMessages(['conflicts' => array_column($conflicts, 'message')]);
+        }
     }
 
     private function syncReservation(TimetableSession $session): void
@@ -121,5 +161,8 @@ class TimetableService
         ]);
     }
 
-    private function relations(): array { return ['group.level.cycle', 'subject', 'teacher', 'room', 'academicPeriod', 'reservation']; }
+    private function relations(): array
+    {
+        return ['group.level.cycle', 'subject', 'teacher', 'room', 'academicPeriod', 'reservation'];
+    }
 }

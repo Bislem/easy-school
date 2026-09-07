@@ -162,6 +162,7 @@ class StaffController extends Controller
             'gender' => ['nullable', Rule::in(['male', 'female', 'other'])], 'place_of_birth' => ['nullable', 'string', 'max:255'],
             'nationality' => ['nullable', 'string', 'max:100'], 'marital_status' => ['nullable', Rule::in(['single', 'married', 'divorced', 'widowed'])],
             'social_security_number' => ['nullable', 'string', 'max:100', Rule::unique('staff')->ignore($staff)],
+            'nin' => ['nullable', 'string', 'max:30', Rule::unique('staff')->ignore($staff)],
             'emergency_contact_name' => ['nullable', 'string', 'max:255'], 'emergency_contact_relationship' => ['nullable', 'string', 'max:100'],
             'emergency_contact_phone' => ['nullable', 'string', 'max:50'], 'bank_account' => ['nullable', 'string', 'max:150'],
             'leave_opening_balance' => ['nullable', 'numeric', 'min:0', 'max:9999'],

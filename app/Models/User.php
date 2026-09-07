@@ -131,7 +131,15 @@ class User extends Authenticatable
 
     public function principalGroups(): HasMany
     {
-        return $this->hasMany(TrainingPlanGroup::class, 'principal_teacher_id');
+        return $this->hasMany(SchoolGroup::class, 'principal_teacher_id');
+    }
+
+    public function schoolGroups(): BelongsToMany
+    {
+        $relation = $this->belongsToMany(SchoolGroup::class, 'school_group_teacher', 'teacher_id', 'school_group_id')->withTimestamps();
+        $tenantId = app(\App\Tenancy\TenantContext::class)->id();
+
+        return $tenantId ? $relation->withPivotValue('tenant_id', $tenantId) : $relation;
     }
 
     public function timetableSessions(): HasMany

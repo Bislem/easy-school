@@ -26,8 +26,10 @@ const form = useForm({
     nationality: props.employee.nationality ?? '',
     marital_status: props.employee.marital_status ?? '',
     social_security_number: props.employee.social_security_number ?? '',
+    nin: props.employee.nin ?? '',
     emergency_contact_name: props.employee.emergency_contact_name ?? '',
-    emergency_contact_relationship: props.employee.emergency_contact_relationship ?? '',
+    emergency_contact_relationship:
+        props.employee.emergency_contact_relationship ?? '',
     emergency_contact_phone: props.employee.emergency_contact_phone ?? '',
     bank_account: props.employee.bank_account ?? '',
     leave_opening_balance: props.employee.leave_opening_balance ?? '',
@@ -124,13 +126,57 @@ function photo(e: Event) {
                             ><Input v-model="form.hire_date" type="date" />
                         </div>
                         <div>
-                            <Label>Sexe</Label><select v-model="form.gender" class="mt-1 h-9 w-full rounded-md border bg-background px-3"><option value="">Non renseigné</option><option value="male">Homme</option><option value="female">Femme</option><option value="other">Autre</option></select>
+                            <Label>Sexe</Label
+                            ><select
+                                v-model="form.gender"
+                                class="mt-1 h-9 w-full rounded-md border bg-background px-3"
+                            >
+                                <option value="">Non renseigné</option>
+                                <option value="male">Homme</option>
+                                <option value="female">Femme</option>
+                                <option value="other">Autre</option>
+                            </select>
                         </div>
-                        <div><Label>Lieu de naissance</Label><Input v-model="form.place_of_birth" /></div>
-                        <div><Label>Nationalité</Label><Input v-model="form.nationality" /></div>
-                        <div><Label>Situation familiale</Label><select v-model="form.marital_status" class="mt-1 h-9 w-full rounded-md border bg-background px-3"><option value="">Non renseignée</option><option value="single">Célibataire</option><option value="married">Marié(e)</option><option value="divorced">Divorcé(e)</option><option value="widowed">Veuf / Veuve</option></select></div>
-                        <div><Label>N° de sécurité sociale</Label><Input v-model="form.social_security_number" /><InputError :message="form.errors.social_security_number" /></div>
-                        <div><Label>Compte bancaire / RIP</Label><Input v-model="form.bank_account" /></div>
+                        <div>
+                            <Label>Lieu de naissance</Label
+                            ><Input v-model="form.place_of_birth" />
+                        </div>
+                        <div>
+                            <Label>Nationalité</Label
+                            ><Input v-model="form.nationality" />
+                        </div>
+                        <div>
+                            <Label>Situation familiale</Label
+                            ><select
+                                v-model="form.marital_status"
+                                class="mt-1 h-9 w-full rounded-md border bg-background px-3"
+                            >
+                                <option value="">Non renseignée</option>
+                                <option value="single">Célibataire</option>
+                                <option value="married">Marié(e)</option>
+                                <option value="divorced">Divorcé(e)</option>
+                                <option value="widowed">Veuf / Veuve</option>
+                            </select>
+                        </div>
+                        <div>
+                            <Label>N° de sécurité sociale</Label
+                            ><Input
+                                v-model="form.social_security_number"
+                            /><InputError
+                                :message="form.errors.social_security_number"
+                            />
+                        </div>
+                        <div>
+                            <Label>NIN</Label
+                            ><Input
+                                v-model="form.nin"
+                                maxlength="30"
+                            /><InputError :message="form.errors.nin" />
+                        </div>
+                        <div>
+                            <Label>Compte bancaire / RIP</Label
+                            ><Input v-model="form.bank_account" />
+                        </div>
                         <div>
                             <Label>Statut</Label
                             ><select
@@ -161,14 +207,72 @@ function photo(e: Event) {
                                 class="mt-1 min-h-20 w-full rounded-md border bg-background p-3"
                             />
                         </div>
-                        <div class="sm:col-span-2 mt-2 border-t pt-5"><h2 class="font-semibold">Contact d’urgence</h2><p class="text-sm text-muted-foreground">Personne à prévenir si nécessaire.</p></div>
-                        <div><Label>Nom complet</Label><Input v-model="form.emergency_contact_name" /></div>
-                        <div><Label>Lien avec l’employé</Label><Input v-model="form.emergency_contact_relationship" placeholder="Conjoint, parent..." /></div>
-                        <div><Label>Téléphone d’urgence</Label><Input v-model="form.emergency_contact_phone" /></div>
-                        <div class="sm:col-span-2 mt-2 rounded-xl border border-primary/20 bg-primary/5 p-4"><h2 class="font-semibold">Reprise du solde de congés</h2><p class="text-sm text-muted-foreground">À utiliser lorsqu’une société commence avec le logiciel en cours d’année. Le solde saisi devient le point de départ à la date indiquée, puis 2,5 jours sont acquis chaque mois complet. Les anciens congés antérieurs à cette date restent dans l’historique sans être déduits une seconde fois.</p></div>
-                        <div><Label>Solde disponible à la reprise</Label><Input v-model="form.leave_opening_balance" type="number" min="0" step="0.5" placeholder="Ex. 12.5" /><InputError :message="form.errors.leave_opening_balance" /></div>
-                        <div><Label>Solde valable au</Label><Input v-model="form.leave_balance_as_of" type="date" /><InputError :message="form.errors.leave_balance_as_of" /></div>
-                        <div class="sm:col-span-2"><Label>Justification / référence de reprise</Label><textarea v-model="form.leave_balance_note" class="mt-1 min-h-20 w-full rounded-md border bg-background p-3" placeholder="Solde repris de l’ancien registre RH, décision, année..." /></div>
+                        <div class="mt-2 border-t pt-5 sm:col-span-2">
+                            <h2 class="font-semibold">Contact d’urgence</h2>
+                            <p class="text-sm text-muted-foreground">
+                                Personne à prévenir si nécessaire.
+                            </p>
+                        </div>
+                        <div>
+                            <Label>Nom complet</Label
+                            ><Input v-model="form.emergency_contact_name" />
+                        </div>
+                        <div>
+                            <Label>Lien avec l’employé</Label
+                            ><Input
+                                v-model="form.emergency_contact_relationship"
+                                placeholder="Conjoint, parent..."
+                            />
+                        </div>
+                        <div>
+                            <Label>Téléphone d’urgence</Label
+                            ><Input v-model="form.emergency_contact_phone" />
+                        </div>
+                        <div
+                            class="mt-2 rounded-xl border border-primary/20 bg-primary/5 p-4 sm:col-span-2"
+                        >
+                            <h2 class="font-semibold">
+                                Reprise du solde de congés
+                            </h2>
+                            <p class="text-sm text-muted-foreground">
+                                À utiliser lorsqu’une société commence avec le
+                                logiciel en cours d’année. Le solde saisi
+                                devient le point de départ à la date indiquée,
+                                puis 2,5 jours sont acquis chaque mois complet.
+                                Les anciens congés antérieurs à cette date
+                                restent dans l’historique sans être déduits une
+                                seconde fois.
+                            </p>
+                        </div>
+                        <div>
+                            <Label>Solde disponible à la reprise</Label
+                            ><Input
+                                v-model="form.leave_opening_balance"
+                                type="number"
+                                min="0"
+                                step="0.5"
+                                placeholder="Ex. 12.5"
+                            /><InputError
+                                :message="form.errors.leave_opening_balance"
+                            />
+                        </div>
+                        <div>
+                            <Label>Solde valable au</Label
+                            ><Input
+                                v-model="form.leave_balance_as_of"
+                                type="date"
+                            /><InputError
+                                :message="form.errors.leave_balance_as_of"
+                            />
+                        </div>
+                        <div class="sm:col-span-2">
+                            <Label>Justification / référence de reprise</Label
+                            ><textarea
+                                v-model="form.leave_balance_note"
+                                class="mt-1 min-h-20 w-full rounded-md border bg-background p-3"
+                                placeholder="Solde repris de l’ancien registre RH, décision, année..."
+                            />
+                        </div>
                         <div>
                             <Label>Type de document</Label
                             ><Input v-model="form.identification_type" />

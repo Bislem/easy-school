@@ -82,7 +82,7 @@ class DemoRequestsController extends Controller
     {
         $password = Str::password(14);
         DB::transaction(function () use ($demoRequest, $initializer, $days, $password) {
-            $tenant = Tenant::create(['name' => $demoRequest->school_name, 'slug' => $this->uniqueSlug($demoRequest->school_name), 'phone' => $demoRequest->phone, 'email' => Str::lower($demoRequest->email), 'address' => $demoRequest->address, 'wilaya' => $demoRequest->wilaya, 'commune' => $demoRequest->commune, 'status' => 'active', 'account_type' => 'demo', 'demo_expires_at' => now()->addDays($days)->endOfDay()]);
+            $tenant = Tenant::create(['name' => $demoRequest->school_name, 'slug' => $this->uniqueSlug($demoRequest->school_name), 'phone' => $demoRequest->phone, 'email' => Str::lower($demoRequest->email), 'address' => $demoRequest->address, 'wilaya' => $demoRequest->wilaya, 'commune' => $demoRequest->commune, 'status' => 'active', 'account_type' => 'demo', 'organization_type' => $demoRequest->school_type, 'demo_expires_at' => now()->addDays($days)->endOfDay()]);
             app(TenantContext::class)->set($tenant);
             try {
                 $admin = User::create(['name' => $demoRequest->contact_name, 'email' => Str::lower($demoRequest->email), 'phone' => $demoRequest->phone, 'password' => $password, 'role' => UserRole::ADMIN, 'is_active' => true, 'can_login' => true]);

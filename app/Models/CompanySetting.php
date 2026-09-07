@@ -31,6 +31,7 @@ class CompanySetting extends Model
         'tax_enabled',
         'tax_rate',
         'online_advance_percentage',
+        'cnas_employer_number', 'nis', 'legal_activity', 'cnas_portal_url', 'dgi_portal_url',
     ];
 
     protected $casts = [

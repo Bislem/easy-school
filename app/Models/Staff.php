@@ -6,6 +6,7 @@ use App\Enums\EmploymentStatus;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use MohamedGaldi\ViltFilepond\Traits\HasFiles;
 
 class Staff extends Model
@@ -19,7 +20,7 @@ class Staff extends Model
         'phone', 'email', 'address', 'birth_date', 'hire_date', 'employment_status',
         'notes', 'employee_code', 'identification_type', 'identification_number',
         'identification_expires_at', 'identification_notes',
-        'social_security_number', 'gender', 'place_of_birth', 'nationality', 'marital_status',
+        'social_security_number', 'nin', 'gender', 'place_of_birth', 'nationality', 'marital_status',
         'emergency_contact_name', 'emergency_contact_relationship', 'emergency_contact_phone', 'bank_account',
         'leave_opening_balance', 'leave_balance_as_of', 'leave_balance_note',
         'can_view_student_folders',
@@ -57,6 +58,11 @@ class Staff extends Model
     public function salaryPayments(): HasMany
     {
         return $this->hasMany(SalaryPayment::class);
+    }
+
+    public function salaryItems(): BelongsToMany
+    {
+        return $this->belongsToMany(SalaryItem::class, 'staff_salary_items')->withPivot(['salary_configuration_id', 'amount_override', 'source', 'display_order'])->withTimestamps()->orderByPivot('display_order');
     }
 
     public function attendances(): HasMany

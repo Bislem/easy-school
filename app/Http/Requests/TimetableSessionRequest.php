@@ -19,11 +19,11 @@ class TimetableSessionRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'training_plan_group_id' => ['required', 'integer', TenantRule::exists('training_plan_groups')],
-            'course_id' => ['required', 'integer', TenantRule::exists('courses')],
+            'school_group_id' => ['required', 'integer', TenantRule::exists('school_groups')],
+            'course_id' => ['required', 'integer', TenantRule::exists('courses')->where('entity_type', 'subject')],
             'teacher_id' => ['required', 'integer', TenantRule::exists('users')->where('role', UserRole::TEACHER->value)],
             'classroom_id' => ['nullable', 'integer', TenantRule::exists('classrooms')],
-            'academic_period_id' => ['required', 'integer', TenantRule::exists('academic_periods')],
+            'academic_period_id' => ['nullable', 'integer', TenantRule::exists('academic_periods')],
             'day' => ['required', 'integer', 'between:1,7'],
             'effective_date' => ['nullable', 'date'],
             'start_time' => ['required', 'date_format:H:i'],
