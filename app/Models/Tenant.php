@@ -13,7 +13,7 @@ class Tenant extends Model
 {
     use HasFactory, SoftDeletes;
 
-    protected $fillable = ['name', 'slug', 'logo', 'phone', 'email', 'address', 'wilaya', 'commune', 'status', 'account_type', 'organization_type', 'demo_expires_at', 'subscription_plan_id', 'payment_proof_path', 'registration_submitted_at', 'registration_reviewed_at', 'registration_rejection_reason', 'plan_started_at', 'plan_expires_at', 'settings'];
+    protected $fillable = ['name', 'slug', 'logo', 'phone', 'email', 'address', 'wilaya', 'commune', 'status', 'account_type', 'organization_type', 'demo_expires_at', 'subscription_plan_id', 'payment_proof_path', 'registration_submitted_at', 'registration_reviewed_at', 'registration_rejection_reason', 'plan_started_at', 'plan_expires_at', 'settings', 'storage_used_bytes', 'storage_limit_bytes'];
 
     protected $appends = ['logo_url'];
 
@@ -21,7 +21,7 @@ class Tenant extends Model
 
     protected function casts(): array
     {
-        return ['settings' => 'array', 'demo_expires_at' => 'datetime', 'registration_submitted_at' => 'datetime', 'registration_reviewed_at' => 'datetime', 'plan_started_at' => 'datetime', 'plan_expires_at' => 'datetime'];
+        return ['settings' => 'array', 'demo_expires_at' => 'datetime', 'registration_submitted_at' => 'datetime', 'registration_reviewed_at' => 'datetime', 'plan_started_at' => 'datetime', 'plan_expires_at' => 'datetime', 'storage_used_bytes' => 'integer', 'storage_limit_bytes' => 'integer'];
     }
 
     public function subscriptionPlan(): BelongsTo
@@ -44,6 +44,11 @@ class Tenant extends Model
         return $this->hasMany(User::class);
     }
 
+    public function roles(): HasMany
+    {
+        return $this->hasMany(Role::class);
+    }
+
     public function mobileMemberships(): HasMany
     {
         return $this->hasMany(MobileMembership::class);
@@ -62,6 +67,11 @@ class Tenant extends Model
     public function subscriptionPayments(): HasMany
     {
         return $this->hasMany(SubscriptionPayment::class);
+    }
+
+    public function storedFiles(): HasMany
+    {
+        return $this->hasMany(TenantStoredFile::class);
     }
 
     public function getLogoUrlAttribute(): ?string

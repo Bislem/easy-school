@@ -18,6 +18,9 @@ use App\Http\Controllers\Admin\ExpensesController;
 use App\Http\Controllers\Admin\GroupsController;
 use App\Http\Controllers\Admin\ParentsController;
 use App\Http\Controllers\Admin\PortalAccountsController;
+use App\Http\Controllers\Admin\AccountSubscriptionController;
+use App\Http\Controllers\Admin\RolesController;
+use App\Http\Controllers\Admin\AccessManagementController;
 use App\Http\Controllers\Admin\PrivateSchoolCampaignsController;
 use App\Http\Controllers\Admin\PrivateSchoolInscriptionsController;
 use App\Http\Controllers\Admin\ReportsController;
@@ -90,6 +93,7 @@ if ($superAdminPath !== '') {
         Route::post('schools/{tenant}/subscription', [SuperAdminTenantsController::class, 'subscription'])->name('tenants.subscription');
         Route::get('schools/{tenant}/payments/{payment}/proof', [SuperAdminTenantsController::class, 'paymentProof'])->name('tenants.payments.proof');
         Route::put('schools/{tenant}/administrator', [SuperAdminTenantsController::class, 'administrator'])->name('tenants.administrator');
+        Route::post('schools/{tenant}/credentials', [SuperAdminTenantsController::class, 'regenerateCredentials'])->name('tenants.credentials');
         Route::delete('schools/{tenant}', [SuperAdminTenantsController::class, 'destroy'])->name('tenants.destroy');
         Route::get('plans', [SuperAdminSubscriptionPlansController::class, 'index'])->name('plans.index');
         Route::post('plans', [SuperAdminSubscriptionPlansController::class, 'store'])->name('plans.store');
@@ -146,10 +150,11 @@ Route::middleware(['auth', 'verified', 'active'])->group(function () {
     Route::get('/portal/payments/{payment}/receipt', [PortalController::class, 'receipt'])->name('portal.payments.receipt');
 });
 
-Route::middleware(['auth', 'verified', 'active', 'admin'])
+Route::middleware(['auth', 'verified', 'active', 'admin', 'permission'])
     ->prefix('admin')
     ->as('admin.')
     ->group(function () {
+        Route::get('account', AccountSubscriptionController::class)->name('account.index');
         Route::middleware('private-school')->group(function () {
             Route::get('academic-years', [AcademicYearsController::class, 'index'])->name('academic-years.index');
             Route::post('academic-years', [AcademicYearsController::class, 'store'])->name('academic-years.store');
@@ -249,7 +254,19 @@ Route::middleware(['auth', 'verified', 'active', 'admin'])
         Route::patch('staff/{staff}/toggle-active', [StaffController::class, 'toggleActive'])->name('staff.toggle-active');
         Route::get('settings', [CompanySettingsController::class, 'edit'])->name('settings.edit');
         Route::put('settings', [CompanySettingsController::class, 'update'])->name('settings.update');
+        Route::get('settings/access/users', [AccessManagementController::class, 'users'])->name('access.users');
+        Route::get('settings/access/roles', [AccessManagementController::class, 'roles'])->name('access.roles');
+        Route::get('settings/access/permissions', [AccessManagementController::class, 'matrix'])->name('access.permissions');
+        Route::get('settings/access/history', [AccessManagementController::class, 'history'])->name('access.history');
         Route::get('users', [UsersController::class, 'index'])->name('users.index');
+        Route::get('users/roles', [RolesController::class, 'index'])->name('users.roles.index');
+        Route::post('users/roles', [RolesController::class, 'store'])->name('users.roles.store');
+        Route::put('users/roles/{role}', [RolesController::class, 'update'])->name('users.roles.update');
+        Route::delete('users/roles/{role}', [RolesController::class, 'destroy'])->name('users.roles.destroy');
+        Route::post('users/roles/{role}/duplicate', [RolesController::class, 'duplicate'])->name('users.roles.duplicate');
+        Route::patch('users/roles/{role}/toggle', [RolesController::class, 'toggle'])->name('users.roles.toggle');
+        Route::post('users/roles/{role}/restore', [RolesController::class, 'restore'])->name('users.roles.restore');
+        Route::put('users/{user}/roles', [RolesController::class, 'assign'])->name('users.roles.assign');
         Route::post('users', [UsersController::class, 'store'])->name('users.store');
         Route::put('users/{user}', [UsersController::class, 'update'])->name('users.update');
         Route::patch('users/{user}/toggle-active', [UsersController::class, 'toggleActive'])->name('users.toggle-active');

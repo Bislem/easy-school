@@ -10,11 +10,11 @@ class PrivateSchoolInscription extends Model
 {
     use Concerns\GuardsAcademicYearWrites;
 
-    protected $fillable = ['academic_year_id', 'campaign_id', 'campaign_level_id', 'school_level_id', 'student_id', 'parent_id', 'status', 'review_notes', 'reviewed_by', 'reviewed_at'];
+    protected $fillable = ['academic_year_id', 'campaign_id', 'campaign_level_id', 'school_level_id', 'student_id', 'parent_id', 'applicant_data', 'status', 'review_notes', 'reviewed_by', 'reviewed_at'];
 
     protected function casts(): array
     {
-        return ['status' => PrivateSchoolInscriptionStatus::class, 'reviewed_at' => 'datetime'];
+        return ['applicant_data' => 'array', 'status' => PrivateSchoolInscriptionStatus::class, 'reviewed_at' => 'datetime'];
     }
 
     public function academicYear(): BelongsTo

@@ -9,6 +9,7 @@ use App\Models\PrivateSchoolCampaignLevel;
 use App\Models\PrivateSchoolInscription;
 use App\Models\PrivateSchoolInscriptionCampaign;
 use App\Models\SchoolLevel;
+use App\Services\PrivateSchoolApplicantMatcher;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -23,7 +24,8 @@ class PrivateSchoolInscriptionsController extends Controller
     {
         $items = PrivateSchoolInscription::with(['academicYear:id,name', 'campaign:id,title', 'level:id,name,code', 'student:id,first_name,last_name,email,phone,birth_date,address', 'parent.user:id,email,phone'])
             ->when($request->string('search')->trim()->toString(), fn ($query, $search) => $query->where(fn ($q) => $q
-                ->whereHas('student', fn ($s) => $s->where('first_name', 'like', "%{$search}%")->orWhere('last_name', 'like', "%{$search}%")->orWhere('email', 'like', "%{$search}%"))
+                ->where('applicant_data', 'like', "%{$search}%")
+                ->orWhereHas('student', fn ($s) => $s->where('first_name', 'like', "%{$search}%")->orWhere('last_name', 'like', "%{$search}%")->orWhere('email', 'like', "%{$search}%"))
                 ->orWhereHas('parent', fn ($p) => $p->where('first_name', 'like', "%{$search}%")->orWhere('last_name', 'like', "%{$search}%")->orWhere('phone', 'like', "%{$search}%"))))
             ->when($request->filled('academic_year_id'), fn ($q) => $q->where('academic_year_id', $request->integer('academic_year_id')))
             ->when($request->filled('campaign_id'), fn ($q) => $q->where('campaign_id', $request->integer('campaign_id')))
@@ -47,15 +49,23 @@ class PrivateSchoolInscriptionsController extends Controller
         ]);
     }
 
-    public function updateStatus(Request $request, PrivateSchoolInscription $inscription): RedirectResponse
+    public function updateStatus(Request $request, PrivateSchoolInscription $inscription, PrivateSchoolApplicantMatcher $matcher): RedirectResponse
     {
         $data = $request->validate(['status' => ['required', Rule::enum(PrivateSchoolInscriptionStatus::class)], 'review_notes' => ['nullable', 'string', 'max:3000']]);
-        DB::transaction(function () use ($data, $request, $inscription): void {
+        DB::transaction(function () use ($data, $request, $inscription, $matcher): void {
             $locked = PrivateSchoolInscription::query()->lockForUpdate()->findOrFail($inscription->id);
             if ($data['status'] === PrivateSchoolInscriptionStatus::ACCEPTED->value && $locked->status !== PrivateSchoolInscriptionStatus::ACCEPTED) {
                 $level = PrivateSchoolCampaignLevel::query()->lockForUpdate()->findOrFail($locked->campaign_level_id);
                 if ($level->max_places !== null && $level->acceptedInscriptions()->count() >= $level->max_places) {
                     throw ValidationException::withMessages(['status' => 'La capacité de ce niveau est atteinte. Placez la demande en liste d’attente.']);
+                }
+                if (! $locked->student_id || ! $locked->parent_id) {
+                    $applicant = $locked->applicant_data;
+                    abort_unless(isset($applicant['parent'], $applicant['student']), 422, 'Les informations du candidat sont incomplètes.');
+                    $parent = $matcher->parent($applicant['parent']);
+                    $student = $matcher->student([...$applicant['student'], 'parent_phone' => $applicant['parent']['phone']], $parent);
+                    $matcher->link($parent, $student);
+                    $locked->fill(['parent_id' => $parent->id, 'student_id' => $student->id]);
                 }
             }
             $locked->update([...$data, 'reviewed_by' => $request->user()->id, 'reviewed_at' => now()]);

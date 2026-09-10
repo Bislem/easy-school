@@ -1266,9 +1266,7 @@ watch(
                                     !addStudentForm.student_ids.length
                                 "
                                 ><UserPlus class="mr-2 size-4" />Ajouter
-                                {{
-                                    addStudentForm.student_ids.length || ''
-                                }}
+                                {{ addStudentForm.student_ids.length || '' }}
                                 étudiant(s)</Button
                             >
                         </div>

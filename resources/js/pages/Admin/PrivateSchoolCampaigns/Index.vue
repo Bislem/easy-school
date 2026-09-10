@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import InputError from '@/components/InputError.vue';
+import RichTextEditor from '@/components/RichTextEditor.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import AdminLayout from '@/layouts/AdminLayout.vue';
@@ -8,29 +9,354 @@ import { Clipboard, Pencil, Plus, Search, X } from 'lucide-vue-next';
 import { ref } from 'vue';
 
 type Year = { id: number; name: string; status: string };
-type Level = { id: number; name: string; code: string; cycle?: { name: string } };
-type CampaignLevel = { id: number; school_level_id: number; max_places: number | null; is_open: boolean; level: Level };
-type Campaign = { id: number; academic_year_id: number; title: string; description?: string; deadline?: string; status: string; public_token: string; inscriptions_count: number; academic_year: Year; levels: CampaignLevel[] };
-const props = defineProps<{ campaigns: { data: Campaign[]; links: any[] }; academicYears: Year[]; activeAcademicYearId?: number; levels: Level[]; filters: { search?: string; academic_year_id?: string } }>();
-const open = ref(false); const editing = ref<Campaign | null>(null); const search = ref(props.filters.search || ''); const yearFilter = ref(props.filters.academic_year_id || ''); const copied = ref<number | null>(null);
-const form = useForm({ academic_year_id: '', title: '', description: '', deadline: '', status: 'draft', levels: [] as Array<{ school_level_id: number; max_places: number | null; is_open: boolean }> });
-function create() { editing.value = null; form.reset(); form.academic_year_id = String(props.activeAcademicYearId || props.academicYears[0]?.id || ''); form.status = 'draft'; form.levels = []; form.clearErrors(); open.value = true; }
-function edit(item: Campaign) { editing.value = item; Object.assign(form, { academic_year_id: String(item.academic_year_id), title: item.title, description: item.description || '', deadline: item.deadline ? item.deadline.slice(0, 16) : '', status: item.status, levels: item.levels.map(l => ({ school_level_id: l.school_level_id, max_places: l.max_places, is_open: l.is_open })) }); form.clearErrors(); open.value = true; }
-function toggleLevel(id: number) { const found = form.levels.find(l => l.school_level_id === id); found ? form.levels = form.levels.filter(l => l.school_level_id !== id) : form.levels.push({ school_level_id: id, max_places: null, is_open: true }); }
-function chosen(id: number) { return form.levels.find(l => l.school_level_id === id); }
-function submit() { const options = { preserveScroll: true, onSuccess: () => open.value = false }; editing.value ? form.put(`/admin/inscription-campaigns/${editing.value.id}`, options) : form.post('/admin/inscription-campaigns', options); }
-function filters() { router.get('/admin/inscription-campaigns', { search: search.value, academic_year_id: yearFilter.value }, { preserveState: true, replace: true }); }
-function setStatus(item: Campaign, status: string) { router.patch(`/admin/inscription-campaigns/${item.id}/status`, { status }, { preserveScroll: true }); }
-async function copy(item: Campaign) { await navigator.clipboard.writeText(`${window.location.origin}/ecole/inscription/${item.public_token}`); copied.value = item.id; setTimeout(() => copied.value = null, 1500); }
-const labels: Record<string,string> = { draft: 'Brouillon', open: 'Ouverte', closed: 'Fermée' };
+type Level = {
+    id: number;
+    name: string;
+    code: string;
+    cycle?: { name: string };
+};
+type CampaignLevel = {
+    id: number;
+    school_level_id: number;
+    max_places: number | null;
+    is_open: boolean;
+    level: Level;
+};
+type Campaign = {
+    id: number;
+    academic_year_id: number;
+    title: string;
+    description?: string;
+    deadline?: string;
+    status: string;
+    public_token: string;
+    inscriptions_count: number;
+    academic_year: Year;
+    levels: CampaignLevel[];
+};
+const props = defineProps<{
+    campaigns: { data: Campaign[]; links: any[] };
+    academicYears: Year[];
+    activeAcademicYearId?: number;
+    levels: Level[];
+    filters: { search?: string; academic_year_id?: string };
+}>();
+const open = ref(false);
+const editing = ref<Campaign | null>(null);
+const search = ref(props.filters.search || '');
+const yearFilter = ref(props.filters.academic_year_id || '');
+const copied = ref<number | null>(null);
+const form = useForm({
+    academic_year_id: '',
+    title: '',
+    description: '',
+    deadline: '',
+    status: 'draft',
+    levels: [] as Array<{
+        school_level_id: number;
+        max_places: number | null;
+        is_open: boolean;
+    }>,
+});
+function create() {
+    editing.value = null;
+    form.reset();
+    form.academic_year_id = String(
+        props.activeAcademicYearId || props.academicYears[0]?.id || '',
+    );
+    form.status = 'draft';
+    form.levels = [];
+    form.clearErrors();
+    open.value = true;
+}
+function edit(item: Campaign) {
+    editing.value = item;
+    Object.assign(form, {
+        academic_year_id: String(item.academic_year_id),
+        title: item.title,
+        description: item.description || '',
+        deadline: item.deadline ? item.deadline.slice(0, 16) : '',
+        status: item.status,
+        levels: item.levels.map((l) => ({
+            school_level_id: l.school_level_id,
+            max_places: l.max_places,
+            is_open: l.is_open,
+        })),
+    });
+    form.clearErrors();
+    open.value = true;
+}
+function toggleLevel(id: number) {
+    const found = form.levels.find((l) => l.school_level_id === id);
+    found
+        ? (form.levels = form.levels.filter((l) => l.school_level_id !== id))
+        : form.levels.push({
+              school_level_id: id,
+              max_places: null,
+              is_open: true,
+          });
+}
+function chosen(id: number) {
+    return form.levels.find((l) => l.school_level_id === id);
+}
+function submit() {
+    const options = {
+        preserveScroll: true,
+        onSuccess: () => (open.value = false),
+    };
+    editing.value
+        ? form.put(`/admin/inscription-campaigns/${editing.value.id}`, options)
+        : form.post('/admin/inscription-campaigns', options);
+}
+function filters() {
+    router.get(
+        '/admin/inscription-campaigns',
+        { search: search.value, academic_year_id: yearFilter.value },
+        { preserveState: true, replace: true },
+    );
+}
+function setStatus(item: Campaign, status: string) {
+    router.patch(
+        `/admin/inscription-campaigns/${item.id}/status`,
+        { status },
+        { preserveScroll: true },
+    );
+}
+async function copy(item: Campaign) {
+    await navigator.clipboard.writeText(
+        `${window.location.origin}/ecole/inscription/${item.public_token}`,
+    );
+    copied.value = item.id;
+    setTimeout(() => (copied.value = null), 1500);
+}
+const labels: Record<string, string> = {
+    draft: 'Brouillon',
+    open: 'Ouverte',
+    closed: 'Fermée',
+};
 </script>
 
-<template><AdminLayout><Head title="Campagnes d'inscription scolaire"/><main class="flex-1 space-y-6 p-4 sm:p-6 lg:p-8">
-  <header class="flex flex-wrap items-center justify-between gap-3"><div><h1 class="text-2xl font-semibold">Campagnes d’inscription scolaire</h1><p class="text-sm text-muted-foreground">Configurez les niveaux, capacités et liens publics par année scolaire.</p></div><Button @click="create"><Plus class="mr-2 size-4"/>Nouvelle campagne</Button></header>
-  <form class="flex flex-wrap gap-3 rounded-xl border bg-white p-4" @submit.prevent="filters"><div class="relative min-w-64 flex-1"><Search class="absolute left-3 top-3 size-4 text-slate-400"/><Input v-model="search" class="pl-9" placeholder="Rechercher une campagne"/></div><select v-model="yearFilter" class="rounded-md border px-3 text-sm"><option value="">Toutes les années</option><option v-for="y in academicYears" :key="y.id" :value="y.id">{{ y.name }}</option></select><Button variant="outline">Filtrer</Button></form>
-  <section class="grid gap-4 lg:grid-cols-2"><article v-for="item in campaigns.data" :key="item.id" class="rounded-2xl border bg-white p-5 shadow-sm"><div class="flex justify-between gap-3"><div><h2 class="font-semibold">{{ item.title }}</h2><p class="text-sm text-slate-500">{{ item.academic_year.name }} · {{ item.inscriptions_count }} demande(s)</p></div><span class="h-fit rounded-full bg-slate-100 px-2 py-1 text-xs">{{ labels[item.status] }}</span></div><p v-if="item.description" class="mt-3 line-clamp-2 text-sm text-slate-600">{{ item.description }}</p><div class="mt-4 space-y-2"><div v-for="l in item.levels" :key="l.id" class="flex justify-between rounded-lg bg-slate-50 px-3 py-2 text-sm"><span>{{ l.level.name }}</span><span>{{ l.is_open ? 'Ouvert' : 'Fermé' }} · {{ l.max_places ?? 'Illimité' }}</span></div></div><div class="mt-4 flex flex-wrap justify-end gap-2 border-t pt-4"><Button size="sm" variant="outline" @click="copy(item)"><Clipboard class="mr-1 size-3"/>{{ copied === item.id ? 'Copié' : 'Lien public' }}</Button><Button size="sm" variant="outline" @click="edit(item)"><Pencil class="mr-1 size-3"/>Modifier</Button><Button v-if="item.status !== 'open'" size="sm" @click="setStatus(item,'open')">Ouvrir</Button><Button v-else size="sm" variant="destructive" @click="setStatus(item,'closed')">Fermer</Button></div></article></section>
-  <div v-if="!campaigns.data.length" class="rounded-xl border border-dashed py-14 text-center text-slate-500">Aucune campagne.</div>
-  <nav class="flex justify-center gap-1"><Link v-for="link in campaigns.links" :key="link.label" :href="link.url || '#'" class="rounded border px-3 py-1 text-sm" :class="{ 'bg-primary text-white': link.active, 'pointer-events-none opacity-40': !link.url }" v-html="link.label"/></nav>
-</main>
-<div v-if="open" class="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-black/40 p-4" @click.self="open=false"><form class="w-full max-w-3xl rounded-2xl bg-white p-6" @submit.prevent="submit"><div class="mb-5 flex justify-between"><h2 class="text-xl font-semibold">{{ editing ? 'Modifier' : 'Créer' }} la campagne</h2><button type="button" @click="open=false"><X/></button></div><div class="grid gap-4 sm:grid-cols-2"><label class="space-y-1 text-sm">Titre<Input v-model="form.title" required/></label><label class="space-y-1 text-sm">Année scolaire<select v-model="form.academic_year_id" required class="h-10 w-full rounded-md border px-3"><option v-for="y in academicYears" :key="y.id" :value="y.id">{{ y.name }}</option></select><InputError :message="form.errors.academic_year_id"/></label><label class="space-y-1 text-sm">Date limite (facultative)<Input v-model="form.deadline" type="datetime-local"/></label><label class="space-y-1 text-sm">Statut<select v-model="form.status" class="h-10 w-full rounded-md border px-3"><option value="draft">Brouillon</option><option value="open">Ouverte</option><option value="closed">Fermée</option></select></label></div><label class="mt-4 block space-y-1 text-sm">Description<textarea v-model="form.description" class="min-h-20 w-full rounded-md border p-3"/></label><InputError :message="form.errors.levels" class="mt-2"/><h3 class="mt-5 font-semibold">Niveaux disponibles</h3><div class="mt-2 max-h-72 space-y-2 overflow-y-auto"><div v-for="level in levels" :key="level.id" class="grid grid-cols-[auto_1fr_9rem_auto] items-center gap-3 rounded-lg border p-3"><input type="checkbox" :checked="!!chosen(level.id)" @change="toggleLevel(level.id)"/><span>{{ level.name }} <small class="text-slate-500">{{ level.cycle?.name }}</small></span><Input v-if="chosen(level.id)" v-model="chosen(level.id)!.max_places" type="number" min="1" placeholder="Illimité"/><label v-if="chosen(level.id)" class="flex gap-1 text-xs"><input v-model="chosen(level.id)!.is_open" type="checkbox"/>Ouvert</label></div></div><div class="mt-6 flex justify-end gap-2"><Button type="button" variant="outline" @click="open=false">Annuler</Button><Button :disabled="form.processing">Enregistrer</Button></div></form></div>
-</AdminLayout></template>
+<template>
+    <AdminLayout
+        ><Head title="Campagnes d'inscription scolaire" />
+        <main class="flex-1 space-y-6 p-4 sm:p-6 lg:p-8">
+            <header class="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                    <h1 class="text-2xl font-semibold">
+                        Campagnes d’inscription scolaire
+                    </h1>
+                    <p class="text-sm text-muted-foreground">
+                        Configurez les niveaux, capacités et liens publics par
+                        année scolaire.
+                    </p>
+                </div>
+                <Button @click="create"
+                    ><Plus class="mr-2 size-4" />Nouvelle campagne</Button
+                >
+            </header>
+            <form
+                class="flex flex-wrap gap-3 rounded-xl border bg-white p-4"
+                @submit.prevent="filters"
+            >
+                <div class="relative min-w-64 flex-1">
+                    <Search
+                        class="absolute top-3 left-3 size-4 text-slate-400"
+                    /><Input
+                        v-model="search"
+                        class="pl-9"
+                        placeholder="Rechercher une campagne"
+                    />
+                </div>
+                <select
+                    v-model="yearFilter"
+                    class="rounded-md border px-3 text-sm"
+                >
+                    <option value="">Toutes les années</option>
+                    <option
+                        v-for="y in academicYears"
+                        :key="y.id"
+                        :value="y.id"
+                    >
+                        {{ y.name }}
+                    </option></select
+                ><Button variant="outline">Filtrer</Button>
+            </form>
+            <section class="grid gap-4 lg:grid-cols-2">
+                <article
+                    v-for="item in campaigns.data"
+                    :key="item.id"
+                    class="rounded-2xl border bg-white p-5 shadow-sm"
+                >
+                    <div class="flex justify-between gap-3">
+                        <div>
+                            <h2 class="font-semibold">{{ item.title }}</h2>
+                            <p class="text-sm text-slate-500">
+                                {{ item.academic_year.name }} ·
+                                {{ item.inscriptions_count }} demande(s)
+                            </p>
+                        </div>
+                        <span
+                            class="h-fit rounded-full bg-slate-100 px-2 py-1 text-xs"
+                            >{{ labels[item.status] }}</span
+                        >
+                    </div>
+                    <div
+                        v-if="item.description"
+                        class="mt-3 line-clamp-2 text-sm text-slate-600 [&_ol]:list-decimal [&_ol]:pl-5 [&_ul]:list-disc [&_ul]:pl-5"
+                        v-html="item.description"
+                    />
+                    <div class="mt-4 space-y-2">
+                        <div
+                            v-for="l in item.levels"
+                            :key="l.id"
+                            class="flex justify-between rounded-lg bg-slate-50 px-3 py-2 text-sm"
+                        >
+                            <span>{{ l.level.name }}</span
+                            ><span
+                                >{{ l.is_open ? 'Ouvert' : 'Fermé' }} ·
+                                {{ l.max_places ?? 'Illimité' }}</span
+                            >
+                        </div>
+                    </div>
+                    <div
+                        class="mt-4 flex flex-wrap justify-end gap-2 border-t pt-4"
+                    >
+                        <Button size="sm" variant="outline" @click="copy(item)"
+                            ><Clipboard class="mr-1 size-3" />{{
+                                copied === item.id ? 'Copié' : 'Lien public'
+                            }}</Button
+                        ><Button size="sm" variant="outline" @click="edit(item)"
+                            ><Pencil class="mr-1 size-3" />Modifier</Button
+                        ><Button
+                            v-if="item.status !== 'open'"
+                            size="sm"
+                            @click="setStatus(item, 'open')"
+                            >Ouvrir</Button
+                        ><Button
+                            v-else
+                            size="sm"
+                            variant="destructive"
+                            @click="setStatus(item, 'closed')"
+                            >Fermer</Button
+                        >
+                    </div>
+                </article>
+            </section>
+            <div
+                v-if="!campaigns.data.length"
+                class="rounded-xl border border-dashed py-14 text-center text-slate-500"
+            >
+                Aucune campagne.
+            </div>
+            <nav class="flex justify-center gap-1">
+                <Link
+                    v-for="link in campaigns.links"
+                    :key="link.label"
+                    :href="link.url || '#'"
+                    class="rounded border px-3 py-1 text-sm"
+                    :class="{
+                        'bg-primary text-white': link.active,
+                        'pointer-events-none opacity-40': !link.url,
+                    }"
+                    v-html="link.label"
+                />
+            </nav>
+        </main>
+        <div
+            v-if="open"
+            class="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-black/40 p-4"
+            @click.self="open = false"
+        >
+            <form
+                class="w-full max-w-3xl rounded-2xl bg-white p-6"
+                @submit.prevent="submit"
+            >
+                <div class="mb-5 flex justify-between">
+                    <h2 class="text-xl font-semibold">
+                        {{ editing ? 'Modifier' : 'Créer' }} la campagne
+                    </h2>
+                    <button type="button" @click="open = false"><X /></button>
+                </div>
+                <div class="grid gap-4 sm:grid-cols-2">
+                    <label class="space-y-1 text-sm"
+                        >Titre<Input v-model="form.title" required /></label
+                    ><label class="space-y-1 text-sm"
+                        >Année scolaire<select
+                            v-model="form.academic_year_id"
+                            required
+                            class="h-10 w-full rounded-md border px-3"
+                        >
+                            <option
+                                v-for="y in academicYears"
+                                :key="y.id"
+                                :value="y.id"
+                            >
+                                {{ y.name }}
+                            </option></select
+                        ><InputError
+                            :message="form.errors.academic_year_id" /></label
+                    ><label class="space-y-1 text-sm"
+                        >Date limite (facultative)<Input
+                            v-model="form.deadline"
+                            type="datetime-local" /></label
+                    ><label class="space-y-1 text-sm"
+                        >Statut<select
+                            v-model="form.status"
+                            class="h-10 w-full rounded-md border px-3"
+                        >
+                            <option value="draft">Brouillon</option>
+                            <option value="open">Ouverte</option>
+                            <option value="closed">Fermée</option>
+                        </select></label
+                    >
+                </div>
+                <div class="mt-4 space-y-1 text-sm">
+                    <label class="font-medium">Description</label>
+                    <RichTextEditor v-model="form.description" />
+                    <InputError :message="form.errors.description" />
+                </div>
+                <InputError :message="form.errors.levels" class="mt-2" />
+                <h3 class="mt-5 font-semibold">Niveaux disponibles</h3>
+                <div class="mt-2 max-h-72 space-y-2 overflow-y-auto">
+                    <div
+                        v-for="level in levels"
+                        :key="level.id"
+                        class="grid grid-cols-[auto_1fr_9rem_auto] items-center gap-3 rounded-lg border p-3"
+                    >
+                        <input
+                            type="checkbox"
+                            :checked="!!chosen(level.id)"
+                            @change="toggleLevel(level.id)"
+                        /><span
+                            >{{ level.name }}
+                            <small class="text-slate-500">{{
+                                level.cycle?.name
+                            }}</small></span
+                        ><Input
+                            v-if="chosen(level.id)"
+                            v-model="chosen(level.id)!.max_places"
+                            type="number"
+                            min="1"
+                            placeholder="Illimité"
+                        /><label
+                            v-if="chosen(level.id)"
+                            class="flex gap-1 text-xs"
+                            ><input
+                                v-model="chosen(level.id)!.is_open"
+                                type="checkbox"
+                            />Ouvert</label
+                        >
+                    </div>
+                </div>
+                <div class="mt-6 flex justify-end gap-2">
+                    <Button
+                        type="button"
+                        variant="outline"
+                        @click="open = false"
+                        >Annuler</Button
+                    ><Button :disabled="form.processing">Enregistrer</Button>
+                </div>
+            </form>
+        </div>
+    </AdminLayout>
+</template>

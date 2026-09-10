@@ -83,7 +83,7 @@ class PrivateSchoolCampaignsController extends Controller
 
     private function validated(Request $request): array
     {
-        return $request->validate([
+        $data = $request->validate([
             'academic_year_id' => ['required', TenantRule::exists('academic_years')],
             'title' => ['required', 'string', 'max:255'], 'description' => ['nullable', 'string', 'max:5000'],
             'deadline' => ['nullable', 'date'], 'status' => ['required', Rule::enum(PrivateSchoolCampaignStatus::class)],
@@ -92,6 +92,22 @@ class PrivateSchoolCampaignsController extends Controller
             'levels.*.max_places' => ['nullable', 'integer', 'min:1', 'max:100000'],
             'levels.*.is_open' => ['required', 'boolean'],
         ]);
+
+        $data['description'] = $this->sanitizeDescription($data['description'] ?? null);
+
+        return $data;
+    }
+
+    private function sanitizeDescription(?string $description): ?string
+    {
+        if (blank($description)) {
+            return null;
+        }
+
+        $html = strip_tags($description, '<p><br><strong><b><em><i><u><h2><h3><ul><ol><li><blockquote>');
+        $html = preg_replace('/<([a-z][a-z0-9]*)\b[^>]*>/i', '<$1>', $html) ?? '';
+
+        return trim($html) ?: null;
     }
 
     private function syncLevels(PrivateSchoolInscriptionCampaign $campaign, array $levels): void

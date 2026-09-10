@@ -7,6 +7,7 @@ use App\Models\PrivateSchoolInscription;
 use App\Models\PrivateSchoolInscriptionCampaign;
 use App\Models\SchoolCycle;
 use App\Models\SchoolLevel;
+use App\Models\SchoolParent;
 use App\Models\Student;
 use App\Models\Tenant;
 use App\Models\User;
@@ -47,19 +48,82 @@ test('school inscription web entry point opens the admin module', function () {
             ->component('Admin/PrivateSchoolInscriptions/Index'));
 });
 
-test('public inscription creates linked parent and student and prevents a duplicate request', function () {
+test('public inscription stores applicants without accounts and prevents a duplicate request', function () {
     ['campaign' => $campaign, 'campaignLevel' => $campaignLevel] = privateSchoolFixture();
     $url = route('public.private-school-inscription.store', $campaign->public_token);
     $this->post($url, publicSchoolPayload($campaignLevel->id))->assertSessionHasNoErrors()->assertSessionHas('private_school_inscription_submitted');
     expect(PrivateSchoolInscription::withoutGlobalScope('tenant')->count())->toBe(1);
     $this->post($url, publicSchoolPayload($campaignLevel->id))->assertSessionHasErrors('campaign_level_id');
-    expect(Student::withoutGlobalScope('tenant')->where('email', 'child@example.com')->count())->toBe(1)
+    expect(Student::withoutGlobalScope('tenant')->where('email', 'child@example.com')->count())->toBe(0)
+        ->and(SchoolParent::withoutGlobalScope('tenant')->count())->toBe(0)
         ->and(PrivateSchoolInscription::withoutGlobalScope('tenant')->count())->toBe(1);
 });
 
+test('one parent can register multiple children in a single request', function () {
+    ['admin' => $admin, 'campaign' => $campaign, 'campaignLevel' => $campaignLevel] = privateSchoolFixture();
+    $campaignLevel->update(['max_places' => 2]);
+
+    $this->post(route('public.private-school-inscription.store', $campaign->public_token), [
+        'parent_first_name' => 'Nadia', 'parent_last_name' => 'Amrane',
+        'parent_email' => 'nadia-family@example.com', 'parent_phone' => '0550000088',
+        'relationship' => 'Mère',
+        'children' => [
+            ['first_name' => 'Lina', 'last_name' => 'Amrane', 'email' => 'lina-family@example.com', 'birth_date' => '2018-01-01', 'campaign_level_id' => $campaignLevel->id],
+            ['first_name' => 'Sami', 'last_name' => 'Amrane', 'email' => 'sami-family@example.com', 'birth_date' => '2020-01-01', 'campaign_level_id' => $campaignLevel->id],
+        ],
+    ])->assertSessionHasNoErrors()->assertSessionHas('private_school_inscription_submitted', 2);
+
+    $items = PrivateSchoolInscription::withoutGlobalScope('tenant')->orderBy('id')->get();
+    expect($items)->toHaveCount(2)
+        ->and($items->pluck('parent_id')->filter())->toBeEmpty()
+        ->and(Student::withoutGlobalScope('tenant')->whereIn('email', ['lina-family@example.com', 'sami-family@example.com'])->count())->toBe(0)
+        ->and(SchoolParent::withoutGlobalScope('tenant')->count())->toBe(0);
+
+    foreach ($items as $item) {
+        $this->actingAs($admin)->patch("/admin/school-inscriptions/{$item->id}/status", ['status' => 'accepted'])->assertSessionHasNoErrors();
+    }
+    $items = $items->map->fresh();
+    expect($items->pluck('parent_id')->unique())->toHaveCount(1)
+        ->and(Student::withoutGlobalScope('tenant')->whereIn('email', ['lina-family@example.com', 'sami-family@example.com'])->count())->toBe(2)
+        ->and(SchoolParent::withoutGlobalScope('tenant')->count())->toBe(1);
+});
+
+test('rejecting an inscription never creates parent or student records', function () {
+    ['admin' => $admin, 'campaign' => $campaign, 'campaignLevel' => $campaignLevel] = privateSchoolFixture();
+    $this->post(route('public.private-school-inscription.store', $campaign->public_token), publicSchoolPayload($campaignLevel->id))->assertSessionHasNoErrors();
+    $inscription = PrivateSchoolInscription::withoutGlobalScope('tenant')->firstOrFail();
+
+    $this->actingAs($admin)->patch("/admin/school-inscriptions/{$inscription->id}/status", ['status' => 'rejected'])->assertSessionHasNoErrors();
+
+    expect($inscription->fresh()->student_id)->toBeNull()
+        ->and($inscription->fresh()->parent_id)->toBeNull()
+        ->and(Student::withoutGlobalScope('tenant')->count())->toBe(0)
+        ->and(SchoolParent::withoutGlobalScope('tenant')->count())->toBe(0);
+});
+
+test('campaign rich text keeps formatting and removes unsafe html', function () {
+    ['admin' => $admin, 'year' => $year, 'level' => $level] = privateSchoolFixture();
+
+    $this->actingAs($admin)->post('/admin/inscription-campaigns', [
+        'academic_year_id' => $year->id,
+        'title' => 'Campagne enrichie',
+        'description' => '<h2 onclick="alert(1)">Bienvenue</h2><script>alert(2)</script><p><strong>Documents requis</strong></p>',
+        'status' => 'draft',
+        'levels' => [['school_level_id' => $level->id, 'max_places' => null, 'is_open' => true]],
+    ])->assertSessionHasNoErrors();
+
+    $description = PrivateSchoolInscriptionCampaign::where('title', 'Campagne enrichie')->value('description');
+    expect($description)->toContain('<h2>Bienvenue</h2>')
+        ->and($description)->toContain('<strong>Documents requis</strong>')
+        ->and($description)->not->toContain('onclick')
+        ->and($description)->not->toContain('<script>');
+});
+
 test('an existing student can submit in a later academic year', function () {
-    ['tenant' => $tenant, 'campaignLevel' => $campaignLevel] = privateSchoolFixture();
+    ['tenant' => $tenant, 'admin' => $admin, 'campaignLevel' => $campaignLevel] = privateSchoolFixture();
     $this->post(route('public.private-school-inscription.store', $campaignLevel->campaign->public_token), publicSchoolPayload($campaignLevel->id))->assertSessionHasNoErrors();
+    $first = PrivateSchoolInscription::withoutGlobalScope('tenant')->firstOrFail();
+    $this->actingAs($admin)->patch("/admin/school-inscriptions/{$first->id}/status", ['status' => 'accepted'])->assertSessionHasNoErrors();
     app(TenantContext::class)->set($tenant);
     $year = AcademicYear::create(['name' => '2027-2028', 'start_date' => '2027-09-01', 'end_date' => '2028-06-30', 'status' => 'draft']);
     $campaign = PrivateSchoolInscriptionCampaign::create(['academic_year_id' => $year->id, 'title' => 'Inscription 2027/2028', 'status' => 'open']);

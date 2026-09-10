@@ -26,6 +26,7 @@ import {
     DoorOpen,
     Download,
     GraduationCap,
+    KeyRound,
     LoaderCircle,
     Save,
     Trash2,
@@ -40,6 +41,8 @@ const props = defineProps<{
     stats: any;
     plans: any[];
     payments: any[];
+    storage: any;
+    accountSummary: any;
 }>();
 const basePath = (usePage().props.superAdmin as any).basePath as string;
 const schoolForm = useForm({
@@ -89,6 +92,18 @@ const archive = () => {
     if (confirm('Archiver cette école ?'))
         router.delete(`${basePath}/schools/${props.school.id}`);
 };
+const showCredentials = ref(false);
+const credentialsForm = useForm({
+    delivery_email: props.administrator?.email || '',
+});
+const regenerateCredentials = () =>
+    credentialsForm.post(`${basePath}/schools/${props.school.id}/credentials`, {
+        preserveScroll: true,
+        onSuccess: () => {
+            showCredentials.value = false;
+            credentialsForm.delivery_email = props.administrator?.email || '';
+        },
+    });
 const showSubscription = ref(false);
 const subscriptionForm = useForm({
     action: 'renew',
@@ -126,6 +141,13 @@ const date = (value: string | null) =>
               new Date(value),
           )
         : 'Sans échéance';
+const bytes = (value: number | null) => {
+    if (value === null) return 'Illimité';
+    if (!value) return '0 B';
+    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.min(Math.floor(Math.log(value) / Math.log(1024)), 4);
+    return `${(value / 1024 ** i).toFixed(i > 1 ? 1 : 0)} ${units[i]}`;
+};
 const statCards = [
     ['Étudiants', props.stats.students, GraduationCap],
     ['Personnel', props.stats.staff, Users],
@@ -197,7 +219,14 @@ const statCards = [
                         {{ school.subscription_plan?.name || 'Aucun plan' }}
                     </p>
                     <p class="text-xs text-cyan-100">
-                        Expire le {{ date(school.plan_expires_at) }}
+                        Expire le {{ date(accountSummary.expires_at) }}
+                    </p>
+                    <p
+                        v-if="accountSummary.remaining_days !== null"
+                        class="mt-1 text-xs text-cyan-100"
+                    >
+                        {{ accountSummary.remaining_days }} jour(s) restant(s) ·
+                        {{ accountSummary.status }}
                     </p>
                 </div>
             </div>
@@ -218,6 +247,53 @@ const statCards = [
                 ></Card
             >
         </div>
+        <Card class="mb-6"
+            ><CardHeader
+                ><CardTitle>Utilisation du stockage</CardTitle></CardHeader
+            ><CardContent>
+                <div class="flex items-end justify-between">
+                    <p>
+                        <b class="text-2xl">{{ bytes(storage.used_bytes) }}</b>
+                        <span class="text-muted-foreground"
+                            >/ {{ bytes(storage.limit_bytes) }}</span
+                        >
+                    </p>
+                    <b
+                        :class="
+                            storage.percentage >= 90
+                                ? 'text-red-600'
+                                : storage.percentage >= 75
+                                  ? 'text-amber-600'
+                                  : 'text-emerald-600'
+                        "
+                        >{{ storage.percentage }}%</b
+                    >
+                </div>
+                <div class="mt-3 h-3 overflow-hidden rounded-full bg-slate-100">
+                    <div
+                        class="h-full rounded-full"
+                        :class="
+                            storage.percentage >= 90
+                                ? 'bg-red-500'
+                                : storage.percentage >= 75
+                                  ? 'bg-amber-500'
+                                  : 'bg-emerald-500'
+                        "
+                        :style="{ width: `${storage.percentage}%` }"
+                    />
+                </div>
+                <div class="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                    <div
+                        v-for="item in storage.breakdown"
+                        :key="item.category"
+                        class="flex justify-between rounded-lg bg-slate-50 p-3 text-sm"
+                    >
+                        <span>{{ item.category.replaceAll('_', ' ') }}</span
+                        ><b>{{ bytes(item.bytes) }}</b>
+                    </div>
+                </div>
+            </CardContent></Card
+        >
         <div class="mb-6 grid gap-6 xl:grid-cols-[.8fr_1.2fr]">
             <Card
                 ><CardHeader><CardTitle>Abonnement</CardTitle></CardHeader
@@ -446,6 +522,14 @@ const statCards = [
                         <Button class="mt-5" :disabled="adminForm.processing"
                             ><Save />Enregistrer l'administrateur</Button
                         >
+                        <Button
+                            v-if="administrator"
+                            type="button"
+                            class="mt-5 ml-2"
+                            variant="outline"
+                            @click="showCredentials = true"
+                            ><KeyRound />Régénérer les identifiants</Button
+                        >
                     </form></CardContent
                 ></Card
             >
@@ -469,6 +553,50 @@ const statCards = [
                     >
                 </div></CardContent
             ></Card
+        >
+        <Dialog v-model:open="showCredentials"
+            ><DialogContent class="max-w-md"
+                ><DialogHeader
+                    ><DialogTitle>Régénérer les identifiants</DialogTitle
+                    ><DialogDescription
+                        >Le nouveau mot de passe remplacera immédiatement
+                        l’ancien. Vous pouvez l’envoyer à une autre adresse sans
+                        changer l’e-mail de connexion.</DialogDescription
+                    ></DialogHeader
+                >
+                <form class="space-y-4" @submit.prevent="regenerateCredentials">
+                    <div>
+                        <Label for="credentials-delivery-email"
+                            >Adresse de livraison</Label
+                        ><Input
+                            id="credentials-delivery-email"
+                            v-model="credentialsForm.delivery_email"
+                            type="email"
+                            :placeholder="administrator?.email"
+                        /><InputError
+                            :message="credentialsForm.errors.delivery_email"
+                        />
+                        <p class="mt-2 text-xs text-muted-foreground">
+                            L’e-mail de connexion restera
+                            <b>{{ administrator?.email }}</b
+                            >.
+                        </p>
+                    </div>
+                    <DialogFooter
+                        ><Button
+                            type="button"
+                            variant="outline"
+                            @click="showCredentials = false"
+                            >Annuler</Button
+                        ><Button :disabled="credentialsForm.processing"
+                            ><LoaderCircle
+                                v-if="credentialsForm.processing"
+                                class="animate-spin"
+                            /><KeyRound v-else />Régénérer et envoyer</Button
+                        ></DialogFooter
+                    >
+                </form></DialogContent
+            ></Dialog
         >
         <Dialog v-model:open="showSubscription"
             ><DialogContent class="max-w-xl"

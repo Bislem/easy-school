@@ -9,7 +9,7 @@ import {
     FileText,
     Languages,
 } from 'lucide-vue-next';
-import { computed, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, ref, watch } from 'vue';
 
 type Level = {
     id: number;
@@ -25,11 +25,13 @@ type Group = {
     school_level_id: number;
     level: Level & { cycle?: { id: number; name: string } };
 };
+type Teacher = { id: number; name: string; email?: string | null };
 
 const props = defineProps<{
     academicYear: { id: number; name: string } | null;
     cycles: Cycle[];
     groups: Group[];
+    teachers: Teacher[];
     documentTypes: Array<{ value: string; label: string }>;
 }>();
 
@@ -37,9 +39,15 @@ const page = usePage();
 const cycleId = ref<number | ''>('');
 const levelId = ref<number | ''>('');
 const selectedGroups = ref<number[]>([]);
+const selectedTeachers = ref<number[]>([]);
+const audience = ref<'groups' | 'teachers'>('groups');
 const language = ref<'fr' | 'ar'>('fr');
 const documentType = ref(props.documentTypes[0]?.value || 'school_certificate');
 const issueDate = ref(new Date().toISOString().slice(0, 10));
+const isGenerating = ref(false);
+const downloadProgress = ref<number | null>(null);
+const downloadError = ref('');
+let activeRequest: XMLHttpRequest | null = null;
 
 const availableLevels = computed(() => {
     if (!cycleId.value) return props.cycles.flatMap((cycle) => cycle.levels);
@@ -62,6 +70,29 @@ const selectedStudentCount = computed(() =>
         .filter((group) => selectedGroups.value.includes(group.id))
         .reduce((sum, group) => sum + group.students_count, 0),
 );
+const isGroupTimetable = computed(
+    () => documentType.value === 'group_timetable',
+);
+const isTeacherTimetable = computed(
+    () => documentType.value === 'teacher_timetable',
+);
+const isTimetable = computed(
+    () => isGroupTimetable.value || isTeacherTimetable.value,
+);
+const availableDocumentTypes = computed(() =>
+    props.documentTypes.filter((type) =>
+        audience.value === 'teachers'
+            ? type.value === 'teacher_timetable'
+            : type.value !== 'teacher_timetable',
+    ),
+);
+const generatedDocumentCount = computed(() =>
+    isTeacherTimetable.value
+        ? selectedTeachers.value.length
+        : isGroupTimetable.value
+          ? selectedGroups.value.length
+          : selectedStudentCount.value,
+);
 const allVisibleSelected = computed(
     () =>
         visibleGroups.value.length > 0 &&
@@ -69,9 +100,23 @@ const allVisibleSelected = computed(
             selectedGroups.value.includes(group.id),
         ),
 );
+const allTeachersSelected = computed(
+    () =>
+        props.teachers.length > 0 &&
+        props.teachers.every((teacher) =>
+            selectedTeachers.value.includes(teacher.id),
+        ),
+);
 
 watch(cycleId, () => {
     levelId.value = '';
+});
+watch(audience, (value) => {
+    if (value === 'teachers') {
+        documentType.value = 'teacher_timetable';
+    } else if (documentType.value === 'teacher_timetable') {
+        documentType.value = 'group_timetable';
+    }
 });
 
 function toggleGroup(id: number) {
@@ -86,6 +131,104 @@ function toggleAllVisible() {
         ? selectedGroups.value.filter((id) => !visibleIds.includes(id))
         : [...new Set([...selectedGroups.value, ...visibleIds])];
 }
+
+function toggleTeacher(id: number) {
+    selectedTeachers.value = selectedTeachers.value.includes(id)
+        ? selectedTeachers.value.filter((teacherId) => teacherId !== id)
+        : [...selectedTeachers.value, id];
+}
+
+function toggleAllTeachers() {
+    selectedTeachers.value = allTeachersSelected.value
+        ? []
+        : props.teachers.map((teacher) => teacher.id);
+}
+
+function filenameFromDisposition(disposition: string | null) {
+    const encoded = disposition?.match(/filename\*=UTF-8''([^;]+)/i)?.[1];
+    const plain = disposition?.match(/filename="?([^";]+)"?/i)?.[1];
+
+    return decodeURIComponent(encoded || plain || 'certificats-scolarite.zip');
+}
+
+async function downloadArchive() {
+    if (isGenerating.value) return;
+
+    isGenerating.value = true;
+    downloadProgress.value = null;
+    downloadError.value = '';
+
+    const data = new FormData();
+    data.append('document_type', documentType.value);
+    data.append('language', language.value);
+    data.append('issue_date', issueDate.value);
+    if (isTeacherTimetable.value) {
+        selectedTeachers.value.forEach((id) =>
+            data.append('teacher_ids[]', String(id)),
+        );
+    } else {
+        selectedGroups.value.forEach((id) =>
+            data.append('group_ids[]', String(id)),
+        );
+    }
+
+    const csrfToken = document
+        .querySelector<HTMLMetaElement>('meta[name="csrf-token"]')
+        ?.getAttribute('content');
+    const request = new XMLHttpRequest();
+    activeRequest = request;
+    request.open('POST', '/admin/school-documents/download');
+    request.responseType = 'blob';
+    request.setRequestHeader('Accept', 'application/json');
+    request.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+    if (csrfToken) request.setRequestHeader('X-CSRF-TOKEN', csrfToken);
+
+    request.onprogress = (event) => {
+        if (event.lengthComputable) {
+            downloadProgress.value = Math.min(
+                99,
+                Math.round((event.loaded / event.total) * 100),
+            );
+        }
+    };
+    request.onload = async () => {
+        if (request.status >= 200 && request.status < 300) {
+            downloadProgress.value = 100;
+            const url = URL.createObjectURL(request.response);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = filenameFromDisposition(
+                request.getResponseHeader('Content-Disposition'),
+            );
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+        } else {
+            try {
+                const payload = JSON.parse(await request.response.text());
+                downloadError.value =
+                    payload.message ||
+                    Object.values(payload.errors || {})
+                        .flat()
+                        .join(' ') ||
+                    'La génération du fichier a échoué.';
+            } catch {
+                downloadError.value = 'La génération du fichier a échoué.';
+            }
+        }
+        isGenerating.value = false;
+        activeRequest = null;
+    };
+    request.onerror = () => {
+        downloadError.value = 'La connexion au serveur a échoué.';
+        isGenerating.value = false;
+        activeRequest = null;
+    };
+    request.send(data);
+}
+
+onBeforeUnmount(() => activeRequest?.abort());
 </script>
 
 <template>
@@ -119,58 +262,75 @@ function toggleAllVisible() {
             </div>
 
             <form
-                method="post"
-                action="/admin/school-documents/download"
                 class="grid gap-6 lg:grid-cols-[1fr_340px]"
+                @submit.prevent="downloadArchive"
             >
-                <input
-                    type="hidden"
-                    name="_token"
-                    :value="page.props.csrf_token as string"
-                />
-                <input
-                    type="hidden"
-                    name="document_type"
-                    :value="documentType"
-                />
-                <input type="hidden" name="language" :value="language" />
-                <input
-                    v-for="id in selectedGroups"
-                    :key="id"
-                    type="hidden"
-                    name="group_ids[]"
-                    :value="id"
-                />
-
                 <section class="rounded-2xl border bg-white p-5 shadow-sm">
+                    <label
+                        class="mb-5 block text-sm font-medium text-slate-700"
+                    >
+                        Documents pour
+                        <select
+                            v-model="audience"
+                            class="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 sm:max-w-sm"
+                        >
+                            <option value="groups">Élèves / groupes</option>
+                            <option value="teachers">Enseignants</option>
+                        </select>
+                    </label>
                     <div
                         class="mb-5 flex flex-wrap items-center justify-between gap-3"
                     >
                         <div>
                             <h2 class="font-semibold text-slate-900">
-                                1. Choisir les groupes
+                                1. Choisir
+                                {{
+                                    audience === 'teachers'
+                                        ? 'les enseignants'
+                                        : 'les groupes'
+                                }}
                             </h2>
                             <p class="text-sm text-slate-500">
-                                Filtrez par niveau, puis sélectionnez un ou
-                                plusieurs groupes.
+                                {{
+                                    audience === 'teachers'
+                                        ? 'Sélectionnez un ou plusieurs enseignants.'
+                                        : 'Filtrez par niveau, puis sélectionnez un ou plusieurs groupes.'
+                                }}
                             </p>
                         </div>
                         <Button
                             type="button"
                             variant="outline"
                             size="sm"
-                            :disabled="!visibleGroups.length"
-                            @click="toggleAllVisible"
+                            :disabled="
+                                audience === 'teachers'
+                                    ? !teachers.length
+                                    : !visibleGroups.length
+                            "
+                            @click="
+                                audience === 'teachers'
+                                    ? toggleAllTeachers()
+                                    : toggleAllVisible()
+                            "
                         >
                             <Check class="mr-2 h-4 w-4" />{{
-                                allVisibleSelected
+                                (
+                                    audience === 'teachers'
+                                        ? allTeachersSelected
+                                        : allVisibleSelected
+                                )
                                     ? 'Tout désélectionner'
-                                    : 'Sélectionner les groupes affichés'
+                                    : audience === 'teachers'
+                                      ? 'Sélectionner tous les enseignants'
+                                      : 'Sélectionner les groupes affichés'
                             }}
                         </Button>
                     </div>
 
-                    <div class="mb-5 grid gap-3 sm:grid-cols-2">
+                    <div
+                        v-if="audience === 'groups'"
+                        class="mb-5 grid gap-3 sm:grid-cols-2"
+                    >
                         <label class="text-sm font-medium text-slate-700"
                             >Cycle
                             <select
@@ -205,7 +365,10 @@ function toggleAllVisible() {
                         </label>
                     </div>
 
-                    <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                    <div
+                        v-if="audience === 'groups'"
+                        class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3"
+                    >
                         <button
                             v-for="group in visibleGroups"
                             :key="group.id"
@@ -240,6 +403,66 @@ function toggleAllVisible() {
                             Aucun groupe actif pour ce filtre.
                         </div>
                     </div>
+                    <div
+                        v-else
+                        class="overflow-hidden rounded-xl border border-slate-200"
+                    >
+                        <button
+                            v-for="teacher in teachers"
+                            :key="teacher.id"
+                            type="button"
+                            class="flex w-full min-w-0 items-center gap-3 border-b border-slate-200 px-3 py-3 text-left transition last:border-b-0 sm:px-4"
+                            :class="
+                                selectedTeachers.includes(teacher.id)
+                                    ? 'bg-blue-50'
+                                    : 'bg-white hover:bg-slate-50'
+                            "
+                            @click="toggleTeacher(teacher.id)"
+                        >
+                            <span
+                                class="flex h-5 w-5 shrink-0 items-center justify-center rounded border"
+                                :class="
+                                    selectedTeachers.includes(teacher.id)
+                                        ? 'border-blue-600 bg-blue-600 text-white'
+                                        : 'border-slate-300 bg-white text-transparent'
+                                "
+                            >
+                                <Check class="h-3.5 w-3.5" />
+                            </span>
+                            <div
+                                class="min-w-0 flex-1 sm:flex sm:items-center sm:gap-4"
+                            >
+                                <div
+                                    class="truncate font-medium text-slate-900 sm:w-2/5"
+                                >
+                                    {{ teacher.name }}
+                                </div>
+                                <div
+                                    class="mt-0.5 truncate text-xs text-slate-500 sm:mt-0 sm:min-w-0 sm:flex-1 sm:text-sm"
+                                    :title="
+                                        teacher.email || 'Sans adresse e-mail'
+                                    "
+                                >
+                                    {{ teacher.email || 'Sans adresse e-mail' }}
+                                </div>
+                            </div>
+                            <span
+                                class="shrink-0 text-xs font-medium text-slate-500"
+                            >
+                                {{
+                                    selectedTeachers.includes(teacher.id)
+                                        ? 'Sélectionné'
+                                        : 'Sélectionner'
+                                }}
+                            </span>
+                        </button>
+                        <div
+                            v-if="!teachers.length"
+                            class="p-8 text-center text-sm text-slate-500"
+                        >
+                            Aucun enseignant actif.
+                        </div>
+                    </div>
                 </section>
 
                 <aside class="space-y-4">
@@ -254,7 +477,7 @@ function toggleAllVisible() {
                                 class="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2"
                             >
                                 <option
-                                    v-for="type in documentTypes"
+                                    v-for="type in availableDocumentTypes"
                                     :key="type.value"
                                     :value="type.value"
                                 >
@@ -263,10 +486,16 @@ function toggleAllVisible() {
                             </select>
                         </label>
 
-                        <div class="mt-4 text-sm font-medium text-slate-700">
+                        <div
+                            v-if="!isTimetable"
+                            class="mt-4 text-sm font-medium text-slate-700"
+                        >
                             Langue
                         </div>
-                        <div class="mt-2 grid grid-cols-2 gap-2">
+                        <div
+                            v-if="!isTimetable"
+                            class="mt-2 grid grid-cols-2 gap-2"
+                        >
                             <button
                                 type="button"
                                 class="rounded-lg border px-3 py-2 text-sm"
@@ -294,6 +523,7 @@ function toggleAllVisible() {
                         </div>
 
                         <label
+                            v-if="!isTimetable"
                             class="mt-4 block text-sm font-medium text-slate-700"
                             >Date de délivrance
                             <input
@@ -313,33 +543,92 @@ function toggleAllVisible() {
                             class="flex items-center gap-2 text-sm text-slate-300"
                         >
                             <Languages class="h-4 w-4" />{{
-                                language === 'ar'
-                                    ? 'Version arabe'
-                                    : 'Version française'
+                                isTeacherTimetable
+                                    ? 'Un emploi du temps par enseignant'
+                                    : isGroupTimetable
+                                      ? 'Un emploi du temps par groupe'
+                                      : language === 'ar'
+                                        ? 'Version arabe'
+                                        : 'Version française'
                             }}
                         </div>
                         <div class="mt-4 text-3xl font-bold">
-                            {{ selectedStudentCount }}
+                            {{ generatedDocumentCount }}
                         </div>
                         <div class="text-sm text-slate-300">
-                            certificat(s) dans
-                            {{ selectedGroups.length }} groupe(s)
+                            {{
+                                isTeacherTimetable
+                                    ? `emploi(s) du temps pour ${selectedTeachers.length} enseignant(s)`
+                                    : isGroupTimetable
+                                      ? `emploi(s) du temps pour ${selectedGroups.length} groupe(s)`
+                                      : `certificat(s) dans ${selectedGroups.length} groupe(s)`
+                            }}
                         </div>
                         <Button
                             type="submit"
                             class="mt-5 w-full bg-blue-500 hover:bg-blue-600"
                             :disabled="
                                 !academicYear ||
-                                !selectedGroups.length ||
-                                !selectedStudentCount
+                                (isTeacherTimetable
+                                    ? !selectedTeachers.length
+                                    : !selectedGroups.length) ||
+                                (!isTimetable && !selectedStudentCount) ||
+                                isGenerating
                             "
                         >
-                            <Download class="mr-2 h-4 w-4" />Télécharger le
-                            fichier ZIP
+                            <Download class="mr-2 h-4 w-4" />{{
+                                isGenerating
+                                    ? 'Génération en cours…'
+                                    : isTimetable
+                                      ? 'Télécharger les emplois du temps'
+                                      : 'Télécharger le fichier ZIP'
+                            }}
                         </Button>
+                        <div
+                            v-if="isGenerating || downloadProgress !== null"
+                            class="mt-3"
+                        >
+                            <div
+                                class="h-2 overflow-hidden rounded-full bg-slate-700"
+                                role="progressbar"
+                                :aria-valuenow="downloadProgress ?? undefined"
+                                aria-label="Progression de la génération"
+                            >
+                                <div
+                                    v-if="downloadProgress === null"
+                                    class="h-full w-1/3 animate-pulse rounded-full bg-blue-400"
+                                />
+                                <div
+                                    v-else
+                                    class="h-full rounded-full bg-blue-400 transition-all"
+                                    :style="{ width: `${downloadProgress}%` }"
+                                />
+                            </div>
+                            <p class="mt-2 text-xs text-slate-300">
+                                {{
+                                    downloadProgress === null
+                                        ? 'Création des certificats…'
+                                        : downloadProgress < 100
+                                          ? `Téléchargement : ${downloadProgress}%`
+                                          : 'Téléchargement prêt.'
+                                }}
+                            </p>
+                        </div>
+                        <p
+                            v-if="downloadError"
+                            class="mt-3 text-xs text-red-300"
+                            role="alert"
+                        >
+                            {{ downloadError }}
+                        </p>
                         <p class="mt-3 flex gap-2 text-xs text-slate-400">
-                            <FileText class="h-4 w-4 shrink-0" />Un PDF par
-                            élève, classé dans un dossier par groupe.
+                            <FileText class="h-4 w-4 shrink-0" />{{
+                                isTeacherTimetable
+                                    ? 'Un PDF par enseignant, nommé avec son nom et l’année scolaire.'
+                                    : isGroupTimetable
+                                      ? 'Un PDF par groupe, nommé avec la classe et l’année scolaire.'
+                                      : 'Un PDF par élève, classé dans un dossier par groupe.'
+                            }}
                         </p>
                     </section>
                 </aside>

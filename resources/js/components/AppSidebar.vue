@@ -24,6 +24,7 @@ import {
     FileCheck2,
     Files,
     GraduationCap,
+    HardDrive,
     IdCard,
     LayoutDashboard,
     ReceiptText,
@@ -36,6 +37,11 @@ import AppLogo from './AppLogo.vue';
 
 const page = usePage();
 const role = page.props.auth.user.role;
+const permissions = new Set<string>(
+    (page.props.auth.permissions as string[] | undefined) ?? [],
+);
+const can = (permission: string) => permissions.has(permission);
+const hasBackOfficeAccess = permissions.size > 0;
 const isPrivateSchool =
     page.props.auth?.tenant?.organization_type === 'private_school';
 const academicYears = (page.props.academic_years || []) as Array<{
@@ -58,18 +64,23 @@ const notificationsTitle = unreadNotifications
     ? `Notifications (${unreadNotifications})`
     : 'Notifications';
 
-const mainNavItems: NavItem[] = [
+const rawMainNavItems: NavItem[] = [
     {
         title: 'Tableau de bord',
         href: '/dashboard',
         icon: LayoutDashboard,
     },
-    ...(role === 'admin'
+    ...(hasBackOfficeAccess
         ? [
               {
                   title: 'Étudiants',
                   href: '/admin/students',
                   icon: GraduationCap,
+              },
+              {
+                  title: 'Compte / Abonnement',
+                  href: '/admin/account',
+                  icon: HardDrive,
               },
               ...(isPrivateSchool
                   ? [
@@ -258,16 +269,72 @@ const mainNavItems: NavItem[] = [
               },
           ]
         : []),
-    ...(role === 'admin'
+    ...(hasBackOfficeAccess
         ? [
               {
                   title: "Paramètres de l'école",
-                  href: '/admin/settings',
                   icon: Settings,
+                  children: [
+                      {
+                          title: 'Configuration',
+                          href: '/admin/settings',
+                          icon: Settings,
+                      },
+                      {
+                          title: 'Utilisateurs & accès',
+                          href: '/admin/settings/access/users',
+                          icon: Users,
+                      },
+                  ],
               },
           ]
         : []),
 ];
+
+const routePermissions: Record<string, string> = {
+    '/admin/students': 'students.view',
+    '/admin/account': 'users.view',
+    '/admin/academic-years': 'academic_years.view',
+    '/admin/inscription-campaigns': 'enrollments.view',
+    '/school-inscription': 'enrollments.view',
+    '/admin/timetable': 'timetables.view',
+    '/admin/school-attendance': 'student_attendance.view',
+    '/admin/groups': 'groups.view',
+    '/admin/subjects': 'groups.view',
+    '/admin/school-documents': 'administrative_documents.view',
+    '/admin/courses': 'groups.view',
+    '/admin/enrollment-forms': 'enrollments.view',
+    '/admin/planifications': 'timetables.view',
+    '/admin/parents': 'parents.view',
+    '/admin/sites': 'groups.view',
+    '/admin/classrooms': 'groups.view',
+    '/admin/users': 'users.view',
+    '/admin/attendance': 'staff_attendance.view',
+    '/admin/salaries': 'salaries.view',
+    '/admin/badges': 'badges.view',
+    '/admin/certificates': 'certificates.view',
+    '/admin/reports': 'reports.view',
+    '/admin/audit': 'audit.view',
+    '/admin/finance': 'payments.view',
+    '/admin/expenses': 'expenses.view',
+    '/admin/settings': 'users.view',
+    '/admin/settings/access/users': 'roles.view',
+};
+
+function filterAuthorized(items: NavItem[]): NavItem[] {
+    return items.flatMap((item) => {
+        const children = item.children
+            ? filterAuthorized(item.children)
+            : undefined;
+        const href = typeof item.href === 'string' ? item.href : undefined;
+        const required = href ? routePermissions[href] : undefined;
+        if (required && !can(required)) return [];
+        if (!href && item.children && !children?.length) return [];
+        return [{ ...item, children }];
+    });
+}
+
+const mainNavItems = filterAuthorized(rawMainNavItems);
 </script>
 
 <template>
@@ -287,7 +354,7 @@ const mainNavItems: NavItem[] = [
                 </SidebarMenuItem>
                 <SidebarMenuItem
                     v-if="
-                        role === 'admin' &&
+                        hasBackOfficeAccess &&
                         isPrivateSchool &&
                         academicYears.length
                     "

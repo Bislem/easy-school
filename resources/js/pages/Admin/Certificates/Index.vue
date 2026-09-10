@@ -588,9 +588,7 @@ function openDialog(kind: 'manual' | 'bulk') {
                                     !bulk.enrollment_ids.length
                                 "
                                 >Générer
-                                {{
-                                    bulk.enrollment_ids.length
-                                }}
+                                {{ bulk.enrollment_ids.length }}
                                 certificat(s)</Button
                             >
                         </div>

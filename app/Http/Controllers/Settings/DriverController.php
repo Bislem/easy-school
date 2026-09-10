@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Settings;
 use App\Enums\ReservationStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Driver;
+use App\Services\TenantStorageService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
@@ -13,6 +14,8 @@ use Inertia\Response;
 
 class DriverController extends Controller
 {
+    public function __construct(private TenantStorageService $tenantStorage) {}
+
     public function index(Request $request): Response
     {
         return Inertia::render('settings/Drivers', [
@@ -28,9 +31,9 @@ class DriverController extends Controller
         }
 
         $validated = $this->validateDriver($request, true);
-        $validated['driving_license_path'] = $request->file('driving_license')->store('driving-licenses/drivers', 'public');
         unset($validated['driving_license']);
-        $request->user()->drivers()->create($validated + ['approval_status' => 'pending']);
+        $driver = $request->user()->drivers()->create($validated + ['approval_status' => 'pending']);
+        $driver->update(['driving_license_path' => $this->tenantStorage->store($request->file('driving_license'), 'driving-licenses/drivers', 'public', TenantStorageService::ATTACHMENTS, 'drivers', $driver)]);
 
         return back()->with('success', 'Le conducteur a été ajouté et attend la validation d’un administrateur.');
     }
@@ -42,7 +45,7 @@ class DriverController extends Controller
         $oldPath = $driver->driving_license_path;
 
         if ($request->hasFile('driving_license')) {
-            $validated['driving_license_path'] = $request->file('driving_license')->store('driving-licenses/drivers', 'public');
+            $validated['driving_license_path'] = $this->tenantStorage->store($request->file('driving_license'), 'driving-licenses/drivers', 'public', TenantStorageService::ATTACHMENTS, 'drivers', $driver);
         }
 
         unset($validated['driving_license']);
@@ -59,7 +62,7 @@ class DriverController extends Controller
             ]);
 
         if (isset($validated['driving_license_path']) && $oldPath) {
-            Storage::disk('public')->delete($oldPath);
+            $this->tenantStorage->delete($oldPath);
         }
 
         return back()->with('success', 'Le conducteur a été modifié et doit être validé à nouveau.');
@@ -74,7 +77,7 @@ class DriverController extends Controller
 
         $path = $driver->driving_license_path;
         $driver->delete();
-        Storage::disk('public')->delete($path);
+        $this->tenantStorage->delete($path);
 
         return back()->with('success', 'Le conducteur a été supprimé.');
     }

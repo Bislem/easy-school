@@ -8,6 +8,7 @@ use App\Enums\UserRole;
 use App\Models\Payment;
 use App\Models\Driver;
 use App\Models\User;
+use App\Services\TenantStorageService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -18,6 +19,8 @@ use Illuminate\Validation\Rule;
 
 class ClientsController extends Controller
 {
+    public function __construct(private TenantStorageService $tenantStorage) {}
+
     public function create(): Response
     {
         return Inertia::render('Admin/Clients/Edit', ['client' => null]);
@@ -26,18 +29,17 @@ class ClientsController extends Controller
     public function store(Request $request)
     {
         $validated = $this->validateClient($request);
-        $path = $request->file('driving_license_copy')->store('driving-licenses', 'public');
         $approved = $validated['approval_status'] === 'approved';
 
         $client = User::create([
             ...collect($validated)->except(['password', 'password_confirmation', 'driving_license_copy'])->toArray(),
             'password' => Hash::make($validated['password']),
-            'driving_license_path' => $path,
             'role' => UserRole::CLIENT,
             'is_active' => $approved,
             'approved_at' => $approved ? now() : null,
             'approved_by' => $approved ? auth()->id() : null,
         ]);
+        $client->update(['driving_license_path' => $this->tenantStorage->store($request->file('driving_license_copy'), 'driving-licenses', 'public', TenantStorageService::ATTACHMENTS, 'clients', $client)]);
         $client->forceFill(['email_verified_at' => now()])->save();
 
         return redirect()->route('admin.clients.show', $client)->with('success', 'Le compte client a été créé.');
@@ -68,8 +70,8 @@ class ClientsController extends Controller
         if (!empty($validated['password'])) $data['password'] = Hash::make($validated['password']);
 
         if ($request->hasFile('driving_license_copy')) {
-            $newPath = $request->file('driving_license_copy')->store('driving-licenses', 'public');
-            if ($client->driving_license_path) Storage::disk('public')->delete($client->driving_license_path);
+            $newPath = $this->tenantStorage->store($request->file('driving_license_copy'), 'driving-licenses', 'public', TenantStorageService::ATTACHMENTS, 'clients', $client);
+            if ($client->driving_license_path) $this->tenantStorage->delete($client->driving_license_path);
             $data['driving_license_path'] = $newPath;
         }
 

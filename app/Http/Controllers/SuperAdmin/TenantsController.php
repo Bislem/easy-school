@@ -4,15 +4,18 @@ namespace App\Http\Controllers\SuperAdmin;
 
 use App\Enums\UserRole;
 use App\Http\Controllers\Controller;
+use App\Mail\SchoolCredentialsRegeneratedMail;
 use App\Models\Tenant;
 use App\Models\SubscriptionPayment;
 use App\Models\SubscriptionPlan;
 use App\Models\User;
 use App\Services\TenantInitializer;
+use App\Services\TenantStorageService;
 use App\Tenancy\TenantContext;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -34,6 +37,12 @@ final class TenantsController extends Controller
             ->when($filters['search'] ?? null, fn ($query, $search) => $query->where(fn ($query) => $query->where('name', 'like', "%{$search}%")->orWhere('email', 'like', "%{$search}%")->orWhere('slug', 'like', "%{$search}%")))
             ->when($filters['status'] ?? null, fn ($query, $status) => $query->where('status', $status))
             ->latest()->paginate(12)->withQueryString();
+        $schools->getCollection()->each(function (Tenant $tenant): void {
+            $expiry = $tenant->isDemo() ? $tenant->demo_expires_at : $tenant->plan_expires_at;
+            $tenant->setAttribute('storage_percentage', $tenant->storage_limit_bytes ? min(100, round($tenant->storage_used_bytes / $tenant->storage_limit_bytes * 100, 1)) : 0);
+            $tenant->setAttribute('account_status', $tenant->status !== 'active' ? 'suspended' : ($expiry?->isPast() ? 'expired' : ($tenant->isDemo() ? 'demo' : 'active')));
+            $tenant->setAttribute('remaining_days', $expiry ? max(0, now()->startOfDay()->diffInDays($expiry, false)) : null);
+        });
 
         return Inertia::render('SuperAdmin/Tenants/Index', [
             'schools' => $schools,
@@ -48,7 +57,7 @@ final class TenantsController extends Controller
         ]);
     }
 
-    public function store(Request $request, TenantInitializer $initializer): RedirectResponse
+    public function store(Request $request, TenantInitializer $initializer, TenantStorageService $tenantStorage): RedirectResponse
     {
         $data = $request->validate($this->schoolRules() + [
             'admin_name' => ['required', 'string', 'max:150'],
@@ -65,7 +74,7 @@ final class TenantsController extends Controller
         $logoPath = null;
 
         try {
-            $school = DB::transaction(function () use ($request, $data, $initializer, &$logoPath) {
+            $school = DB::transaction(function () use ($request, $data, $initializer, $tenantStorage, &$logoPath) {
                 $plan = SubscriptionPlan::findOrFail($data['subscription_plan_id']);
                 $expiresAt = $data['plan_expires_at'] ?? match ($plan->billing_period) {
                     'monthly' => now()->addMonth(), 'yearly' => now()->addYear(), default => null,
@@ -74,10 +83,11 @@ final class TenantsController extends Controller
                     ...collect($data)->only(['name', 'email', 'phone', 'address', 'wilaya', 'commune'])->all(),
                     'slug' => $this->uniqueSlug($data['name']), 'status' => 'active', 'account_type' => 'paid',
                     'subscription_plan_id' => $plan->id, 'plan_started_at' => now(), 'plan_expires_at' => $expiresAt,
+                    'storage_limit_bytes' => $plan->storage_mb === null ? null : $plan->storage_mb * 1024 * 1024,
                 ]);
                 app(TenantContext::class)->set($school);
                 if ($request->hasFile('logo')) {
-                    $logoPath = $request->file('logo')->store("tenants/{$school->id}/branding", 'public');
+                    $logoPath = $tenantStorage->store($request->file('logo'), 'branding', 'public', TenantStorageService::PROFILE_IMAGES, 'school_branding', $school, $school);
                     $school->update(['logo' => $logoPath]);
                 }
                 $admin = User::create([
@@ -88,7 +98,7 @@ final class TenantsController extends Controller
                 $admin->forceFill(['email_verified_at' => now()])->save();
                 $initializer->initialize($school);
                 if (($data['payment_amount'] ?? null) !== null) {
-                    $proofPath = $request->file('payment_proof')?->store("subscription-payments/{$school->id}", 'local');
+                    $proofPath = $request->file('payment_proof') ? $tenantStorage->store($request->file('payment_proof'), 'subscription-payments', 'local', TenantStorageService::ATTACHMENTS, 'subscriptions', $school, $school) : null;
                     SubscriptionPayment::create([
                         'tenant_id' => $school->id, 'subscription_plan_id' => $plan->id,
                         'amount' => $data['payment_amount'], 'currency' => $plan->currency,
@@ -112,9 +122,10 @@ final class TenantsController extends Controller
         return redirect()->route('super-admin.tenants.show', $school)->with('success', 'École créée.');
     }
 
-    public function show(Tenant $tenant): Response
+    public function show(Tenant $tenant, TenantStorageService $tenantStorage): Response
     {
         $tenant->load('subscriptionPlan')->loadCount(['users', 'students', 'staff']);
+        $expiry = $tenant->isDemo() ? $tenant->demo_expires_at : $tenant->plan_expires_at;
         $administrator = User::withoutGlobalScopes()->where('tenant_id', $tenant->id)
             ->where('role', UserRole::ADMIN->value)->oldest()->first();
 
@@ -135,10 +146,12 @@ final class TenantsController extends Controller
             'school' => $tenant, 'administrator' => $administrator, 'stats' => $stats,
             'plans' => SubscriptionPlan::where('is_active', true)->orderBy('sort_order')->get(),
             'payments' => SubscriptionPayment::with('plan:id,name')->where('tenant_id', $tenant->id)->latest('paid_at')->get(),
+            'storage' => $tenantStorage->summary($tenant),
+            'accountSummary' => ['status' => $tenant->status !== 'active' ? 'suspended' : ($expiry?->isPast() ? 'expired' : ($tenant->isDemo() ? 'demo' : 'active')), 'expires_at' => $expiry, 'remaining_days' => $expiry ? max(0, now()->startOfDay()->diffInDays($expiry, false)) : null],
         ]);
     }
 
-    public function subscription(Request $request, Tenant $tenant): RedirectResponse
+    public function subscription(Request $request, Tenant $tenant, TenantStorageService $tenantStorage): RedirectResponse
     {
         $data = $request->validate([
             'action' => ['required', Rule::in(['renew', 'extend', 'change'])],
@@ -151,7 +164,9 @@ final class TenantsController extends Controller
         $base = $data['action'] === 'extend' && $tenant->plan_expires_at?->isFuture() ? $tenant->plan_expires_at->copy() : now();
         $tenant->update([
             'subscription_plan_id' => $data['subscription_plan_id'], 'plan_started_at' => $data['action'] === 'change' ? now() : ($tenant->plan_started_at ?? now()),
-            'plan_expires_at' => $base->addMonths($data['months'])->endOfDay(), 'status' => 'active', 'account_type' => 'paid',
+            'plan_expires_at' => $base->addMonths($data['months'])->endOfDay(), 'demo_expires_at' => null,
+            'status' => 'active', 'account_type' => 'paid',
+            'storage_limit_bytes' => ($storageMb = SubscriptionPlan::findOrFail($data['subscription_plan_id'])->storage_mb) === null ? null : $storageMb * 1024 * 1024,
         ]);
         if (($data['amount'] ?? null) !== null) {
             $plan = SubscriptionPlan::findOrFail($data['subscription_plan_id']);
@@ -159,7 +174,7 @@ final class TenantsController extends Controller
                 'tenant_id' => $tenant->id, 'subscription_plan_id' => $plan->id, 'amount' => $data['amount'],
                 'currency' => $plan->currency, 'paid_at' => now()->toDateString(), 'payment_method' => $data['payment_method'] ?? null,
                 'reference' => $data['reference'] ?? null, 'notes' => $data['notes'] ?? null, 'type' => $data['action'],
-                'proof_path' => $request->file('proof')?->store("subscription-payments/{$tenant->id}", 'local'),
+                'proof_path' => $request->file('proof') ? $tenantStorage->store($request->file('proof'), 'subscription-payments', 'local', TenantStorageService::ATTACHMENTS, 'subscriptions', $tenant, $tenant) : null,
                 'recorded_by' => auth('super_admin')->id(),
             ]);
         }
@@ -173,14 +188,14 @@ final class TenantsController extends Controller
         return Storage::disk('local')->download($payment->proof_path);
     }
 
-    public function update(Request $request, Tenant $tenant): RedirectResponse
+    public function update(Request $request, Tenant $tenant, TenantStorageService $tenantStorage): RedirectResponse
     {
         $data = $request->validate($this->schoolRules());
         if ($request->hasFile('logo')) {
             $oldLogo = $tenant->logo;
-            $data['logo'] = $request->file('logo')->store("tenants/{$tenant->id}/branding", 'public');
+            $data['logo'] = $tenantStorage->store($request->file('logo'), 'branding', 'public', TenantStorageService::PROFILE_IMAGES, 'school_branding', $tenant, $tenant);
             if ($oldLogo) {
-                Storage::disk('public')->delete($oldLogo);
+                $tenantStorage->delete($oldLogo, 'public', $tenant);
             }
         }
         $tenant->update($data);
@@ -222,6 +237,37 @@ final class TenantsController extends Controller
         }
 
         return back()->with('success', 'Administrateur principal mis à jour.');
+    }
+
+    public function regenerateCredentials(Request $request, Tenant $tenant): RedirectResponse
+    {
+        $data = $request->validate([
+            'delivery_email' => ['nullable', 'email', 'max:255'],
+        ]);
+        $administrator = User::withoutGlobalScopes()
+            ->where('tenant_id', $tenant->id)
+            ->where('role', UserRole::ADMIN->value)
+            ->oldest()
+            ->firstOrFail();
+        $recipient = Str::lower($data['delivery_email'] ?: $administrator->email);
+        $password = Str::password(14, letters: true, numbers: true, symbols: false);
+
+        DB::transaction(function () use ($administrator, $tenant, $recipient, $password): void {
+            $administrator->update([
+                'password' => $password,
+                'is_active' => true,
+                'can_login' => true,
+            ]);
+            $administrator->forceFill(['email_verified_at' => $administrator->email_verified_at ?? now()])->save();
+
+            Mail::to($recipient)->send(new SchoolCredentialsRegeneratedMail(
+                $tenant,
+                $administrator->fresh(),
+                $password,
+            ));
+        });
+
+        return back()->with('success', "Identifiants régénérés et envoyés à {$recipient}.");
     }
 
     public function destroy(Tenant $tenant): RedirectResponse

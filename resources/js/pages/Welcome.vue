@@ -8,7 +8,6 @@ import {
     BarChart3,
     Bell,
     BookOpen,
-    Building2,
     CalendarDays,
     Check,
     CheckCircle2,
@@ -20,10 +19,11 @@ import {
     Grid2X2,
     HeartHandshake,
     IdCard,
-    Landmark,
+    KeyRound,
     Layers3,
     MessageCircle,
     Phone,
+    Printer,
     ReceiptText,
     ShieldCheck,
     Smartphone,
@@ -141,34 +141,34 @@ const colors: Record<string, string> = {
 };
 const assurances = [
     [
-        Sparkles,
-        'Interface moderne',
-        'Design intuitif et expérience utilisateur exceptionnelle.',
+        KeyRound,
+        'Accès maîtrisés',
+        'Rôles personnalisables et permissions précises par équipe.',
     ],
     [
-        Landmark,
-        'SaaS multi-tenant',
-        'Une plateforme, plusieurs établissements gérés.',
+        Layers3,
+        'Périmètres de données',
+        'Accès limité au site, aux classes affectées ou à ses propres données.',
+    ],
+    [
+        Printer,
+        'Documents en série',
+        'Certificats et emplois du temps générés en quelques clics.',
+    ],
+    [
+        CalendarDays,
+        'Planning intelligent',
+        'Conflits détectés, salles organisées et enseignants coordonnés.',
+    ],
+    [
+        ReceiptText,
+        'Finance centralisée',
+        'Paiements, dépenses, salaires et justificatifs dans un même flux.',
     ],
     [
         ShieldCheck,
-        'Sécurité avancée',
-        'Données chiffrées et sauvegardes régulières.',
-    ],
-    [
-        Building2,
-        'Multi-sites',
-        'Gérez plusieurs campus avec statistiques par site.',
-    ],
-    [
-        Grid2X2,
-        'Modules complets',
-        'Tous les besoins couverts dans une seule solution.',
-    ],
-    [
-        HeartHandshake,
-        'Accompagnement',
-        'Support réactif et suivi personnalisé.',
+        'Traçabilité complète',
+        'Historique des accès et actions sensibles consultable à tout moment.',
     ],
 ];
 </script>
@@ -227,7 +227,7 @@ const assurances = [
                         >
                             <span
                                 v-for="item in [
-                                    [CheckCircle2, 'Démo jusqu’à 15 jours'],
+                                    [CheckCircle2, 'Durée de démo flexible'],
                                     [Check, 'Mise en place rapide'],
                                     [ShieldCheck, 'Données sécurisées'],
                                     [Grid2X2, 'Multi-sites'],
@@ -853,67 +853,201 @@ const assurances = [
             </section>
             <section
                 id="about"
-                class="mx-auto max-w-[1380px] px-6 py-8 lg:px-10"
+                class="relative overflow-hidden bg-slate-50 py-20"
             >
-                <p class="text-center text-[9px] font-bold text-blue-500">
-                    POURQUOI EASY SCHOOL ?
-                </p>
-                <h2 class="mt-2 text-center text-xl font-extrabold">
-                    Une solution puissante et pensée pour votre réussite
-                </h2>
                 <div
-                    class="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6"
-                >
-                    <article
-                        v-for="a in assurances"
-                        :key="a[1] as string"
-                        class="flex gap-3 rounded-xl border p-4"
+                    class="absolute -top-32 -right-32 size-96 rounded-full bg-cyan-200/30 blur-3xl"
+                ></div>
+                <div class="relative mx-auto max-w-[1380px] px-6 lg:px-10">
+                    <div
+                        class="grid items-end gap-8 border-b border-slate-200 pb-10 lg:grid-cols-[1fr_.72fr]"
                     >
-                        <component
-                            :is="a[0]"
-                            class="size-7 shrink-0 text-blue-600"
-                        />
                         <div>
-                            <h3 class="text-[11px] font-extrabold">
-                                {{ a[1] }}
-                            </h3>
-                            <p class="mt-1 text-[9px] leading-4 text-slate-500">
-                                {{ a[2] }}
-                            </p>
+                            <span
+                                class="inline-flex items-center gap-2 rounded-full bg-cyan-100 px-3 py-1.5 text-xs font-bold text-cyan-800"
+                                ><Sparkles class="size-4" />NOUVEAUTÉS EASY
+                                SCHOOL</span
+                            >
+                            <h2
+                                class="mt-5 max-w-3xl text-3xl leading-tight font-black tracking-tight text-[#071f3e] sm:text-4xl"
+                            >
+                                Plus de contrôle, moins de tâches répétitives.
+                            </h2>
                         </div>
-                    </article>
-                </div>
-            </section>
-            <section
-                id="tarifs"
-                class="mx-auto max-w-[1380px] px-6 pb-5 lg:px-10"
-            >
-                <div
-                    class="flex flex-col items-center justify-between gap-6 rounded-2xl bg-gradient-to-r from-[#07345e] to-[#064486] px-8 py-7 text-white md:flex-row"
-                >
-                    <div>
-                        <h2 class="text-2xl font-black">
-                            Prêt à découvrir Easy School ?
-                        </h2>
-                        <p
-                            class="mt-2 max-w-xl text-xs leading-5 text-slate-200"
-                        >
-                            Demandez une démonstration personnalisée adaptée aux
-                            besoins de votre établissement. Démo configurable
-                            jusqu'à 15 jours.
+                        <p class="text-base leading-7 text-slate-600">
+                            Les dernières évolutions relient désormais la
+                            gestion des accès, les documents, les opérations
+                            scolaires et la finance dans une expérience
+                            cohérente et sécurisée.
                         </p>
                     </div>
-                    <div class="flex flex-wrap gap-4">
-                        <Link
-                            href="/demo"
-                            class="flex items-center gap-3 rounded-xl bg-[#12cbb2] px-6 py-3 text-sm font-bold"
-                            >Demander une démo
-                            <ArrowRight class="size-4" /></Link
-                        ><a
-                            href="#contact"
-                            class="flex items-center gap-3 rounded-xl border border-white px-6 py-3 text-sm font-bold"
-                            ><Phone class="size-4" /> Nous contacter</a
+                    <div class="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                        <article
+                            v-for="(a, index) in assurances"
+                            :key="a[1] as string"
+                            class="group relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition duration-300 hover:-translate-y-1 hover:border-cyan-300 hover:shadow-xl hover:shadow-cyan-900/5"
                         >
+                            <div class="flex items-start justify-between gap-4">
+                                <span
+                                    class="flex size-12 items-center justify-center rounded-2xl bg-[#082b50] text-[#20d4bd] transition group-hover:bg-[#0b416b]"
+                                    ><component :is="a[0]" class="size-6"
+                                /></span>
+                                <span class="font-mono text-xs text-slate-300"
+                                    >0{{ index + 1 }}</span
+                                >
+                            </div>
+                            <h3
+                                class="mt-6 text-lg font-extrabold text-[#071f3e]"
+                            >
+                                {{ a[1] }}
+                            </h3>
+                            <p class="mt-2 text-sm leading-6 text-slate-500">
+                                {{ a[2] }}
+                            </p>
+                        </article>
+                    </div>
+                    <div
+                        class="mt-8 flex flex-col gap-4 rounded-2xl border border-cyan-200 bg-cyan-50/70 px-6 py-5 sm:flex-row sm:items-center sm:justify-between"
+                    >
+                        <p
+                            class="flex items-center gap-3 text-sm font-semibold text-[#07345e]"
+                        >
+                            <ShieldCheck
+                                class="size-6 shrink-0 text-[#0dbba6]"
+                            />
+                            Chaque établissement conserve ses propres rôles,
+                            données et réglages.
+                        </p>
+                        <span class="text-sm text-slate-500"
+                            >Multi-tenant · Multi-sites · Journal d’audit</span
+                        >
+                    </div>
+                </div>
+            </section>
+            <section id="tarifs" class="bg-white px-6 py-16 lg:px-10 lg:py-24">
+                <div
+                    class="relative mx-auto grid max-w-[1300px] overflow-hidden rounded-[32px] bg-[#061d3b] text-white shadow-2xl shadow-blue-950/20 lg:grid-cols-[1.05fr_.95fr]"
+                >
+                    <div
+                        class="absolute inset-0 bg-[radial-gradient(circle_at_80%_0%,rgba(19,203,177,.22),transparent_38%)]"
+                    ></div>
+                    <div class="relative p-8 sm:p-12 lg:p-16">
+                        <span
+                            class="text-xs font-bold tracking-[.18em] text-[#22d8bf]"
+                            >UNE DÉMO À VOTRE IMAGE</span
+                        >
+                        <h2
+                            class="mt-4 max-w-xl text-3xl leading-tight font-black sm:text-4xl"
+                        >
+                            Voyez Easy School fonctionner avec vos vrais
+                            besoins.
+                        </h2>
+                        <p
+                            class="mt-5 max-w-xl text-base leading-7 text-slate-300"
+                        >
+                            Échangez avec notre équipe et découvrez un parcours
+                            adapté à votre établissement : inscriptions,
+                            planning, suivi pédagogique, RH, finance et accès
+                            sécurisés.
+                        </p>
+                        <div
+                            class="mt-7 flex flex-wrap gap-x-6 gap-y-3 text-sm text-slate-200"
+                        >
+                            <span
+                                v-for="item in [
+                                    'Présentation personnalisée',
+                                    'Réponses à vos questions',
+                                    'Sans engagement',
+                                ]"
+                                :key="item"
+                                class="flex items-center gap-2"
+                                ><CheckCircle2
+                                    class="size-5 text-[#20d4bd]"
+                                />{{ item }}</span
+                            >
+                        </div>
+                        <div class="mt-9 flex flex-wrap gap-3">
+                            <Link
+                                href="/demo"
+                                class="flex items-center gap-3 rounded-xl bg-[#12cbb2] px-6 py-3.5 text-sm font-bold text-[#061d3b] shadow-lg shadow-cyan-950/30 transition hover:bg-[#27dbc4]"
+                                >Demander une démo <ArrowRight class="size-4"
+                            /></Link>
+                            <a
+                                href="#contact"
+                                class="flex items-center gap-3 rounded-xl border border-white/30 bg-white/5 px-6 py-3.5 text-sm font-bold transition hover:bg-white/10"
+                                ><Phone class="size-4" />Nous contacter</a
+                            >
+                        </div>
+                    </div>
+                    <div class="relative hidden min-h-[470px] p-10 lg:block">
+                        <div
+                            class="absolute inset-10 rounded-[28px] border border-white/10 bg-white/5 p-6 backdrop-blur"
+                        >
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-xs text-cyan-200">
+                                        Aperçu de votre journée
+                                    </p>
+                                    <h3 class="mt-1 text-xl font-bold">
+                                        Tableau de bord
+                                    </h3>
+                                </div>
+                                <span
+                                    class="rounded-full bg-emerald-400/15 px-3 py-1 text-xs text-emerald-300"
+                                    >En direct</span
+                                >
+                            </div>
+                            <div class="mt-6 grid grid-cols-2 gap-3">
+                                <div
+                                    v-for="stat in [
+                                        ['1 248', 'Élèves suivis'],
+                                        ['42', 'Classes actives'],
+                                        ['96%', 'Présences'],
+                                        ['8', 'Sites connectés'],
+                                    ]"
+                                    :key="stat[1]"
+                                    class="rounded-2xl border border-white/10 bg-[#092b4e] p-4"
+                                >
+                                    <strong class="text-2xl text-white">{{
+                                        stat[0]
+                                    }}</strong>
+                                    <p class="mt-1 text-xs text-slate-300">
+                                        {{ stat[1] }}
+                                    </p>
+                                </div>
+                            </div>
+                            <div
+                                class="mt-4 rounded-2xl bg-white p-4 text-[#071f3e]"
+                            >
+                                <div class="flex items-center justify-between">
+                                    <span class="text-sm font-bold"
+                                        >Opérations centralisées</span
+                                    ><span class="text-xs text-emerald-600"
+                                        >Tout est à jour</span
+                                    >
+                                </div>
+                                <div class="mt-4 space-y-3">
+                                    <div
+                                        v-for="(line, i) in [
+                                            'Inscriptions et dossiers',
+                                            'Emplois du temps',
+                                            'Paiements et salaires',
+                                        ]"
+                                        :key="line"
+                                        class="flex items-center gap-3"
+                                    >
+                                        <span
+                                            class="h-2 rounded-full bg-[#12cbb2]"
+                                            :style="{ width: `${72 + i * 9}%` }"
+                                        ></span
+                                        ><span
+                                            class="shrink-0 text-xs text-slate-500"
+                                            >{{ line }}</span
+                                        >
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </section>

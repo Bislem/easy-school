@@ -10,6 +10,7 @@ use App\Models\EmployeeType;
 use App\Models\Staff;
 use App\Models\User;
 use App\Services\AnnualLeaveService;
+use App\Services\TenantStorageService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -22,7 +23,7 @@ use MohamedGaldi\ViltFilepond\Services\FilePondService;
 
 class StaffController extends Controller
 {
-    public function __construct(private FilePondService $filePondService, private AnnualLeaveService $annualLeaveService) {}
+    public function __construct(private FilePondService $filePondService, private AnnualLeaveService $annualLeaveService, private TenantStorageService $tenantStorage) {}
 
     public function index(Request $request): RedirectResponse
     {
@@ -184,9 +185,7 @@ class StaffController extends Controller
         $type = EmployeeType::findOrFail($data['employee_type_id']);
         $canLogin = (bool) $data['can_login'];
         unset($data['photo'], $data['password'], $data['password_confirmation'], $data['can_login']);
-        if ($request->hasFile('photo')) {
-            $data['photo_path'] = $request->file('photo')->store('staff', 'public');
-        }
+        $newPhoto = $request->file('photo');
 
         $user = $staff->user;
         $payload = ['name' => trim($data['first_name'].' '.$data['last_name']), 'email' => $data['email'], 'phone' => $data['phone'] ?? null,
@@ -198,6 +197,11 @@ class StaffController extends Controller
         $user ? $user->update($payload) : $user = User::create($payload + ['email_verified_at' => now(), 'password' => str()->password(32)]);
         $data['user_id'] = $user->id;
         $staff->fill($data)->save();
+        if ($newPhoto) {
+            $oldPhoto = $staff->getOriginal('photo_path');
+            $staff->update(['photo_path' => $this->tenantStorage->store($newPhoto, 'staff', 'public', TenantStorageService::PROFILE_IMAGES, 'hr', $staff)]);
+            if ($oldPhoto) $this->tenantStorage->delete($oldPhoto);
+        }
 
         if ($staff->wasChanged(['leave_opening_balance', 'leave_balance_as_of'])) {
             $staff->leaveBalanceAdjustments()->create([

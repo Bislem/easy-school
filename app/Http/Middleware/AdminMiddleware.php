@@ -17,14 +17,12 @@ class AdminMiddleware
      */
     public function handle(Request $request, Closure $next): Response
     {
-        if (Auth::check() && Auth::user()->role === UserRole::ADMIN) {
+        // This middleware now identifies the tenant back-office boundary only.
+        // Fine-grained access is enforced by RequireEffectivePermission.
+        if (Auth::check() && Auth::user()->tenant_id && Auth::user()->role !== UserRole::SUPER_ADMIN) {
             return $next($request);
         }
 
-        if (Auth::check() && Auth::user()->role === UserRole::TEACHER && $request->is('admin/planifications*')) {
-            return $next($request);
-        }
-
-        abort(403, 'Unauthorized action.');
+        abort(403, 'Forbidden.');
     }
 }

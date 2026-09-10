@@ -45,6 +45,8 @@ final class TenantScope
         \App\Models\StudentInstallment::class, \App\Models\StudentObservation::class,
         \App\Models\StudentPayment::class, \App\Models\TeacherAttendance::class,
         \App\Models\Ticket::class, \App\Models\TrainingPlan::class,
+        \App\Models\Role::class,
+        \App\Models\TenantStoredFile::class,
         \App\Models\TrainingPlanGroup::class, \App\Models\TrainingPlanTeacherAccess::class,
         \App\Models\TrainingSession::class, \App\Models\User::class,
         \MohamedGaldi\ViltFilepond\Models\File::class,

@@ -3,12 +3,16 @@
 use App\Enums\SchoolDocumentType;
 use App\Models\AcademicYear;
 use App\Models\CompanySetting;
+use App\Models\Classroom;
 use App\Models\SchoolCycle;
 use App\Models\SchoolGroup;
 use App\Models\SchoolLevel;
+use App\Models\SchoolSite;
+use App\Models\SchoolSubject;
 use App\Models\Student;
 use App\Models\StudentAcademicEnrollment;
 use App\Models\Tenant;
+use App\Models\TimetableSession;
 use App\Models\User;
 use App\Services\SchoolDocumentGenerator;
 use App\Tenancy\TenantContext;
@@ -36,9 +40,86 @@ test('private school admin can open the school documents module', function () {
     $this->actingAs($fixture['admin'])->get('/admin/school-documents')->assertOk()->assertInertia(fn ($page) => $page
         ->component('Admin/SchoolDocuments/Index')
         ->where('academicYear.id', $fixture['year']->id)
-        ->has('documentTypes', 1)
+        ->has('documentTypes', 3)
         ->has('groups', 2)
         ->where('groups.0.students_count', 1));
+});
+
+test('group timetables download as one named pdf per selected group', function () {
+    $fixture = schoolDocumentsFixture();
+    app(TenantContext::class)->set($fixture['tenant']);
+    $site = SchoolSite::create(['name' => 'Site principal', 'code' => 'SITE-DOC', 'wilaya' => 'Alger', 'is_active' => true]);
+    $room = Classroom::create(['school_site_id' => $site->id, 'name' => 'Salle 1', 'code' => 'ROOM-DOC', 'type' => 'classroom', 'capacity' => 30]);
+    $fixture['firstGroup']->update(['classroom_id' => $room->id]);
+    $subject = SchoolSubject::create(['title' => 'Mathématiques', 'code' => 'MATH-DOC', 'duration_hours' => 1, 'price' => 0, 'is_active' => true]);
+    $teacher = User::factory()->create(['tenant_id' => $fixture['tenant']->id, 'role' => 'teacher']);
+    TimetableSession::create([
+        'academic_year_id' => $fixture['year']->id,
+        'school_group_id' => $fixture['firstGroup']->id,
+        'course_id' => $subject->id,
+        'teacher_id' => $teacher->id,
+        'classroom_id' => $room->id,
+        'day' => 1,
+        'start_time' => '08:00',
+        'end_time' => '09:00',
+        'recurrence' => 'weekly',
+        'status' => 'published',
+    ]);
+    app(TenantContext::class)->clear();
+
+    $response = $this->actingAs($fixture['admin'])->post('/admin/school-documents/download', [
+        'document_type' => 'group_timetable',
+        'language' => 'fr',
+        'issue_date' => '2026-09-07',
+        'group_ids' => [$fixture['firstGroup']->id, $fixture['secondGroup']->id],
+    ]);
+
+    $response->assertOk()->assertDownload('emplois-du-temps-2026-2027.zip');
+    $zip = new PharData($response->baseResponse->getFile()->getPathname());
+    $files = iterator_to_array(new RecursiveIteratorIterator($zip));
+    expect(array_keys($files))->toHaveCount(2)
+        ->toContain('phar://'.$response->baseResponse->getFile()->getPathname().'/Emploi-du-temps-1AS-A-2026-2027.pdf')
+        ->toContain('phar://'.$response->baseResponse->getFile()->getPathname().'/Emploi-du-temps-1AS-B-2026-2027.pdf');
+    foreach ($files as $file) {
+        expect(file_get_contents($file->getPathname()))->toStartWith('%PDF-');
+    }
+});
+
+test('teacher timetables download as one named pdf per selected teacher', function () {
+    $fixture = schoolDocumentsFixture();
+    app(TenantContext::class)->set($fixture['tenant']);
+    $site = SchoolSite::create(['name' => 'Site principal', 'code' => 'SITE-TEACHER-DOC', 'wilaya' => 'Alger', 'is_active' => true]);
+    $room = Classroom::create(['school_site_id' => $site->id, 'name' => 'Salle 2', 'code' => 'TEACHER-ROOM-DOC', 'type' => 'classroom', 'capacity' => 30]);
+    $subject = SchoolSubject::create(['title' => 'Physique', 'code' => 'PHYSICS-DOC', 'duration_hours' => 1, 'price' => 0, 'is_active' => true]);
+    $teacher = User::factory()->create(['tenant_id' => $fixture['tenant']->id, 'role' => 'teacher', 'name' => 'Nadia Test']);
+    TimetableSession::create([
+        'academic_year_id' => $fixture['year']->id,
+        'school_group_id' => $fixture['firstGroup']->id,
+        'course_id' => $subject->id,
+        'teacher_id' => $teacher->id,
+        'classroom_id' => $room->id,
+        'day' => 2,
+        'start_time' => '09:00',
+        'end_time' => '10:00',
+        'recurrence' => 'weekly',
+        'status' => 'published',
+    ]);
+    app(TenantContext::class)->clear();
+
+    $response = $this->actingAs($fixture['admin'])->post('/admin/school-documents/download', [
+        'document_type' => 'teacher_timetable',
+        'language' => 'fr',
+        'issue_date' => '2026-09-07',
+        'teacher_ids' => [$teacher->id],
+    ]);
+
+    $response->assertOk()->assertDownload('emplois-du-temps-enseignants-2026-2027.zip');
+    $zip = new PharData($response->baseResponse->getFile()->getPathname());
+    $files = iterator_to_array(new RecursiveIteratorIterator($zip));
+    expect($files)->toHaveCount(1);
+    $filename = array_key_first($files);
+    expect($filename)->toContain("Emploi-du-temps-Nadia Test-{$teacher->id}-2026-2027.pdf")
+        ->and(file_get_contents(array_values($files)[0]->getPathname()))->toStartWith('%PDF-');
 });
 
 test('school document download validates the selection', function () {

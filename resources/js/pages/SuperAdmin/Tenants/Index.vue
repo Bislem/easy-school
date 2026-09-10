@@ -86,6 +86,13 @@ const date = (value: string | null) =>
               new Date(value),
           )
         : 'Sans échéance';
+const bytes = (value: number | null) => {
+    if (value === null) return '∞';
+    if (!value) return '0 B';
+    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.min(Math.floor(Math.log(value) / Math.log(1024)), 4);
+    return `${(value / 1024 ** i).toFixed(i > 1 ? 1 : 0)} ${units[i]}`;
+};
 </script>
 
 <template>
@@ -205,9 +212,14 @@ const date = (value: string | null) =>
                                                 : 'bg-amber-100 text-amber-700'
                                         "
                                         >{{
-                                            client.status === 'active'
-                                                ? 'Actif'
-                                                : 'Suspendu'
+                                            client.account_status === 'demo'
+                                                ? 'Démo'
+                                                : client.account_status ===
+                                                    'expired'
+                                                  ? 'Expiré'
+                                                  : client.status === 'active'
+                                                    ? 'Actif'
+                                                    : 'Suspendu'
                                         }}</Badge
                                     >
                                 </div>
@@ -236,6 +248,32 @@ const date = (value: string | null) =>
                             <p class="text-xs text-muted-foreground">
                                 {{ date(client.plan_expires_at) }}
                             </p>
+                        </div>
+                        <div class="mt-3 rounded-xl border p-3">
+                            <div class="flex justify-between text-xs">
+                                <span>Stockage</span
+                                ><b
+                                    >{{ bytes(client.storage_used_bytes) }} /
+                                    {{ bytes(client.storage_limit_bytes) }}</b
+                                >
+                            </div>
+                            <div
+                                class="mt-2 h-2 overflow-hidden rounded-full bg-slate-100"
+                            >
+                                <div
+                                    class="h-full rounded-full"
+                                    :class="
+                                        client.storage_percentage >= 90
+                                            ? 'bg-red-500'
+                                            : client.storage_percentage >= 75
+                                              ? 'bg-amber-500'
+                                              : 'bg-emerald-500'
+                                    "
+                                    :style="{
+                                        width: `${client.storage_percentage}%`,
+                                    }"
+                                />
+                            </div>
                         </div>
                         <div class="mt-4 grid grid-cols-3 divide-x text-center">
                             <div>

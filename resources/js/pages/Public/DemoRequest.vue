@@ -254,14 +254,13 @@ const inputClass =
                             <div>
                                 <label class="mb-2 block text-xs font-bold"
                                     >Durée souhaitée</label
-                                ><select
+                                ><input
                                     v-model="form.requested_days"
+                                    type="number"
+                                    min="1"
+                                    required
                                     :class="inputClass"
-                                >
-                                    <option :value="7">7 jours</option>
-                                    <option :value="10">10 jours</option>
-                                    <option :value="15">15 jours</option>
-                                </select>
+                                />
                             </div>
                         </div>
                         <div
@@ -463,7 +462,7 @@ const inputClass =
                             ],
                             [
                                 CalendarDays,
-                                'Accès jusqu’à 15 jours',
+                                'Durée de démonstration flexible',
                                 'Explorez en toute autonomie.',
                             ],
                         ]"

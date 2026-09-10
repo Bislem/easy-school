@@ -46,6 +46,7 @@ class SubscriptionPlansController extends Controller
         unset($data['storage_go']);
         $data['features'] = $this->features($data['features'] ?? null);
         $plan->update($data);
+        $plan->tenants()->update(['storage_limit_bytes' => $plan->storage_mb === null ? null : $plan->storage_mb * 1024 * 1024]);
 
         return back()->with('success', 'Plan mis à jour.');
     }
@@ -63,7 +64,8 @@ class SubscriptionPlansController extends Controller
     {
         $data = $request->validate(['tenant_id' => ['required', 'exists:tenants,id'], 'subscription_plan_id' => ['nullable', 'exists:subscription_plans,id'], 'plan_expires_at' => ['nullable', 'date', 'after:today']]);
         $tenant = Tenant::findOrFail($data['tenant_id']);
-        $tenant->update(['subscription_plan_id' => $data['subscription_plan_id'] ?: null, 'plan_started_at' => $data['subscription_plan_id'] ? now() : null, 'plan_expires_at' => $data['subscription_plan_id'] ? ($data['plan_expires_at'] ?? null) : null]);
+        $plan = $data['subscription_plan_id'] ? SubscriptionPlan::findOrFail($data['subscription_plan_id']) : null;
+        $tenant->update(['subscription_plan_id' => $plan?->id, 'plan_started_at' => $plan ? now() : null, 'plan_expires_at' => $plan ? ($data['plan_expires_at'] ?? null) : null, 'storage_limit_bytes' => $plan?->storage_mb === null ? null : $plan->storage_mb * 1024 * 1024]);
 
         return back()->with('success', 'Abonnement mis à jour.');
     }

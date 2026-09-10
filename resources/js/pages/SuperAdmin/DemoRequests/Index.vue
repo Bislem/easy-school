@@ -15,6 +15,7 @@ import {
     Clock3,
     Eye,
     Filter,
+    KeyRound,
     Mail,
     MapPin,
     Plus,
@@ -30,6 +31,13 @@ const props = defineProps<{
     requests: any;
     filters: any;
     counts: Record<string, number>;
+    plans: Array<{
+        id: number;
+        name: string;
+        price: string | number;
+        currency: string;
+        billing_period: string;
+    }>;
 }>();
 const base = (usePage().props.superAdmin as any).basePath;
 const status = ref(props.filters.status || '');
@@ -37,8 +45,36 @@ const search = ref('');
 const selected = ref<any>(null);
 const action = ref<'details' | 'approve' | 'reject' | ''>('');
 const showCreate = ref(false);
+const converting = ref<any>(null);
 const approval = useForm({ days: 15 });
 const rejection = useForm({ reason: '' });
+const conversion = useForm({
+    action: 'change',
+    subscription_plan_id: '',
+    months: 1,
+    amount: '',
+    payment_method: 'bank_transfer',
+    reference: '',
+    notes: '',
+});
+const credentialTarget = ref<any>(null);
+const credentials = useForm({ delivery_email: '' });
+const openCredentials = (item: any) => {
+    credentialTarget.value = item;
+    credentials.clearErrors();
+    credentials.delivery_email = item.email || '';
+};
+const regenerateCredentials = () =>
+    credentials.post(
+        `${base}/schools/${credentialTarget.value.tenant.id}/credentials`,
+        {
+            preserveScroll: true,
+            onSuccess: () => {
+                credentialTarget.value = null;
+                credentials.reset();
+            },
+        },
+    );
 const manual = useForm({
     school_name: '',
     school_type: 'private_school',
@@ -97,7 +133,7 @@ const typeLabel = (value: string) =>
 const open = (type: typeof action.value, item: any) => {
     selected.value = item;
     action.value = type;
-    approval.days = Math.min(Number(item.requested_days) || 15, 15);
+    approval.days = Math.max(Number(item.requested_days) || 15, 1);
 };
 const close = () => {
     selected.value = null;
@@ -125,6 +161,20 @@ const suspend = (item: any) =>
     confirm(
         `Suspendre immédiatement la démonstration de ${item.school_name} ?`,
     ) && router.patch(`${base}/demo-requests/${item.id}/suspend`);
+const openConversion = (item: any) => {
+    converting.value = item;
+    conversion.reset();
+    conversion.action = 'change';
+};
+const convertToPaid = () =>
+    conversion.post(
+        `${base}/schools/${converting.value.tenant.id}/subscription`,
+        {
+            onSuccess: () => {
+                converting.value = null;
+            },
+        },
+    );
 const toggleManualModule = (value: string) =>
     (manual.modules = manual.modules.includes(value)
         ? manual.modules.filter((x) => x !== value)
@@ -326,10 +376,24 @@ const createManual = () =>
                                 ><Button
                                     size="sm"
                                     variant="outline"
+                                    @click="openCredentials(r)"
+                                    ><KeyRound />Régénérer les accès</Button
+                                ><Button
+                                    v-if="r.tenant.account_type === 'demo'"
+                                    size="sm"
+                                    @click="openConversion(r)"
+                                    >Convertir en client</Button
+                                ><Button
+                                    v-if="r.tenant.account_type === 'demo'"
+                                    size="sm"
+                                    variant="outline"
                                     @click="extend(r)"
                                     ><CalendarPlus />+15 jours</Button
                                 ><Button
-                                    v-if="r.status === 'approved'"
+                                    v-if="
+                                        r.status === 'approved' &&
+                                        r.tenant.account_type === 'demo'
+                                    "
                                     size="sm"
                                     variant="outline"
                                     class="text-amber-700"
@@ -358,6 +422,171 @@ const createManual = () =>
                 @click="link.url && router.get(link.url)"
                 v-html="link.label"
             />
+        </div>
+
+        <div
+            v-if="credentialTarget"
+            class="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4 backdrop-blur-sm"
+            @click.self="credentialTarget = null"
+        >
+            <Card class="w-full max-w-md"
+                ><CardContent class="p-6"
+                    ><h2 class="text-xl font-black">
+                        Régénérer les identifiants
+                    </h2>
+                    <p class="mt-1 text-sm text-muted-foreground">
+                        Le nouveau mot de passe remplacera l’ancien pour
+                        {{ credentialTarget.school_name }}.
+                    </p>
+                    <form
+                        class="mt-5 space-y-4"
+                        @submit.prevent="regenerateCredentials"
+                    >
+                        <div>
+                            <label class="mb-1 block text-sm font-bold"
+                                >Adresse de livraison</label
+                            ><Input
+                                v-model="credentials.delivery_email"
+                                type="email"
+                                required
+                            /><InputError
+                                :message="credentials.errors.delivery_email"
+                            />
+                            <p class="mt-2 text-xs text-muted-foreground">
+                                Cette adresse reçoit les accès sans modifier
+                                l’identifiant de connexion du client.
+                            </p>
+                        </div>
+                        <div class="flex justify-end gap-2">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                @click="credentialTarget = null"
+                                >Annuler</Button
+                            ><Button :disabled="credentials.processing"
+                                >Régénérer et envoyer</Button
+                            >
+                        </div>
+                    </form></CardContent
+                ></Card
+            >
+        </div>
+
+        <div
+            v-if="converting"
+            class="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-black/50 p-4 backdrop-blur-sm"
+            @click.self="converting = null"
+        >
+            <Card class="w-full max-w-xl">
+                <CardContent class="p-6">
+                    <h2 class="text-xl font-black">
+                        Convertir en client payant
+                    </h2>
+                    <p class="mt-1 text-sm text-muted-foreground">
+                        {{ converting.school_name }} conservera toutes ses
+                        données. L’accès aux paramètres de l’école sera
+                        déverrouillé immédiatement.
+                    </p>
+                    <form
+                        class="mt-5 space-y-4"
+                        @submit.prevent="convertToPaid"
+                    >
+                        <div>
+                            <label class="mb-1 block text-sm font-bold"
+                                >Plan *</label
+                            >
+                            <select
+                                v-model="conversion.subscription_plan_id"
+                                required
+                                class="h-10 w-full rounded-md border bg-background px-3"
+                            >
+                                <option value="">Sélectionner un plan</option>
+                                <option
+                                    v-for="plan in plans"
+                                    :key="plan.id"
+                                    :value="plan.id"
+                                >
+                                    {{ plan.name }} · {{ plan.price }}
+                                    {{ plan.currency }} /
+                                    {{
+                                        plan.billing_period === 'yearly'
+                                            ? 'an'
+                                            : plan.billing_period === 'monthly'
+                                              ? 'mois'
+                                              : 'période'
+                                    }}
+                                </option>
+                            </select>
+                            <InputError
+                                :message="
+                                    conversion.errors.subscription_plan_id
+                                "
+                            />
+                        </div>
+                        <div class="grid gap-4 sm:grid-cols-2">
+                            <div>
+                                <label class="mb-1 block text-sm font-bold"
+                                    >Durée en mois *</label
+                                >
+                                <Input
+                                    v-model="conversion.months"
+                                    type="number"
+                                    min="1"
+                                    max="60"
+                                    required
+                                />
+                                <InputError
+                                    :message="conversion.errors.months"
+                                />
+                            </div>
+                            <div>
+                                <label class="mb-1 block text-sm font-bold"
+                                    >Montant encaissé</label
+                                >
+                                <Input
+                                    v-model="conversion.amount"
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                />
+                            </div>
+                            <div>
+                                <label class="mb-1 block text-sm font-bold"
+                                    >Moyen de paiement</label
+                                >
+                                <select
+                                    v-model="conversion.payment_method"
+                                    class="h-9 w-full rounded-md border bg-background px-3"
+                                >
+                                    <option value="bank_transfer">
+                                        Virement
+                                    </option>
+                                    <option value="cash">Espèces</option>
+                                    <option value="cheque">Chèque</option>
+                                    <option value="card">Carte</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="mb-1 block text-sm font-bold"
+                                    >Référence</label
+                                >
+                                <Input v-model="conversion.reference" />
+                            </div>
+                        </div>
+                        <div class="flex justify-end gap-2 pt-2">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                @click="converting = null"
+                                >Annuler</Button
+                            >
+                            <Button :disabled="conversion.processing"
+                                >Convertir et activer</Button
+                            >
+                        </div>
+                    </form>
+                </CardContent>
+            </Card>
         </div>
 
         <div
@@ -547,7 +776,6 @@ const createManual = () =>
                             v-model="approval.days"
                             type="number"
                             min="1"
-                            max="15"
                             required
                             class="mt-1"
                         /><InputError :message="approval.errors.days" />
@@ -675,7 +903,6 @@ const createManual = () =>
                                     v-model="manual.requested_days"
                                     type="number"
                                     min="1"
-                                    max="15"
                                     required
                                 />
                             </div>

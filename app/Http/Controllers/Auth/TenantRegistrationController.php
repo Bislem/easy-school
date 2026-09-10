@@ -8,6 +8,7 @@ use App\Models\Tenant;
 use App\Models\SubscriptionPlan;
 use App\Models\User;
 use App\Services\TenantInitializer;
+use App\Services\TenantStorageService;
 use App\Tenancy\TenantContext;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -32,7 +33,7 @@ final class TenantRegistrationController extends Controller
         ]);
     }
 
-    public function store(Request $request, TenantInitializer $initializer): RedirectResponse
+    public function store(Request $request, TenantInitializer $initializer, TenantStorageService $tenantStorage): RedirectResponse
     {
         $data = $request->validate([
             'name' => ['required', 'string', 'max:150'],
@@ -53,22 +54,24 @@ final class TenantRegistrationController extends Controller
         $logoPath = null;
         $paymentProofPath = null;
         try {
-            [$tenant, $admin] = DB::transaction(function () use ($request, $data, $initializer, &$logoPath, &$paymentProofPath) {
+            [$tenant, $admin] = DB::transaction(function () use ($request, $data, $initializer, $tenantStorage, &$logoPath, &$paymentProofPath) {
+                $plan = SubscriptionPlan::findOrFail($data['subscription_plan_id']);
                 $tenant = Tenant::create([
                     'name' => $data['name'], 'slug' => $this->uniqueSlug($data['name']),
                     'phone' => $data['phone'] ?? null, 'email' => Str::lower($data['email']),
                     'address' => $data['address'] ?? null, 'wilaya' => $data['wilaya'] ?? null,
                     'commune' => $data['commune'] ?? null, 'status' => 'pending',
                     'subscription_plan_id' => $data['subscription_plan_id'],
+                    'storage_limit_bytes' => $plan->storage_mb === null ? null : $plan->storage_mb * 1024 * 1024,
                     'registration_submitted_at' => now(),
                 ]);
                 app(TenantContext::class)->set($tenant);
 
                 if ($request->hasFile('logo')) {
-                    $logoPath = $request->file('logo')->store("tenants/{$tenant->id}/branding", 'public');
+                    $logoPath = $tenantStorage->store($request->file('logo'), 'branding', 'public', TenantStorageService::PROFILE_IMAGES, 'school_branding', $tenant, $tenant);
                     $tenant->update(['logo' => $logoPath]);
                 }
-                $paymentProofPath = $request->file('payment_proof')->store("tenants/{$tenant->id}/registration", 'local');
+                $paymentProofPath = $tenantStorage->store($request->file('payment_proof'), 'registration', 'local', TenantStorageService::ATTACHMENTS, 'registration', $tenant, $tenant);
                 $tenant->update(['payment_proof_path' => $paymentProofPath]);
 
                 $admin = User::create([

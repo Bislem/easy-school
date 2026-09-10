@@ -30,8 +30,12 @@ use App\Models\User;
 use App\Observers\PortalNotificationObserver;
 use App\Policies\StaffPolicy;
 use App\Policies\TimetableSessionPolicy;
+use App\Support\PermissionCatalog;
 use App\Tenancy\TenantContext;
 use App\Tenancy\TenantScope;
+use App\Services\TenantFilePondService;
+use App\Services\TenantStorageService;
+use App\Services\AuthorizationService;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 
@@ -43,6 +47,7 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->singleton(TenantContext::class);
+        $this->app->bind(\MohamedGaldi\ViltFilepond\Services\FilePondService::class, TenantFilePondService::class);
     }
 
     /**
@@ -53,28 +58,48 @@ class AppServiceProvider extends ServiceProvider
         foreach (TenantScope::MODELS as $model) {
             TenantScope::boot($model);
         }
+        foreach ([\App\Models\Student::class, \App\Models\SchoolParent::class, \App\Models\SchoolGroup::class,
+            \App\Models\Staff::class, \App\Models\StudentAcademicEnrollment::class, \App\Models\CourseEnrollment::class,
+            \App\Models\StudentPayment::class, \App\Models\StudentObservation::class, \App\Models\SessionAttendance::class,
+            \App\Models\TimetableSession::class, \App\Models\Expense::class, \App\Models\SalaryStatement::class,
+            \App\Models\SalaryPayment::class] as $scopedModel) {
+            $scopedModel::addGlobalScope(AuthorizationService::DATA_SCOPE, function ($query): void {
+                $permission = request()?->attributes->get('effective_permission');
+                if ($permission && request()->user()) app(AuthorizationService::class)->apply($query, request()->user(), $permission);
+            });
+        }
+        \MohamedGaldi\ViltFilepond\Models\File::deleted(function ($file): void {
+            $tenantId = $file->fileable?->tenant_id;
+            if ($tenantId) {
+                app(TenantStorageService::class)->forget($file->getCleanPath(), config('vilt-filepond.storage_disk'), \App\Models\Tenant::findOrFail($tenantId));
+            }
+        });
         Gate::policy(Staff::class, StaffPolicy::class);
         Gate::policy(TimetableSession::class, TimetableSessionPolicy::class);
+        Gate::before(fn (User $user, string $ability) => $user->hasPermission($ability) ? true : null);
+        foreach (PermissionCatalog::all() as $permission => $label) {
+            Gate::define($permission, fn (User $user) => $user->hasPermission($permission));
+        }
         foreach (StaffPermission::cases() as $permission) {
-            Gate::define($permission->value, fn (User $user) => $user->role->value === 'admin');
+            Gate::define($permission->value, fn (User $user) => $user->hasPermission($permission->value));
         }
         foreach (BadgePermission::cases() as $permission) {
-            Gate::define($permission->value, fn (User $user) => $user->role->value === 'admin');
+            Gate::define($permission->value, fn (User $user) => $user->hasPermission($permission->value));
         }
         foreach (ManagementPermission::cases() as $permission) {
-            Gate::define($permission->value, fn (User $user) => $user->role->value === 'admin');
+            Gate::define($permission->value, fn (User $user) => $user->hasPermission($permission->value));
         }
         foreach (AttendancePermission::cases() as $permission) {
-            Gate::define($permission->value, fn (User $user) => $user->role->value === 'admin');
+            Gate::define($permission->value, fn (User $user) => $user->hasPermission($permission->value));
         }
         foreach (TimetablePermission::cases() as $permission) {
-            Gate::define($permission->value, fn (User $user) => $user->role === \App\Enums\UserRole::ADMIN || ($permission === TimetablePermission::VIEW && $user->role === \App\Enums\UserRole::TEACHER));
+            Gate::define($permission->value, fn (User $user) => $user->hasPermission($permission->value));
         }
         foreach (AcademicYearPermission::cases() as $permission) {
-            Gate::define($permission->value, fn (User $user) => $user->role === \App\Enums\UserRole::ADMIN && $user->tenant?->organization_type === 'private_school');
+            Gate::define($permission->value, fn (User $user) => $user->tenant?->organization_type === 'private_school' && $user->hasPermission($permission->value));
         }
         foreach (SchoolAttendancePermission::cases() as $permission) {
-            Gate::define($permission->value, fn (User $user) => $user->role === \App\Enums\UserRole::ADMIN && $user->tenant?->organization_type === 'private_school');
+            Gate::define($permission->value, fn (User $user) => $user->tenant?->organization_type === 'private_school' && $user->hasPermission($permission->value));
         }
         $created = [StudentPayment::class => 'student_payment.recorded', SalaryPayment::class => 'salary_payment.recorded', SalaryAdjustment::class => 'salary_adjustment.recorded', EnrollmentFinancialAdjustment::class => 'student_finance.adjusted', StudentHistory::class => 'student_history.recorded', Certificate::class => 'certificate.issued'];
         foreach ($created as $model => $event) {

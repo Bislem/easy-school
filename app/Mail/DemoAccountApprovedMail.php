@@ -13,7 +13,7 @@ class DemoAccountApprovedMail extends Mailable
 {
     use Queueable, SerializesModels;
 
-    public function __construct(public DemoRequest $demoRequest, public string $password) {}
+    public function __construct(public DemoRequest $demoRequest, public string $temporaryPassword) {}
 
     public function envelope(): Envelope
     {

@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Mail\DemoAccountApprovedMail;
 use App\Mail\DemoAccountRejectedMail;
 use App\Models\DemoRequest;
+use App\Models\SubscriptionPlan;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Services\TenantInitializer;
@@ -28,15 +29,16 @@ class DemoRequestsController extends Controller
         $filters = $request->validate(['status' => ['nullable', Rule::in(['pending', 'approved', 'rejected', 'suspended'])]]);
 
         return Inertia::render('SuperAdmin/DemoRequests/Index', [
-            'requests' => DemoRequest::with(['tenant:id,name,status,demo_expires_at', 'reviewer:id,name'])->when($filters['status'] ?? null, fn ($q, $status) => $q->where('status', $status))->latest()->paginate(15)->withQueryString(),
+            'requests' => DemoRequest::with(['tenant:id,name,status,account_type,demo_expires_at', 'reviewer:id,name'])->when($filters['status'] ?? null, fn ($q, $status) => $q->where('status', $status))->latest()->paginate(15)->withQueryString(),
             'filters' => $filters, 'counts' => DemoRequest::selectRaw('status, count(*) total')->groupBy('status')->pluck('total', 'status'),
+            'plans' => SubscriptionPlan::where('is_active', true)->orderBy('sort_order')->get(['id', 'name', 'price', 'currency', 'billing_period']),
         ]);
     }
 
     public function approve(Request $request, DemoRequest $demoRequest, TenantInitializer $initializer): RedirectResponse
     {
         abort_unless($demoRequest->status === 'pending', 422);
-        $data = $request->validate(['days' => ['required', 'integer', 'min:1', 'max:15']]);
+        $data = $request->validate(['days' => ['required', 'integer', 'min:1']]);
         $password = $this->provision($demoRequest, $data['days'], $initializer);
         $this->sendCredentials($demoRequest, $password);
 
@@ -60,7 +62,7 @@ class DemoRequestsController extends Controller
             'teachers_count' => ['required', 'integer', 'min:0', 'max:10000'],
             'staff_count' => ['required', 'integer', 'min:0', 'max:10000'],
             'sites_count' => ['required', 'integer', 'min:1', 'max:1000'],
-            'requested_days' => ['required', 'integer', 'min:1', 'max:15'],
+            'requested_days' => ['required', 'integer', 'min:1'],
             'needs' => ['nullable', 'string', 'max:3000'],
             'modules' => ['nullable', 'array', 'max:12'],
             'modules.*' => ['string', Rule::in(['students', 'hr', 'multi_sites', 'courses', 'planning', 'certificates', 'badges', 'mobile', 'finance', 'reports'])],
@@ -80,7 +82,9 @@ class DemoRequestsController extends Controller
 
     private function provision(DemoRequest $demoRequest, int $days, TenantInitializer $initializer): string
     {
-        $password = Str::password(14);
+        // Keep one-time credentials easy to copy from any email client. Some
+        // clients reinterpret punctuation such as angle brackets in HTML mail.
+        $password = Str::password(14, letters: true, numbers: true, symbols: false);
         DB::transaction(function () use ($demoRequest, $initializer, $days, $password) {
             $tenant = Tenant::create(['name' => $demoRequest->school_name, 'slug' => $this->uniqueSlug($demoRequest->school_name), 'phone' => $demoRequest->phone, 'email' => Str::lower($demoRequest->email), 'address' => $demoRequest->address, 'wilaya' => $demoRequest->wilaya, 'commune' => $demoRequest->commune, 'status' => 'active', 'account_type' => 'demo', 'organization_type' => $demoRequest->school_type, 'demo_expires_at' => now()->addDays($days)->endOfDay()]);
             app(TenantContext::class)->set($tenant);

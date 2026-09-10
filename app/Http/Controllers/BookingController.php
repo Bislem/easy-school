@@ -9,6 +9,7 @@ use App\Models\CompanySetting;
 use App\Models\Driver;
 use App\Models\Reservation;
 use App\Services\ReservationMailer;
+use App\Services\TenantStorageService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -44,7 +45,7 @@ class BookingController extends Controller
         return inertia('Booking', compact('car', 'unavailablePeriods', 'approvedDrivers'));
     }
 
-    public function book(Car $car, Request $request, ReservationMailer $reservationMailer)
+    public function book(Car $car, Request $request, ReservationMailer $reservationMailer, TenantStorageService $tenantStorage)
     {
         if (CompanySetting::current()->booking_disabled) {
             return redirect()->route('fleet')->with('error', 'Les réservations en ligne sont actuellement indisponibles.');
@@ -138,7 +139,7 @@ class BookingController extends Controller
         $advancePercentage = (float) $agencySettings->online_advance_percentage;
         $requiredAdvance = round($total * ($advancePercentage / 100), 2);
 
-        $reservation = DB::transaction(function () use ($request, $car, $startDate, $endDate, $days, $dailyRate, $subtotal, $taxAmount, $discount, $total, $advancePercentage, $requiredAdvance, $secondaryDriver) {
+        $reservation = DB::transaction(function () use ($request, $car, $startDate, $endDate, $days, $dailyRate, $subtotal, $taxAmount, $discount, $total, $advancePercentage, $requiredAdvance, $secondaryDriver, $tenantStorage) {
             $requestedDriver = null;
             if ($request->secondary_driver_mode === 'new') {
                 $requestedDriver = Driver::create([
@@ -146,9 +147,9 @@ class BookingController extends Controller
                     'full_name' => $request->new_driver_full_name,
                     'phone' => $request->new_driver_phone,
                     'email' => $request->new_driver_email,
-                    'driving_license_path' => $request->file('new_driver_license')->store('driving-licenses/drivers', 'public'),
                     'approval_status' => 'pending',
                 ]);
+                $requestedDriver->update(['driving_license_path' => $tenantStorage->store($request->file('new_driver_license'), 'driving-licenses/drivers', 'public', TenantStorageService::ATTACHMENTS, 'drivers', $requestedDriver)]);
             }
 
             return Reservation::create([

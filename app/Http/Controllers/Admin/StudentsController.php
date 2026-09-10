@@ -6,6 +6,8 @@ use App\Enums\StudentStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Formation;
 use App\Models\Student;
+use App\Services\TenantStorageService;
+use App\Services\AuthorizationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -15,11 +17,11 @@ use MohamedGaldi\ViltFilepond\Services\FilePondService;
 
 class StudentsController extends Controller
 {
-    public function __construct(private FilePondService $filePondService) {}
+    public function __construct(private FilePondService $filePondService, private TenantStorageService $tenantStorage, private AuthorizationService $authorization) {}
 
     public function index(Request $request): Response
     {
-        $students = Student::query()
+        $students = $this->authorization->apply(Student::query(), $request->user(), 'students.view')
             ->when($request->string('search')->trim()->toString(), function ($query, string $search) {
                 $query->where(function ($query) use ($search) {
                     $query->where('first_name', 'like', "%{$search}%")
@@ -58,11 +60,11 @@ class StudentsController extends Controller
         $data = $this->validateStudent($request);
         $data['registration_date'] ??= now()->toDateString();
         $data['status'] ??= $request->boolean('is_active', true) ? StudentStatus::ACTIVE : StudentStatus::STOPPED;
-        if ($request->hasFile('photo')) {
-            $data['photo_path'] = $request->file('photo')->store('students', 'public');
-        }
         unset($data['photo']);
         $student = Student::create($data);
+        if ($request->hasFile('photo')) {
+            $student->update(['photo_path' => $this->tenantStorage->store($request->file('photo'), 'students', 'public', TenantStorageService::PROFILE_IMAGES, 'students', $student)]);
+        }
         $student->histories()->create(['user_id' => $request->user()->id, 'event' => 'created', 'to_status' => $student->status->value, 'description' => 'Dossier créé manuellement.']);
 
         return back()->with('success', 'Étudiant ajouté avec succès.');
@@ -74,7 +76,9 @@ class StudentsController extends Controller
         $requestedStatus = isset($data['status']) ? StudentStatus::from($data['status'] instanceof StudentStatus ? $data['status']->value : $data['status']) : $student->status;
         unset($data['status']);
         if ($request->hasFile('photo')) {
-            $data['photo_path'] = $request->file('photo')->store('students', 'public');
+            $oldPhoto = $student->photo_path;
+            $data['photo_path'] = $this->tenantStorage->store($request->file('photo'), 'students', 'public', TenantStorageService::PROFILE_IMAGES, 'students', $student);
+            if ($oldPhoto) $this->tenantStorage->delete($oldPhoto);
         }
         unset($data['photo']);
         $student->fill($data);

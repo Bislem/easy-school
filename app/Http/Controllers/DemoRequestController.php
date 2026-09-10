@@ -26,7 +26,7 @@ class DemoRequestController extends Controller
             'address' => ['required', 'string', 'max:255'], 'wilaya' => ['required', 'string', 'max:100'], 'commune' => ['required', 'string', 'max:100'],
             'website' => ['nullable', 'url', 'max:255'], 'students_count' => ['required', 'integer', 'min:0', 'max:100000'],
             'teachers_count' => ['required', 'integer', 'min:0', 'max:10000'], 'staff_count' => ['required', 'integer', 'min:0', 'max:10000'],
-            'sites_count' => ['required', 'integer', 'min:1', 'max:1000'], 'requested_days' => ['required', 'integer', 'min:1', 'max:15'],
+            'sites_count' => ['required', 'integer', 'min:1', 'max:1000'], 'requested_days' => ['required', 'integer', 'min:1'],
             'needs' => ['nullable', 'string', 'max:3000'],
             'modules' => ['nullable', 'array', 'max:12'],
             'modules.*' => ['string', Rule::in(['students', 'hr', 'multi_sites', 'courses', 'planning', 'certificates', 'badges', 'mobile', 'finance', 'reports'])],

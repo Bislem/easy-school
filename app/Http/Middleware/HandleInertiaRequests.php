@@ -7,6 +7,7 @@ use App\Models\CompanySetting;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
+use App\Services\AuthorizationService;
 use Inertia\Middleware;
 
 class HandleInertiaRequests extends Middleware
@@ -53,6 +54,9 @@ class HandleInertiaRequests extends Middleware
         $authenticatedUser = $isPlatformAdmin
             ? auth('super_admin')->user()
             : $request->user();
+        $effectivePermissions = (! $isPlatformAdmin && $authenticatedUser && Schema::hasTable('roles'))
+            ? app(AuthorizationService::class)->permissions($authenticatedUser)
+            : [];
         $academicYears = collect();
         $selectedAcademicYear = null;
         if (! $isPlatformAdmin && $authenticatedUser?->tenant?->organization_type === 'private_school' && Schema::hasTable('academic_years')) {
@@ -72,6 +76,7 @@ class HandleInertiaRequests extends Middleware
             'auth' => [
                 'user' => $authenticatedUser,
                 'tenant' => $authenticatedUser?->tenant?->only(['id', 'name', 'slug', 'logo_url', 'status', 'account_type', 'organization_type', 'demo_expires_at']),
+                'permissions' => $effectivePermissions,
             ],
             'academic_years' => $academicYears,
             'current_academic_year' => $selectedAcademicYear,

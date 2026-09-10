@@ -9,8 +9,6 @@ import {
     ArrowLeft,
     ArrowRight,
     CalendarDays,
-    ChevronDown,
-    ChevronUp,
     Eye,
     EyeOff,
     GraduationCap,
@@ -21,7 +19,6 @@ import {
     Mail,
     RefreshCw,
     ShieldCheck,
-    UserRound,
     UsersRound,
 } from 'lucide-vue-next';
 import { ref } from 'vue';
@@ -29,7 +26,6 @@ import { ref } from 'vue';
 defineProps<{ status?: string; canResetPassword: boolean }>();
 
 const showPassword = ref(false);
-const isDemoOpen = ref(false);
 </script>
 
 <template>
@@ -276,75 +272,13 @@ const isDemoOpen = ref(false);
                         </button>
                     </Form>
 
-                    <div
-                        class="my-6 flex items-center gap-4 text-[11px] text-slate-400"
-                    >
-                        <span class="h-px flex-1 bg-slate-200"></span>OU<span
-                            class="h-px flex-1 bg-slate-200"
-                        ></span>
-                    </div>
-                    <a
-                        href="#email"
-                        class="flex items-center gap-4 rounded-xl border border-slate-200 p-4 transition hover:border-[#14c7b2] hover:bg-teal-50/40"
-                        ><UserRound class="size-9 shrink-0 text-[#0aa39c]" />
-                        <div class="flex-1">
-                            <p class="text-sm font-bold">
-                                Vous êtes parent ou élève ?
-                            </p>
-                            <p class="mt-1 text-xs text-slate-500">
-                                Utilisez les identifiants de votre portail dédié
-                            </p>
-                        </div>
-                        <ArrowRight class="size-5"
-                    /></a>
                     <Link
                         href="/register-school"
-                        class="mt-3 flex items-center justify-center gap-2 rounded-xl border border-[#11aa9f] px-4 py-3 text-sm font-bold text-[#078f88] transition hover:bg-teal-50"
+                        class="mt-6 flex items-center justify-center gap-2 rounded-xl border border-[#11aa9f] px-4 py-3 text-sm font-bold text-[#078f88] transition hover:bg-teal-50"
                     >
                         <GraduationCap class="size-5" /> Enregistrer un nouvel
                         établissement
                     </Link>
-
-                    <button
-                        type="button"
-                        class="mt-4 flex w-full items-center justify-between rounded-xl bg-[#effbfa] p-4 text-left"
-                        @click="isDemoOpen = !isDemoOpen"
-                    >
-                        <span class="flex items-center gap-3"
-                            ><ShieldCheck class="size-7 text-[#0aa39c]" /><span
-                                ><b class="block text-xs"
-                                    >Comptes de démonstration</b
-                                ><span class="text-[11px] text-slate-500"
-                                    >Essayez les accès administrateur et
-                                    enseignant</span
-                                ></span
-                            ></span
-                        ><ChevronUp
-                            v-if="isDemoOpen"
-                            class="size-4"
-                        /><ChevronDown v-else class="size-4" />
-                    </button>
-                    <div
-                        v-show="isDemoOpen"
-                        class="mt-2 grid gap-2 sm:grid-cols-2"
-                    >
-                        <div
-                            v-for="account in [
-                                ['Administrateur', 'admin@easyschool.test'],
-                                ['Enseignant', 'teacher@easyschool.test'],
-                            ]"
-                            :key="account[0]"
-                            class="rounded-lg border bg-slate-50 p-3 text-[11px]"
-                        >
-                            <b>{{ account[0] }}</b>
-                            <p class="mt-1 break-all text-slate-500">
-                                {{ account[1] }}
-                            </p>
-                            <p class="text-slate-500">
-                                Mot de passe : password
-                            </p>
-                        </div>
-                    </div>
 
                     <div
                         class="mt-5 flex gap-3 rounded-xl border border-cyan-100 bg-gradient-to-r from-cyan-50 to-white p-4"
