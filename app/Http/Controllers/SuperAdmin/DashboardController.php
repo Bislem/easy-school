@@ -7,6 +7,7 @@ use App\Models\Student;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Models\ContactRequest;
+use App\Models\PlatformNotification;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -24,6 +25,9 @@ final class DashboardController extends Controller
                 'newContacts' => ContactRequest::where('status', 'new')->count(),
             ],
             'recentSchools' => Tenant::latest()->limit(6)->get(['id', 'name', 'slug', 'status', 'created_at']),
+            'parentAccountNotifications' => PlatformNotification::with('tenant:id,name')
+                ->whereIn('type', ['parent_account.enabled', 'parent_account.disabled'])
+                ->latest()->limit(10)->get(),
         ]);
     }
 }

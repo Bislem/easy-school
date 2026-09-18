@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\PrivateSchoolInscriptionStatus;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class PrivateSchoolInscription extends Model
 {
@@ -50,5 +51,10 @@ class PrivateSchoolInscription extends Model
     public function reviewer(): BelongsTo
     {
         return $this->belongsTo(User::class, 'reviewed_by');
+    }
+
+    public function academicEnrollment(): HasOne
+    {
+        return $this->hasOne(StudentAcademicEnrollment::class, 'source_registration_id');
     }
 }

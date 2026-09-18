@@ -70,7 +70,7 @@ class ParentController extends Controller
             'message' => $data['message'],
         ]);
         if ($observation->author) {
-            $notifications->send($observation->author, 'observation.parent_replied', 'Réponse d’un parent', $request->user()->name.' a répondu à une observation concernant '.$student->full_name.'.', $reply, ['url' => '/portal/students/'.$student->id]);
+            $notifications->send($observation->author, 'observation.parent_replied', 'Réponse d’un parent', $request->user()->name.' a répondu à une observation concernant '.$student->full_name.'.', $reply, ['url' => '/portal/students/'.$student->id.'?tab=observations']);
         }
 
         return response()->json(['data' => [
@@ -86,6 +86,18 @@ class ParentController extends Controller
         $this->child($request, $student);
 
         return response()->json(['data' => [], 'meta' => ['supported' => false, 'message' => 'Aucun module de notes n’est disponible dans cette version.']]);
+    }
+
+    public function reportCards(Request $request, Student $student): JsonResponse
+    {
+        $student = $this->child($request, $student);
+        $cards = \App\Models\ReportCard::where('tenant_id', $student->tenant_id)->where('student_id', $student->id)->where('status', 'published')->with(['year:id,name','level:id,name','group:id,name','subjects'])->latest()->get();
+        return response()->json(['data' => $cards->map(fn ($card) => ['id'=>$card->id,'academic_year'=>$card->year?->name,'period'=>$card->period_key,'level'=>$card->level?->name,'group'=>$card->group?->name,'general_average'=>$card->general_average,'class_average'=>$card->class_average,'rank'=>$card->rank,'total_students'=>$card->total_students,'absences'=>$card->absences_count,'late_arrivals'=>$card->late_count,'published_at'=>$card->published_at?->toIso8601String(),'subjects'=>$card->subjects->map(fn($s)=>['subject'=>$s->subject_name,'teacher'=>$s->teacher_name,'coefficient'=>$s->coefficient,'average'=>$s->average,'class_average'=>$s->class_average,'min'=>$s->min_average,'max'=>$s->max_average,'rank'=>$s->rank,'appreciation'=>$s->appreciation])])]);
+    }
+    public function reportCardPdf(Request $request, Student $student, \App\Models\ReportCard $reportCard)
+    {
+        $student = $this->child($request, $student); abort_unless($reportCard->student_id === $student->id && $reportCard->status === 'published', 404); $reportCard->load(['student','year','level','group','subjects']);
+        return \Barryvdh\DomPDF\Facade\Pdf::loadView('admin.report-cards.bulletin',['card'=>$reportCard,'school'=>\App\Models\CompanySetting::current()])->setPaper('a4')->download('bulletin-'.$reportCard->id.'.pdf');
     }
 
     public function certificates(Request $request, Student $student): JsonResponse

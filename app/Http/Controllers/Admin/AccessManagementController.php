@@ -63,7 +63,7 @@ final class AccessManagementController extends Controller
     {
         return collect(PermissionCatalog::all())->groupBy(fn ($label, $key) => str($key)->before('.')->toString())
             ->map(fn ($items, $module) => ['key' => $module, 'label' => str($module)->replace('_', ' ')->title()->toString(),
-                'permissions' => $items->map(fn ($label, $key) => ['key' => $key, 'label' => $label, 'action' => $this->actionFor($key)])->values()])->values()->all();
+                'permissions' => $items->map(fn ($label, $key) => ['key' => (string) $key, 'label' => (string) $label, 'action' => $this->actionFor((string) $key)])->values()])->values()->all();
     }
 
     private function actionFor(string $key): string

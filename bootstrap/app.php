@@ -43,6 +43,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'website-available' => \App\Http\Middleware\WebsiteAvailability::class,
             'mobile-access' => \App\Http\Middleware\EnsureMobileAccess::class,
             'mobile-role' => \App\Http\Middleware\EnsureMobileRole::class,
+            'parent' => \App\Http\Middleware\EnsureParent::class,
             'mobile-context' => \App\Http\Middleware\SetMobileContext::class,
             'private-school' => \App\Http\Middleware\EnsurePrivateSchool::class,
             'permission' => \App\Http\Middleware\RequireEffectivePermission::class,

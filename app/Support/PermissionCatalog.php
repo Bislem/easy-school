@@ -23,9 +23,13 @@ final class PermissionCatalog
             'timetables.view' => 'Consulter les emplois du temps', 'timetables.manage' => 'Gérer les emplois du temps',
             'student_attendance.view' => 'Consulter les présences élèves', 'student_attendance.record' => 'Saisir les présences élèves', 'student_attendance.justify' => 'Justifier les absences élèves',
             'staff_attendance.view' => 'Consulter les présences du personnel', 'staff_attendance.record' => 'Saisir les présences du personnel', 'staff_attendance.justify' => 'Justifier les absences du personnel',
-            'absences.view' => 'Consulter les absences', 'absences.manage' => 'Gérer les absences',
+            'absences.view' => 'Consulter les absences', 'absences.create' => 'Créer des absences', 'absences.update' => 'Modifier les absences', 'absences.delete' => 'Supprimer des absences',
+            'student_absences.manage' => 'Gérer les absences élèves', 'teacher_absences.manage' => 'Gérer les absences enseignants', 'absence_justifications.manage' => 'Gérer les justificatifs d’absence',
             'discipline.view' => 'Consulter le suivi disciplinaire', 'discipline.manage' => 'Gérer le suivi disciplinaire',
             'grades.view' => 'Consulter les notes', 'grades.manage' => 'Gérer les notes',
+            'report_cards.view' => 'Consulter les bulletins', 'report_cards.create' => 'Créer des bulletins', 'report_cards.edit' => 'Modifier des bulletins', 'report_cards.validate' => 'Valider des bulletins', 'report_cards.publish' => 'Publier des bulletins', 'report_cards.print' => 'Imprimer des bulletins', 'report_cards.lock' => 'Verrouiller les bulletins', 'report_cards.reopen' => 'Rouvrir les bulletins',
+            'assessments.view' => 'Consulter les évaluations', 'assessments.create' => 'Créer des évaluations', 'assessments.edit' => 'Modifier les évaluations', 'assessments.delete' => 'Supprimer les évaluations', 'assessments.lock' => 'Verrouiller les évaluations', 'grades.view' => 'Consulter les notes', 'grades.enter' => 'Saisir les notes', 'grades.edit' => 'Modifier les notes', 'grades.lock' => 'Verrouiller les notes',
+            'assessments.complete' => 'Terminer les évaluations', 'assessments.reopen' => 'Rouvrir les évaluations', 'grades.correct' => 'Corriger les notes', 'grades.view_history' => 'Consulter l’historique des notes',
             'homework.view' => 'Consulter les devoirs', 'homework.manage' => 'Gérer les devoirs',
             'observations.view' => 'Consulter les observations', 'observations.manage' => 'Gérer les observations',
             'administrative_documents.view' => 'Consulter les documents administratifs', 'administrative_documents.manage' => 'Gérer les documents administratifs',
@@ -43,6 +47,19 @@ final class PermissionCatalog
         return self::aliases()[$key] ?? $key;
     }
 
+    public static function legacyFor(string $key): ?string
+    {
+        return [
+            'absences.view' => 'student_attendance.view',
+            'absences.create' => 'student_attendance.record',
+            'absences.update' => 'student_attendance.record',
+            'absences.delete' => 'student_attendance.record',
+            'student_absences.manage' => 'student_attendance.record',
+            'teacher_absences.manage' => 'student_attendance.record',
+            'absence_justifications.manage' => 'student_attendance.justify',
+        ][$key] ?? null;
+    }
+
     /** @return array<string, string> */
     private static function aliases(): array
     {
@@ -50,7 +67,7 @@ final class PermissionCatalog
             'staff.viewAny' => 'employees.view', 'staff.view' => 'employees.view', 'staff.create' => 'employees.create', 'staff.update' => 'employees.update', 'staff.changeStatus' => 'employees.update', 'staff.manageTypes' => 'employees.update',
             'attendance.view' => 'staff_attendance.view', 'attendance.students.manage' => 'student_attendance.record', 'attendance.teachers.manage' => 'staff_attendance.record', 'attendance.employees.manage' => 'staff_attendance.record', 'attendance.validate' => 'staff_attendance.justify', 'attendance.correct_locked' => 'staff_attendance.justify', 'attendance.reports.view' => 'staff_attendance.view',
             'timetable.view' => 'timetables.view', 'timetable.manage' => 'timetables.manage',
-            'school_attendance.view' => 'student_attendance.view', 'school_attendance.manage' => 'student_attendance.record',
+            'school_attendance.view' => 'absences.view', 'school_attendance.manage' => 'student_absences.manage',
             'academic_year.view' => 'academic_years.view', 'academic_year.create' => 'academic_years.manage', 'academic_year.update' => 'academic_years.manage', 'academic_year.activate' => 'academic_years.manage', 'academic_year.close' => 'academic_years.manage', 'academic_year.archive' => 'academic_years.manage',
             'badges.print' => 'badges.manage', 'badges.reissue' => 'badges.manage',
             'certificates.issue' => 'certificates.manage', 'certificates.print' => 'certificates.manage',

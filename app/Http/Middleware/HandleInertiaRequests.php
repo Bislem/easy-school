@@ -4,6 +4,8 @@ namespace App\Http\Middleware;
 
 use App\Models\AcademicYear;
 use App\Models\CompanySetting;
+use App\Models\SchoolAnnouncement;
+use App\Enums\UserRole;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
@@ -54,12 +56,15 @@ class HandleInertiaRequests extends Middleware
         $authenticatedUser = $isPlatformAdmin
             ? auth('super_admin')->user()
             : $request->user();
+        $authenticatedTenant = $isPlatformAdmin
+            ? null
+            : ($request->attributes->get('tenant') ?? $authenticatedUser?->tenant);
         $effectivePermissions = (! $isPlatformAdmin && $authenticatedUser && Schema::hasTable('roles'))
             ? app(AuthorizationService::class)->permissions($authenticatedUser)
             : [];
         $academicYears = collect();
         $selectedAcademicYear = null;
-        if (! $isPlatformAdmin && $authenticatedUser?->tenant?->organization_type === 'private_school' && Schema::hasTable('academic_years')) {
+        if (! $isPlatformAdmin && $authenticatedTenant?->organization_type === 'private_school' && Schema::hasTable('academic_years')) {
             $academicYears = AcademicYear::orderByDesc('start_date')->get(['id', 'name', 'status', 'start_date', 'end_date']);
             $selectedId = $request->session()->get('academic_year_id');
             $selectedAcademicYear = $academicYears->firstWhere('id', (int) $selectedId)
@@ -75,7 +80,7 @@ class HandleInertiaRequests extends Middleware
             'quote' => ['message' => trim($message), 'author' => trim($author)],
             'auth' => [
                 'user' => $authenticatedUser,
-                'tenant' => $authenticatedUser?->tenant?->only(['id', 'name', 'slug', 'logo_url', 'status', 'account_type', 'organization_type', 'demo_expires_at']),
+                'tenant' => $authenticatedTenant?->only(['id', 'name', 'slug', 'logo_url', 'status', 'account_type', 'organization_type', 'demo_expires_at']),
                 'permissions' => $effectivePermissions,
             ],
             'academic_years' => $academicYears,
@@ -85,6 +90,15 @@ class HandleInertiaRequests extends Middleware
             'auth_notifications' => fn () => $isPlatformAdmin ? [] : ($request->user()?->portalNotifications()
                 ->limit(10)
                 ->get(['id', 'type', 'title', 'message', 'data', 'read_at', 'occurred_at']) ?? []),
+            'latest_parent_announcement' => function () use ($isPlatformAdmin, $request) {
+                $user = $request->user();
+                if ($isPlatformAdmin || ! $user || $user->role !== UserRole::PARENT) return null;
+                $item = $user->portalNotifications()->where('type', 'announcement.new')->whereNull('read_at')
+                    ->whereHasMorph('related', [SchoolAnnouncement::class], fn ($query) => $query->where('status', 'published'))
+                    ->latest('occurred_at')->first();
+                return $item ? ['notification_id' => $item->id, 'title' => $item->title, 'message' => $item->message,
+                    'poster_url' => $item->data['poster_url'] ?? null, 'published_at' => $item->occurred_at?->toIso8601String()] : null;
+            },
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
             'csrf_token' => csrf_token(),
             'fileUploadConfig' => [

@@ -127,9 +127,16 @@ class TrainingPlansController extends Controller
         ]);
         $trainingPlan->groups->each(function ($group) {
             $group->setAttribute('planned_hours', round($group->sessions->sum(fn ($session) => $session->starts_at->diffInMinutes($session->ends_at)) / 60, 1));
-            $records=$group->sessions->flatMap->attendances;$present=$records->whereIn('status',['present','late'])->count();
-            $repeated=$records->where('status','absent')->groupBy('student_id')->filter(fn($items)=>$items->count()>=3)->count();
-            $group->setAttribute('attendance_stats',['rate'=>$records->count()?round($present/$records->count()*100,1):null,'repeated_absences'=>$repeated,'missing_sessions'=>$group->sessions->where('attendance_status','pending')->count()]);
+            $records = $group->sessions->flatMap->attendances;
+            $recordedSessions = $group->sessions->whereIn('attendance_status', ['completed', 'validated']);
+            $expectedAttendances = $recordedSessions->count() * $group->enrollments->count();
+            $absences = $records->whereIn('status', ['absent', 'excused'])->count();
+            $repeated = $records->whereIn('status', ['absent', 'excused'])->groupBy('student_id')->filter(fn ($items) => $items->count() >= 3)->count();
+            $group->setAttribute('attendance_stats', [
+                'rate' => $expectedAttendances ? round(max(0, $expectedAttendances - $absences) / $expectedAttendances * 100, 1) : null,
+                'repeated_absences' => $repeated,
+                'missing_sessions' => $group->sessions->where('attendance_status', 'pending')->count(),
+            ]);
         });
 
         return Inertia::render('Admin/TrainingPlans/Show', [
@@ -376,17 +383,14 @@ class TrainingPlansController extends Controller
         $this->authorizePlanning($request, $trainingPlan, 'attendance');
         $this->ensureGroup($trainingPlan, $group);
         abort_unless($session->training_plan_group_id === $group->id, 404);
-        if ($session->attendance_status !== 'pending' || $session->attendances()->exists()) {
-            throw ValidationException::withMessages(['attendance' => 'Les présences ont déjà été saisies. Toute correction doit être effectuée dans le module Présences avec un justificatif.']);
-        }
-        $validated = $request->validate(['attendances' => ['required', 'array'], 'attendances.*' => ['required', Rule::in(['present', 'absent', 'late', 'excused'])], 'validate_session' => ['sometimes', 'boolean']]);
-        $records=collect($validated['attendances'])->map(fn($status,$studentId)=>['student_id'=>(int)$studentId,'status'=>$status])->values()->all();
-        app(AttendanceService::class)->recordStudents($session,$records,$request->user()->id);
-        if ($validated['validate_session'] ?? false) {
-            app(AttendanceService::class)->validate($session, $request->user()->id);
-            return back()->with('success', 'Présences et séance validées définitivement. Le formateur est marqué présent.');
-        }
-        return back()->with('success', 'Présences enregistrées une fois. La séance reste à valider.');
+        abort_if($session->attendance_locked_at || $session->attendance_status === 'validated', 422, 'Les absences de cette séance sont verrouillées.');
+        $validated = $request->validate([
+            'student_ids' => ['present', 'array'],
+            'student_ids.*' => ['integer', 'distinct'],
+        ]);
+        app(AttendanceService::class)->syncTrainingSessionAbsences($session, $validated['student_ids'] ?? [], $request->user()->id);
+
+        return back()->with('success', 'Absences de la séance enregistrées. Les autres étudiants sont considérés présents.');
     }
 
     private function notifySessionAudience(TrainingPlan $plan,TrainingPlanGroup $group,TrainingSession $session,string $type,string $title,string $message): void

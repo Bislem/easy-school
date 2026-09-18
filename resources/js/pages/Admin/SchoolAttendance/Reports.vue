@@ -41,7 +41,7 @@ const props = defineProps<{
 }>();
 const filters = reactive({ ...props.filters });
 function apply() {
-    router.get('/admin/school-attendance/reports', filters, {
+    router.get('/admin/school-absence/reports', filters, {
         preserveState: true,
         replace: true,
     });
@@ -51,7 +51,7 @@ function changeScope() {
     apply();
 }
 function exportUrl(format: string) {
-    return `/admin/school-attendance/reports/export/${format}?${new URLSearchParams(
+    return `/admin/school-absence/reports/export/${format}?${new URLSearchParams(
         Object.entries(filters)
             .filter(([, value]) => value !== null && value !== '')
             .map(([key, value]) => [key, String(value)]),
@@ -60,7 +60,7 @@ function exportUrl(format: string) {
 </script>
 
 <template>
-    <Head title="Rapports de présence" />
+    <Head title="Rapports d’absences" />
     <AdminLayout
         ><main
             class="min-h-full flex-1 space-y-5 bg-slate-50/60 p-4 sm:p-6 lg:p-8"
@@ -68,18 +68,19 @@ function exportUrl(format: string) {
             <header class="flex flex-wrap items-center justify-between gap-3">
                 <div>
                     <a
-                        href="/admin/school-attendance"
+                        href="/admin/school-absence"
                         class="mb-2 inline-flex items-center gap-1 text-sm text-blue-600"
-                        ><ArrowLeft class="size-4" />Retour aux présences</a
+                        ><ArrowLeft class="size-4" />Retour aux absences</a
                     >
                     <h1 class="flex items-center gap-2 text-2xl font-semibold">
                         <span class="rounded-xl bg-blue-600 p-2 text-white"
                             ><FileText class="size-5" /></span
-                        >Rapports de présence
+                        >Rapports d’absences
                     </h1>
                     <p class="mt-1 text-sm text-muted-foreground">
-                        Les présences sont calculées depuis l’emploi du temps,
-                        sans lignes de présence artificielles.
+                        Les présences sont déduites des séances prévues moins
+                        les absences, sans créer de lignes de présence
+                        artificielles.
                     </p>
                 </div>
                 <div class="flex gap-2">

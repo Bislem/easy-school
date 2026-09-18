@@ -14,6 +14,7 @@ import {
 const props = defineProps<{
     stats: Record<string, number>;
     recentSchools: Array<any>;
+    parentAccountNotifications: Array<any>;
 }>();
 const basePath = (usePage().props.superAdmin as any).basePath as string;
 const cards = [
@@ -71,5 +72,41 @@ const cards = [
                 </div></CardContent
             ></Card
         >
+        <Card class="mt-6">
+            <CardContent class="p-0">
+                <div class="border-b p-5">
+                    <h2 class="font-bold">Activité des comptes parents</h2>
+                    <p class="text-xs text-muted-foreground">
+                        Changements à prendre en compte pour la facturation.
+                    </p>
+                </div>
+                <div
+                    v-for="notification in parentAccountNotifications"
+                    :key="notification.id"
+                    class="flex items-start justify-between gap-4 border-b p-4 last:border-0"
+                >
+                    <div>
+                        <p class="font-semibold">{{ notification.title }}</p>
+                        <p class="text-sm text-muted-foreground">
+                            {{ notification.tenant?.name }} ·
+                            {{ notification.message }}
+                        </p>
+                    </div>
+                    <time class="shrink-0 text-xs text-muted-foreground">
+                        {{
+                            new Date(notification.created_at).toLocaleString(
+                                'fr-DZ',
+                            )
+                        }}
+                    </time>
+                </div>
+                <p
+                    v-if="!parentAccountNotifications.length"
+                    class="p-6 text-center text-sm text-muted-foreground"
+                >
+                    Aucun changement de compte parent.
+                </p>
+            </CardContent>
+        </Card>
     </SuperAdminLayout>
 </template>

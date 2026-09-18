@@ -85,9 +85,25 @@ test('subjects are assigned to levels teachers and room requirements', function 
     $tenant = Tenant::factory()->create();
     $admin = User::factory()->create(['tenant_id' => $tenant->id, 'role' => UserRole::ADMIN]);
     $f = schoolManagementFixture($tenant);
-    $this->actingAs($admin)->post('/admin/subjects', ['title' => 'Sciences physiques', 'code' => 'PHY', 'category' => 'Sciences', 'color' => '#2563eb', 'weekly_hours' => 3, 'description' => null, 'required_room_types' => ['laboratory'], 'is_specialized' => true, 'is_active' => true, 'school_level_ids' => [$f['level']->id], 'teacher_ids' => [$f['teacher']->id]])->assertSessionHasNoErrors();
+    app(TenantContext::class)->set($tenant);
+    $specializedLevel = SchoolLevel::create([
+        'school_cycle_id' => $f['cycle']->id,
+        'name' => '2AS',
+        'code' => '2AS',
+        'specialization' => 'Sciences expérimentales',
+        'sort_order' => 2,
+    ]);
+    app(TenantContext::class)->clear();
+
+    $this->actingAs($admin)->post('/admin/subjects', ['title' => 'Sciences physiques', 'code' => 'PHY', 'category' => 'Sciences', 'color' => '#2563eb', 'weekly_hours' => 3, 'description' => null, 'required_room_types' => ['laboratory'], 'is_specialized' => true, 'is_active' => true, 'level_assignments' => [
+        ['school_level_id' => $f['level']->id, 'coefficient' => 2],
+        ['school_level_id' => $specializedLevel->id, 'coefficient' => 5],
+    ], 'teacher_ids' => [$f['teacher']->id]])->assertSessionHasNoErrors();
     $subject = Course::where('code', 'PHY')->first();
-    expect($subject->schoolLevels()->whereKey($f['level']->id)->exists())->toBeTrue()->and($subject->teachers()->whereKey($f['teacher']->id)->exists())->toBeTrue()->and($subject->required_room_types)->toBe(['laboratory']);
+    expect((float) $subject->schoolLevels()->whereKey($f['level']->id)->firstOrFail()->pivot->coefficient)->toBe(2.0)
+        ->and((float) $subject->schoolLevels()->whereKey($specializedLevel->id)->firstOrFail()->pivot->coefficient)->toBe(5.0)
+        ->and($subject->teachers()->whereKey($f['teacher']->id)->exists())->toBeTrue()
+        ->and($subject->required_room_types)->toBe(['laboratory']);
 });
 
 test('room management stores scheduling type and reservation availability', function () {

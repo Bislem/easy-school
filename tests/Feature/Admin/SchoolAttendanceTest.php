@@ -20,6 +20,7 @@ use App\Models\TimetableSession;
 use App\Models\User;
 use App\Services\AttendanceReportingService;
 use App\Services\AttendanceService;
+use App\Services\DefaultTenantRoles;
 use App\Tenancy\TenantContext;
 use Illuminate\Support\Facades\Event;
 
@@ -38,6 +39,7 @@ function schoolAttendanceFixture(Tenant $tenant, string $yearName = '2026-2027')
     $student = Student::create(['first_name' => 'Amine', 'last_name' => 'Test', 'email' => fake()->unique()->safeEmail(), 'phone' => '0550000000', 'registration_date' => '2026-09-01', 'status' => 'active', 'is_active' => true]);
     StudentAcademicEnrollment::create(['academic_year_id' => $year->id, 'student_id' => $student->id, 'school_level_id' => $level->id, 'school_group_id' => $group->id, 'status' => 'enrolled', 'enrollment_date' => '2026-09-01']);
     $session = TimetableSession::create(['academic_year_id' => $year->id, 'school_group_id' => $group->id, 'course_id' => $subject->id, 'teacher_id' => $teacher->id, 'classroom_id' => $room->id, 'day' => 1, 'start_time' => '08:00', 'end_time' => '09:00', 'recurrence' => 'weekly', 'status' => 'published']);
+    app(DefaultTenantRoles::class)->provision($tenant);
     app(TenantContext::class)->clear();
 
     return compact('tenant', 'year', 'group', 'teacher', 'admin', 'student', 'session');
@@ -100,7 +102,7 @@ test('private school admin can open attendance screen defaulting to today', func
     $tenant = Tenant::factory()->create();
     $f = schoolAttendanceFixture($tenant);
     $this->travelTo('2026-09-07');
-    $this->actingAs($f['admin'])->get('/admin/school-attendance')->assertOk()->assertInertia(fn ($page) => $page
+    $this->actingAs($f['admin'])->get('/admin/school-absence')->assertOk()->assertInertia(fn ($page) => $page
         ->component('Admin/SchoolAttendance/Index')->where('date', '2026-09-07')->where('view', 'students'));
 });
 
@@ -146,7 +148,7 @@ test('attendance writes emit uncoupled domain events', function () {
     Event::fake([StudentAbsent::class, StudentLate::class, TeacherAbsent::class]);
     $f = schoolAttendanceFixture(Tenant::factory()->create());
 
-    $this->actingAs($f['admin'])->post('/admin/school-attendance/exceptions', [
+    $this->actingAs($f['admin'])->post('/admin/school-absence/exceptions', [
         'academic_year_id' => $f['year']->id, 'date' => '2026-09-07', 'timetable_session_id' => $f['session']->id,
         'person_type' => 'STUDENT', 'student_id' => $f['student']->id, 'status' => 'ABSENT',
     ])->assertRedirect();
@@ -156,12 +158,47 @@ test('attendance writes emit uncoupled domain events', function () {
     Event::assertNotDispatched(TeacherAbsent::class);
 });
 
+test('absence form loads the selected person timetable for the chosen day', function () {
+    $f = schoolAttendanceFixture(Tenant::factory()->create());
+
+    $studentResponse = $this->actingAs($f['admin'])->getJson('/admin/school-absence/session-options?'.http_build_query([
+        'academic_year_id' => $f['year']->id,
+        'person_type' => 'STUDENT',
+        'student_id' => $f['student']->id,
+        'date' => '2026-09-07',
+    ]));
+    $studentResponse->assertOk()->assertJsonPath('sessions.0.id', $f['session']->id);
+
+    $teacherResponse = $this->actingAs($f['admin'])->getJson('/admin/school-absence/session-options?'.http_build_query([
+        'academic_year_id' => $f['year']->id,
+        'person_type' => 'TEACHER',
+        'teacher_id' => $f['teacher']->id,
+        'date' => '2026-09-07',
+    ]));
+    $teacherResponse->assertOk()->assertJsonPath('sessions.0.id', $f['session']->id);
+});
+
+test('an absence cannot reference a session outside the persons timetable day', function () {
+    $f = schoolAttendanceFixture(Tenant::factory()->create());
+
+    $this->actingAs($f['admin'])->post('/admin/school-absence/exceptions', [
+        'academic_year_id' => $f['year']->id,
+        'date' => '2026-09-08',
+        'timetable_session_id' => $f['session']->id,
+        'person_type' => 'STUDENT',
+        'student_id' => $f['student']->id,
+        'status' => 'ABSENT',
+    ])->assertSessionHasErrors('timetable_session_id');
+
+    expect(AttendanceException::count())->toBe(0);
+});
+
 test('attendance reports are available as screen csv and pdf', function () {
     $f = schoolAttendanceFixture(Tenant::factory()->create());
     $query = '?academic_year_id='.$f['year']->id.'&scope=student&entity_id='.$f['student']->id.'&period_type=month&month=2026-09';
 
-    $this->actingAs($f['admin'])->get('/admin/school-attendance/reports'.$query)->assertOk()
+    $this->actingAs($f['admin'])->get('/admin/school-absence/reports'.$query)->assertOk()
         ->assertInertia(fn ($page) => $page->component('Admin/SchoolAttendance/Reports')->has('rows', 1));
-    $this->get('/admin/school-attendance/reports/export/csv'.$query)->assertOk()->assertHeader('content-type', 'text/csv; charset=UTF-8');
-    $this->get('/admin/school-attendance/reports/export/pdf'.$query)->assertOk()->assertHeader('content-type', 'application/pdf');
+    $this->get('/admin/school-absence/reports/export/csv'.$query)->assertOk()->assertHeader('content-type', 'text/csv; charset=UTF-8');
+    $this->get('/admin/school-absence/reports/export/pdf'.$query)->assertOk()->assertHeader('content-type', 'application/pdf');
 });

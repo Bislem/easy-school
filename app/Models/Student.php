@@ -25,6 +25,8 @@ class Student extends Model
         'address',
         'registration_date', 'school_level', 'status',
         'notes',
+        'blood_type', 'allergies', 'chronic_conditions', 'medications', 'medical_notes',
+        'emergency_contact_name', 'emergency_contact_phone',
         'is_active',
     ];
 

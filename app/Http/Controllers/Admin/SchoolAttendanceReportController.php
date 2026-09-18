@@ -26,6 +26,15 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class SchoolAttendanceReportController extends Controller
 {
+    public function settings(): Response
+    {
+        Gate::authorize(SchoolAttendancePermission::MANAGE_JUSTIFICATIONS->value);
+
+        return Inertia::render('Admin/SchoolAttendance/Settings', [
+            'attendanceSettings' => AttendanceSetting::current(),
+        ]);
+    }
+
     public function index(Request $request, AttendanceReportingService $reporting): Response
     {
         Gate::authorize(SchoolAttendancePermission::VIEW->value);
@@ -59,9 +68,9 @@ class SchoolAttendanceReportController extends Controller
             'Retards' => $row['late_arrivals'], 'Taux de présence' => $row['attendance_percentage'].'%',
             'Séances affectées' => collect($row['affected_teaching_sessions'] ?? [])->map(fn ($s) => "{$s['date']} {$s['group']} {$s['subject']} {$s['start_time']}")->join(' | '),
         ]);
-        $filename = "presences-{$scope}-{$from->format('Ymd')}-{$to->format('Ymd')}";
+        $filename = "absences-{$scope}-{$from->format('Ymd')}-{$to->format('Ymd')}";
         if ($format === 'pdf') {
-            return Pdf::loadView('admin.reports.table', ['title' => 'Rapport des présences', 'rows' => $rows, 'from' => $from, 'to' => $to])->setPaper('a4', 'landscape')->download($filename.'.pdf');
+            return Pdf::loadView('admin.reports.table', ['title' => 'Rapport des absences', 'rows' => $rows, 'from' => $from, 'to' => $to])->setPaper('a4', 'landscape')->download($filename.'.pdf');
         }
 
         return response()->streamDownload(function () use ($rows): void {
@@ -79,7 +88,7 @@ class SchoolAttendanceReportController extends Controller
 
     public function updateSettings(Request $request): RedirectResponse
     {
-        Gate::authorize(SchoolAttendancePermission::MANAGE->value);
+        Gate::authorize(SchoolAttendancePermission::MANAGE_JUSTIFICATIONS->value);
         $data = $request->validate([
             'monthly_absence_threshold' => ['required', 'integer', 'between:1,100'],
             'consecutive_days_threshold' => ['required', 'integer', 'between:1,30'],

@@ -24,6 +24,10 @@ class DashboardController extends Controller
 {
     public function __invoke(Request $request): Response|RedirectResponse
     {
+        if ($request->user()->role === UserRole::PARENT) {
+            return redirect()->route('parent.dashboard');
+        }
+
         if ($request->user()->role !== UserRole::ADMIN) {
             return redirect()->route('portal.dashboard');
         }

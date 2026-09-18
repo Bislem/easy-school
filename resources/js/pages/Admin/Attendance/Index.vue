@@ -25,13 +25,15 @@ import {
     UserRoundCheck,
     UserRoundX,
 } from 'lucide-vue-next';
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 
 interface Props {
     personType: 'student' | 'employee';
     selectedPerson: any | null;
     students: any[];
     employees: any[];
+    groups: any[];
+    daySessions: any[];
     records: { data: any[]; links: any[] };
     teachers: any[];
     filters: any;
@@ -51,6 +53,8 @@ const selectedRecord = ref<any | null>(null);
 const filters = useForm({
     person_type: props.personType,
     person_id: props.filters.person_id ? String(props.filters.person_id) : '',
+    group_id: props.filters.group_id ? String(props.filters.group_id) : '',
+    date: props.filters.date ?? new Date().toISOString().slice(0, 10),
     date_from: props.filters.date_from ?? '',
     date_to: props.filters.date_to ?? '',
     status: props.filters.status ?? '',
@@ -67,6 +71,16 @@ const correction = useForm({
     notes: '',
     correction_reason: '',
 });
+const absenceForm = useForm<{ session_ids: number[] }>({ session_ids: [] });
+watch(
+    () => props.daySessions,
+    (sessions) => {
+        absenceForm.session_ids = sessions
+            .filter((session) => session.is_absent && !session.is_locked)
+            .map((session) => session.id);
+    },
+    { immediate: true },
+);
 const people = computed(() =>
     props.personType === 'student' ? props.students : props.employees,
 );
@@ -167,6 +181,14 @@ function changeType(type: 'student' | 'employee') {
     filters.person_id = '';
     navigate({ person_type: type, person_id: '' });
 }
+function changeGroup() {
+    filters.person_id = '';
+    search.value = '';
+    navigate({ group_id: filters.group_id, person_id: '' });
+}
+function changeDay() {
+    navigate({ date: filters.date });
+}
 function selectPerson(id: number) {
     filters.person_id = String(id);
     navigate({ person_id: String(id) });
@@ -179,6 +201,29 @@ function clearFilters() {
     filters.date_to = '';
     filters.status = '';
     navigate();
+}
+function toggleSession(sessionId: number) {
+    absenceForm.session_ids = absenceForm.session_ids.includes(sessionId)
+        ? absenceForm.session_ids.filter((id) => id !== sessionId)
+        : [...absenceForm.session_ids, sessionId];
+}
+function isSessionAbsent(session: any) {
+    return session.is_locked
+        ? session.is_absent
+        : absenceForm.session_ids.includes(session.id);
+}
+function saveDayAbsences() {
+    if (!props.selectedPerson || !filters.group_id) return;
+    absenceForm
+        .transform((data) => ({
+            ...data,
+            group_id: Number(filters.group_id),
+            student_id: props.selectedPerson.id,
+            date: filters.date,
+        }))
+        .put('/admin/attendance/student-day-absences', {
+            preserveScroll: true,
+        });
 }
 function openCorrection(record: any | null = null) {
     selectedRecord.value = record;
@@ -251,7 +296,7 @@ const time = (value?: string | null) =>
 </script>
 
 <template>
-    <Head title="Présences" /><AdminLayout
+    <Head title="Absences et pointages" /><AdminLayout
         ><main class="flex min-h-0 flex-1 flex-col bg-muted/15 lg:flex-row">
             <aside
                 class="w-full shrink-0 border-b bg-card lg:w-80 lg:border-r lg:border-b-0"
@@ -260,7 +305,7 @@ const time = (value?: string | null) =>
                     class="space-y-5 p-4 lg:sticky lg:top-0 lg:max-h-screen lg:overflow-y-auto"
                 >
                     <div>
-                        <h1 class="text-xl font-bold">Présences</h1>
+                        <h1 class="text-xl font-bold">Absences et pointages</h1>
                         <p class="text-sm text-muted-foreground">
                             Sélectionnez une personne pour consulter son
                             calendrier.
@@ -293,6 +338,25 @@ const time = (value?: string | null) =>
                             />Employés
                         </button>
                     </div>
+                    <div v-if="personType === 'student'" class="space-y-3">
+                        <div>
+                            <Label>Groupe</Label>
+                            <select
+                                v-model="filters.group_id"
+                                class="mt-1 h-10 w-full rounded-md border bg-background px-3 text-sm"
+                                @change="changeGroup"
+                            >
+                                <option value="">Sélectionner un groupe</option>
+                                <option v-for="group in groups" :key="group.id" :value="String(group.id)">
+                                    {{ group.name }} · {{ group.planning || group.course }}
+                                </option>
+                            </select>
+                        </div>
+                        <div>
+                            <Label>Journée</Label>
+                            <Input v-model="filters.date" class="mt-1" type="date" @change="changeDay" />
+                        </div>
+                    </div>
                     <div>
                         <Label>Rechercher</Label>
                         <div class="relative mt-1">
@@ -309,6 +373,7 @@ const time = (value?: string | null) =>
                             />
                         </div>
                         <div
+                            v-if="personType === 'employee' || filters.group_id"
                             class="mt-2 max-h-64 space-y-1 overflow-y-auto rounded-lg border p-1"
                         >
                             <button
@@ -355,8 +420,12 @@ const time = (value?: string | null) =>
                                 Aucun résultat.
                             </p>
                         </div>
+                        <p v-else class="mt-2 rounded-lg border border-dashed p-3 text-sm text-muted-foreground">
+                            Sélectionnez d’abord un groupe.
+                        </p>
                     </div>
                     <form
+                        v-if="personType === 'employee'"
                         class="space-y-3 border-t pt-4"
                         @submit.prevent="applyFilters"
                     >
@@ -433,7 +502,56 @@ const time = (value?: string | null) =>
                             >Ajouter un pointage</Button
                         >
                     </header>
-                    <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+                    <section
+                        v-if="personType === 'student'"
+                        class="overflow-hidden rounded-2xl border bg-card shadow-sm"
+                    >
+                        <div class="border-b p-5">
+                            <h3 class="font-semibold">Séances du {{ filters.date }}</h3>
+                            <p class="mt-1 text-sm text-muted-foreground">
+                                Cochez seulement les séances où l’étudiant était absent. Une séance non cochée signifie qu’il était présent.
+                            </p>
+                        </div>
+                        <form class="space-y-4 p-5" @submit.prevent="saveDayAbsences">
+                            <div v-if="daySessions.length" class="space-y-2">
+                                <label
+                                    v-for="session in daySessions"
+                                    :key="session.id"
+                                    class="flex items-center gap-4 rounded-xl border p-4"
+                                    :class="isSessionAbsent(session) ? 'border-red-300 bg-red-50/70' : 'bg-background'"
+                                >
+                                    <input
+                                        type="checkbox"
+                                        class="size-5"
+                                        :checked="isSessionAbsent(session)"
+                                        :disabled="session.is_locked"
+                                        @change="toggleSession(session.id)"
+                                    />
+                                    <span class="min-w-0 flex-1">
+                                        <b class="block">{{ session.title }}</b>
+                                        <span class="text-sm text-muted-foreground">
+                                            {{ time(session.starts_at) }}–{{ time(session.ends_at) }}
+                                            <template v-if="session.room"> · {{ session.room }}</template>
+                                            <template v-if="session.teacher"> · {{ session.teacher }}</template>
+                                        </span>
+                                    </span>
+                                    <span v-if="session.is_locked" class="text-xs text-muted-foreground">Validée</span>
+                                    <span v-else-if="isSessionAbsent(session)" class="rounded-full bg-red-100 px-2.5 py-1 text-xs font-semibold text-red-700">Absent</span>
+                                    <span v-else class="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-700">Présent</span>
+                                </label>
+                            </div>
+                            <div v-else class="rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">
+                                Aucune séance planifiée pour cet étudiant durant cette journée.
+                            </div>
+                            <InputError :message="Object.values(absenceForm.errors)[0]" />
+                            <div class="flex justify-end">
+                                <Button :disabled="absenceForm.processing || !daySessions.length">
+                                    Enregistrer les absences
+                                </Button>
+                            </div>
+                        </form>
+                    </section>
+                    <div v-if="personType === 'employee'" class="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
                         <article
                             v-for="card in [
                                 {
@@ -542,7 +660,7 @@ const time = (value?: string | null) =>
                                             :key="record.id"
                                             class="w-full rounded-md border p-2 text-left text-xs transition hover:shadow-sm"
                                             :class="statusTone[record.status]"
-                                            @click="openCorrection(record)"
+                                            @click="personType === 'employee' && openCorrection(record)"
                                         >
                                             <b class="block">{{
                                                 statusLabels[record.status] ??

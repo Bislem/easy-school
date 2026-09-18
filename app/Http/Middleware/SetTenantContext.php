@@ -2,6 +2,8 @@
 
 namespace App\Http\Middleware;
 
+use App\Enums\UserRole;
+use App\Models\MobileMembership;
 use App\Tenancy\TenantContext;
 use Closure;
 use Illuminate\Http\Request;
@@ -22,8 +24,29 @@ final class SetTenantContext
             return $next($request);
         }
 
-        if ($request->user()?->tenant_id) {
-            $context->set($request->user()->tenant_id);
+        $user = $request->user();
+        $tenant = $user?->tenant;
+
+        if ($user?->role === UserRole::PARENT && ! $tenant) {
+            $membershipQuery = MobileMembership::with('tenant')
+                ->where('user_id', $user->id)
+                ->where('role', UserRole::PARENT->value)
+                ->where('is_active', true);
+            $selectedTenantId = (int) $request->session()->get('parent.tenant_id');
+            $membership = $selectedTenantId
+                ? (clone $membershipQuery)->where('tenant_id', $selectedTenantId)->first()
+                : null;
+            $membership ??= $membershipQuery->first();
+            $tenant = $membership?->tenant;
+
+            if ($tenant) {
+                $request->session()->put('parent.tenant_id', $tenant->id);
+            }
+        }
+
+        if ($tenant) {
+            $context->set($tenant);
+            $request->attributes->set('tenant', $tenant);
             config([
                 'vilt-filepond.temp_path' => 'tenants/'.$context->id().'/temp-files',
                 'vilt-filepond.files_path' => 'tenants/'.$context->id().'/files',

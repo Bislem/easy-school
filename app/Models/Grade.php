@@ -1,0 +1,4 @@
+<?php
+namespace App\Models;
+use Illuminate\Database\Eloquent\Model; use Illuminate\Database\Eloquent\Relations\BelongsTo;
+class Grade extends Model { protected $fillable=['tenant_id','assessment_id','student_id','student_academic_enrollment_id','value','status','entered_by','comment']; protected function casts():array{return ['value'=>'decimal:2'];} public function assessment():BelongsTo{return $this->belongsTo(Assessment::class);} public function student():BelongsTo{return $this->belongsTo(Student::class);} public function enrollment():BelongsTo{return $this->belongsTo(StudentAcademicEnrollment::class,'student_academic_enrollment_id');} public function enteredBy():BelongsTo{return $this->belongsTo(User::class,'entered_by');} public function normalizedValue():?float{return $this->value===null?null:round(((float)$this->value/(float)$this->assessment->maximum_grade)*20,2);}}

@@ -44,7 +44,10 @@ class FcmTokenController extends Controller
     {
         $data = $request->validate(['token' => ['required', 'string', 'max:4096']]);
 
-        FcmToken::updateOrCreate(
+        // token_hash is globally unique, while the model's tenant scope can
+        // hide an existing token during a tenant switch. Look up the unique
+        // token without the scope so repeated page loads remain idempotent.
+        FcmToken::withoutGlobalScopes()->updateOrCreate(
             ['token_hash' => hash('sha256', $data['token'])],
             ['token' => $data['token'], 'user_id' => $request->user()->id, 'user_agent' => mb_substr((string) $request->userAgent(), 0, 500), 'last_used_at' => now()],
         );

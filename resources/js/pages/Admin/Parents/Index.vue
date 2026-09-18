@@ -6,8 +6,6 @@ import AdminLayout from '@/layouts/AdminLayout.vue';
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
 import {
     Check,
-    Eye,
-    EyeOff,
     FolderOpen,
     KeyRound,
     Pencil,
@@ -111,13 +109,6 @@ function save() {
 }
 function toggle(p: any) {
     router.patch(`/admin/parents/${p.id}/toggle`, {}, { preserveScroll: true });
-}
-function toggleVisibility(parent: any, student: any) {
-    router.patch(
-        `/admin/parents/${parent.id}/children/${student.id}/visibility`,
-        {},
-        { preserveScroll: true },
-    );
 }
 </script>
 <template>
@@ -225,37 +216,8 @@ function toggleVisibility(parent: any, student: any) {
                                             >·
                                             {{ s.school_level || '—' }}</small
                                         >
-                                        <small
-                                            class="ml-2 rounded-full px-2 py-0.5"
-                                            :class="
-                                                s.pivot.is_visible
-                                                    ? 'bg-emerald-100 text-emerald-700'
-                                                    : 'bg-slate-200 text-slate-600'
-                                            "
-                                            >{{
-                                                s.pivot.is_visible
-                                                    ? 'Visible'
-                                                    : 'Masqué'
-                                            }}</small
-                                        >
                                     </span>
                                     <span class="flex gap-2">
-                                        <Button
-                                            size="sm"
-                                            variant="outline"
-                                            @click="toggleVisibility(p, s)"
-                                        >
-                                            <EyeOff
-                                                v-if="s.pivot.is_visible"
-                                                class="mr-1 size-4"
-                                            />
-                                            <Eye v-else class="mr-1 size-4" />
-                                            {{
-                                                s.pivot.is_visible
-                                                    ? 'Masquer'
-                                                    : 'Rendre visible'
-                                            }}
-                                        </Button>
                                         <Button
                                             size="sm"
                                             variant="outline"

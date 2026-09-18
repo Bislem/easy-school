@@ -8,6 +8,18 @@ import AppDialogs from './components/AppDialogs.vue';
 import { initializeTheme } from './composables/useAppearance';
 import { startFirebaseMessaging } from './lib/firebase-messaging';
 
+function registerPwa() {
+    if (!('serviceWorker' in navigator)) return;
+
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' }).then((registration) => {
+            registration.update().catch(() => undefined);
+        }).catch(() => undefined);
+    });
+}
+
+registerPwa();
+
 const appName = import.meta.env.VITE_APP_NAME || 'Gestion scolaire';
 
 const pages = import.meta.glob<DefineComponent>([
@@ -28,6 +40,7 @@ const pages = import.meta.glob<DefineComponent>([
     './pages/Admin/Courses/**/*.vue',
     './pages/Admin/Students/**/*.vue',
     './pages/Admin/Parents/**/*.vue',
+    './pages/Admin/Announcements/**/*.vue',
     './pages/Admin/EnrollmentForms/**/*.vue',
     './pages/Admin/Expenses/**/*.vue',
     './pages/Admin/Salaries/**/*.vue',
@@ -46,11 +59,15 @@ const pages = import.meta.glob<DefineComponent>([
     './pages/Admin/AcademicYears/**/*.vue',
     './pages/Admin/SchoolAttendance/**/*.vue',
     './pages/Admin/SchoolDocuments/**/*.vue',
+    './pages/Admin/ReportCards/**/*.vue',
+    './pages/Admin/Assessments/**/*.vue',
+    './pages/Admin/Gradebook/**/*.vue',
     './pages/Admin/PrivateSchoolCampaigns/**/*.vue',
     './pages/Admin/PrivateSchoolInscriptions/**/*.vue',
     './pages/Salary/**/*.vue',
     './pages/Badge/**/*.vue',
     './pages/Portal/**/*.vue',
+    './pages/Parent/**/*.vue',
     './pages/Certificates/**/*.vue',
     './pages/Public/**/*.vue',
 ]);

@@ -272,9 +272,27 @@ const showPassword = ref(false);
                         </button>
                     </Form>
 
+                    <div
+                        class="mt-6 flex items-center gap-3"
+                        aria-hidden="true"
+                    >
+                        <span class="h-px flex-1 bg-slate-200"></span>
+                        <span class="text-xs font-semibold text-slate-400"
+                            >ou</span
+                        >
+                        <span class="h-px flex-1 bg-slate-200"></span>
+                    </div>
+
+                    <Link
+                        href="/parent/login"
+                        class="mt-6 flex items-center justify-center gap-2 rounded-xl border border-[#11aa9f] bg-teal-50 px-4 py-3 text-sm font-bold text-[#078f88] transition hover:bg-teal-100 focus-visible:ring-3 focus-visible:ring-[#13bba8]/20 focus-visible:outline-none"
+                    >
+                        <UsersRound class="size-5" /> Accéder à l’espace parent
+                    </Link>
+
                     <Link
                         href="/register-school"
-                        class="mt-6 flex items-center justify-center gap-2 rounded-xl border border-[#11aa9f] px-4 py-3 text-sm font-bold text-[#078f88] transition hover:bg-teal-50"
+                        class="mt-3 flex items-center justify-center gap-2 rounded-xl border border-slate-200 px-4 py-3 text-sm font-bold text-slate-600 transition hover:bg-slate-50"
                     >
                         <GraduationCap class="size-5" /> Enregistrer un nouvel
                         établissement

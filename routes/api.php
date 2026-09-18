@@ -72,6 +72,8 @@ Route::prefix('mobile/v1')->name('api.mobile.v1.')->group(function () {
             Route::get('children/{student}/planning', [ParentController::class, 'planning']);
             Route::get('children/{student}/attendance', [ParentController::class, 'attendance']);
             Route::get('children/{student}/grades', [ParentController::class, 'grades']);
+            Route::get('children/{student}/report-cards', [ParentController::class, 'reportCards']);
+            Route::get('children/{student}/report-cards/{reportCard}/pdf', [ParentController::class, 'reportCardPdf']);
             Route::get('children/{student}/observations', [ParentController::class, 'observations']);
             Route::post('children/{student}/observations/{observation}/replies', [ParentController::class, 'replyToObservation'])->middleware('throttle:10,1');
             Route::get('children/{student}/certificates', [ParentController::class, 'certificates']);

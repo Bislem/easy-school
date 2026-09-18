@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Enums\UserRole;
 use App\Http\Controllers\Controller;
 use App\Models\MobileMembership;
+use App\Models\PlatformNotification;
 use App\Models\SchoolParent;
 use App\Models\Student;
 use App\Models\User;
@@ -162,16 +163,24 @@ class ParentsController extends Controller
         $membership = $parent->mobileMembership;
         abort_unless($membership, 404);
         $membership->update(['is_active' => ! $membership->is_active]);
+        $activeCount = MobileMembership::where('tenant_id', $membership->tenant_id)
+            ->where('role', UserRole::PARENT->value)
+            ->where('is_active', true)
+            ->count();
+        PlatformNotification::create([
+            'tenant_id' => $membership->tenant_id,
+            'type' => $membership->is_active ? 'parent_account.enabled' : 'parent_account.disabled',
+            'title' => $membership->is_active ? 'Compte parent activé' : 'Compte parent désactivé',
+            'message' => trim($parent->first_name.' '.$parent->last_name).' · '.$activeCount.' compte(s) parent actif(s)',
+            'data' => [
+                'parent_id' => $parent->id,
+                'user_id' => $parent->user_id,
+                'active_parent_accounts' => $activeCount,
+                'enabled' => $membership->is_active,
+            ],
+        ]);
 
         return back()->with('success', $membership->is_active ? 'Accès parent activé pour cet établissement.' : 'Accès parent désactivé pour cet établissement.');
-    }
-
-    public function toggleChildVisibility(SchoolParent $parent, Student $student): RedirectResponse
-    {
-        $link = $parent->students()->whereKey($student->id)->firstOrFail();
-        $parent->students()->updateExistingPivot($student->id, ['is_visible' => ! $link->pivot->is_visible]);
-
-        return back()->with('success', $link->pivot->is_visible ? 'Les données de l’enfant sont maintenant masquées au parent.' : 'Les données de l’enfant sont maintenant visibles au parent.');
     }
 
     private function syncChildren(SchoolParent $parent, array $studentIds): void

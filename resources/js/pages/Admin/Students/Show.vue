@@ -5,13 +5,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import FileUpload from '@/components/ViltFilePond/FileUpload.vue';
 import AdminLayout from '@/layouts/AdminLayout.vue';
-import { Head, Link, useForm, usePage } from '@inertiajs/vue3';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3';
 import {
     ArrowLeft,
     BookOpen,
     CalendarCheck,
     CreditCard,
     FileText,
+    HeartPulse,
     History,
     NotebookPen,
     ReceiptText,
@@ -27,14 +28,54 @@ const props = withDefaults(
         readOnly?: boolean;
         teacherView?: boolean;
         parentView?: boolean;
+        isPrivateSchool?: boolean;
+        academicJourney?: any[];
+        selectedAcademicEnrollment?: any;
+        academicallyActive?: boolean;
     }>(),
-    { readOnly: false, teacherView: false, parentView: false },
+    {
+        readOnly: false,
+        teacherView: false,
+        parentView: false,
+        isPrivateSchool: false,
+        academicJourney: () => [],
+    },
 );
 const page = usePage();
-const activeTab = ref('general');
+const tabFromUrl = () => {
+    const query = page.url.split('?')[1] ?? '';
+
+    return new URLSearchParams(query).get('tab') ?? 'general';
+};
+const activeTab = ref(tabFromUrl());
+const selectedAcademicYearId = ref<number | null>(
+    props.selectedAcademicEnrollment?.academic_year_id ??
+        props.academicJourney?.[0]?.academic_year_id ??
+        null,
+);
+const selectedAcademicContext = computed(
+    () =>
+        props.academicJourney?.find(
+            (item: any) =>
+                item.academic_year_id === selectedAcademicYearId.value,
+        ) ?? null,
+);
+const academicStatusLabels: Record<string, string> = {
+    pending: 'En attente',
+    enrolled: 'En cours',
+    completed: 'Terminée',
+    withdrawn: 'Retiré',
+    transferred: 'Transféré',
+};
+const academicResultLabels: Record<string, string> = {
+    passed: 'Admis',
+    failed: 'Échec',
+    withdrawn: 'Retiré',
+    transferred: 'Transféré',
+};
 const statusForm = useForm({ status: props.student.status, observation: '' });
 const profileForm = useForm({
-    _method: 'put',
+    _method: props.parentView ? 'patch' : 'put',
     first_name: props.student.first_name,
     last_name: props.student.last_name,
     email: props.student.email ?? '',
@@ -60,6 +101,28 @@ const documentForm = useForm({
     document_temp_folders: [] as string[],
     document_removed_files: [] as number[],
 });
+const medicalTempFolders = ref<string[]>([]);
+const medicalRemovedFiles = ref<number[]>([]);
+const medicalForm = useForm({
+    blood_type: props.student.blood_type ?? '',
+    allergies: props.student.allergies ?? '',
+    chronic_conditions: props.student.chronic_conditions ?? '',
+    medications: props.student.medications ?? '',
+    medical_notes: props.student.medical_notes ?? '',
+    emergency_contact_name: props.student.emergency_contact_name ?? '',
+    emergency_contact_phone: props.student.emergency_contact_phone ?? '',
+    medical_temp_folders: [] as string[],
+    medical_removed_files: [] as number[],
+});
+const medicalFiles = ref(
+    (props.student.files ?? [])
+        .filter((file: any) => file.collection === 'medical_documents')
+        .map((file: any) => ({
+            id: file.id,
+            url: file.url,
+            name: file.original_name,
+        })),
+);
 const observationForm = useForm({
     message: '',
     parent_id: null as number | null,
@@ -82,6 +145,11 @@ watch(
     },
     { deep: true },
 );
+watch(
+    medicalTempFolders,
+    (value) => (medicalForm.medical_temp_folders = [...value]),
+    { deep: true },
+);
 const labels: Record<string, string> = {
     active: 'Actif',
     enrolled: 'Présent / inscrit',
@@ -99,13 +167,35 @@ const paymentLabels: Record<string, string> = {
 };
 const money = (value: string | number) =>
     `${Number(value ?? 0).toLocaleString('fr-DZ', { minimumFractionDigits: 2 })} DA`;
+function observationAuthor(author: any): string {
+    const role =
+        author?.role === 'parent'
+            ? 'Parent'
+            : author?.role === 'admin'
+              ? 'Administration'
+              : author?.role === 'teacher'
+                ? 'Enseignant'
+                : 'Utilisateur';
+
+    return author?.name ? `${role} · ${author.name}` : role;
+}
 const tabs = computed(() =>
     [
         { id: 'general', label: 'Informations', icon: UserRound },
+        ...(props.isPrivateSchool
+            ? [
+                  {
+                      id: 'academic-journey',
+                      label: 'Parcours scolaire',
+                      icon: History,
+                  },
+              ]
+            : []),
         { id: 'enrollments', label: 'Formations', icon: BookOpen },
         { id: 'attendance', label: 'Présences', icon: CalendarCheck },
         { id: 'payments', label: 'Paiements', icon: ReceiptText },
         { id: 'documents', label: 'Documents', icon: FileText },
+        { id: 'medical', label: 'Dossier médical', icon: HeartPulse },
         { id: 'certificates', label: 'Certificats', icon: FileText },
         { id: 'badge', label: 'Badge', icon: CreditCard },
         { id: 'observations', label: 'Observations', icon: NotebookPen },
@@ -115,6 +205,32 @@ const tabs = computed(() =>
             !props.teacherView || !['payments', 'documents'].includes(tab.id),
     ),
 );
+function selectTab(tab: string) {
+    if (!tabs.value.some((item) => item.id === tab)) return;
+
+    activeTab.value = tab;
+    const [path, query = ''] = page.url.split('?');
+    const params = new URLSearchParams(query);
+    params.set('tab', tab);
+    router.get(
+        `${path}?${params.toString()}`,
+        {},
+        {
+            preserveScroll: true,
+            preserveState: true,
+        },
+    );
+}
+watch(
+    [() => page.url, tabs],
+    () => {
+        const requestedTab = tabFromUrl();
+        activeTab.value = tabs.value.some((tab) => tab.id === requestedTab)
+            ? requestedTab
+            : 'general';
+    },
+    { immediate: true },
+);
 function updateStatus() {
     if (props.readOnly) return;
     statusForm.patch(`/admin/students/${props.student.id}/status`, {
@@ -123,10 +239,15 @@ function updateStatus() {
 }
 function updateProfile() {
     if (props.readOnly) return;
-    profileForm.post(`/admin/students/${props.student.id}`, {
-        forceFormData: true,
-        preserveScroll: true,
-    });
+    profileForm.post(
+        props.parentView
+            ? `/parent/children/${props.student.id}/details`
+            : `/admin/students/${props.student.id}`,
+        {
+            forceFormData: true,
+            preserveScroll: true,
+        },
+    );
 }
 function selectPhoto(event: Event) {
     profileForm.photo = (event.target as HTMLInputElement).files?.[0] ?? null;
@@ -139,9 +260,28 @@ function removeDocument(data: { type: string; fileId?: number }) {
 }
 function saveDocuments() {
     if (props.readOnly) return;
-    documentForm.put(`/admin/students/${props.student.id}/documents`, {
-        preserveScroll: true,
-    });
+    documentForm.put(
+        props.parentView
+            ? `/parent/children/${props.student.id}/documents`
+            : `/admin/students/${props.student.id}/documents`,
+        {
+            preserveScroll: true,
+        },
+    );
+}
+function removeMedicalDocument(data: { type: string; fileId?: number }) {
+    if (data.type === 'existing' && data.fileId) {
+        medicalRemovedFiles.value.push(data.fileId);
+        medicalForm.medical_removed_files = [...medicalRemovedFiles.value];
+    }
+}
+function saveMedical() {
+    medicalForm.put(
+        props.parentView
+            ? `/parent/children/${props.student.id}/medical`
+            : `/admin/students/${props.student.id}/medical`,
+        { preserveScroll: true },
+    );
 }
 </script>
 
@@ -154,7 +294,7 @@ function saveDocuments() {
                         ><Link
                             :href="
                                 parentView
-                                    ? '/portal'
+                                    ? '/parent/children'
                                     : teacherView
                                       ? '/portal/students'
                                       : '/admin/students'
@@ -186,7 +326,7 @@ function saveDocuments() {
                                 le {{ student.registration_date || '—' }}
                             </p>
                             <div
-                                v-if="!readOnly"
+                                v-if="!readOnly && !parentView"
                                 class="mt-4 flex flex-wrap items-end gap-2"
                             >
                                 <label class="text-sm"
@@ -232,7 +372,7 @@ function saveDocuments() {
                                 ? 'bg-primary text-primary-foreground'
                                 : 'hover:bg-muted'
                         "
-                        @click="activeTab = tab.id"
+                        @click="selectTab(tab.id)"
                     >
                         <component :is="tab.icon" class="size-4" />{{
                             tab.label
@@ -280,13 +420,21 @@ function saveDocuments() {
                                 type="date"
                             />
                         </div>
-                        <div>
+                        <div v-if="!isPrivateSchool">
                             <Label>Niveau scolaire</Label
                             ><Input v-model="profileForm.school_level" />
                         </div>
                         <div class="sm:col-span-2">
                             <Label>Adresse</Label
                             ><Input v-model="profileForm.address" />
+                        </div>
+                        <div class="sm:col-span-2">
+                            <Label>Notes générales</Label>
+                            <textarea
+                                v-model="profileForm.notes"
+                                rows="4"
+                                class="mt-1 w-full rounded-md border bg-background p-3 text-sm"
+                            />
                         </div>
                         <div v-if="!readOnly" class="sm:col-span-2">
                             <Label>Photo</Label
@@ -305,6 +453,184 @@ function saveDocuments() {
                             >
                         </div>
                     </form>
+                    <div
+                        v-else-if="activeTab === 'academic-journey'"
+                        class="space-y-5"
+                    >
+                        <div
+                            class="flex flex-wrap items-end justify-between gap-3"
+                        >
+                            <div>
+                                <h2 class="font-semibold">Parcours scolaire</h2>
+                                <p class="text-sm text-muted-foreground">
+                                    Chaque ligne conserve le contexte et le
+                                    résultat de son année scolaire.
+                                </p>
+                            </div>
+                            <label
+                                v-if="academicJourney?.length"
+                                class="text-sm"
+                                >Année consultée
+                                <select
+                                    v-model="selectedAcademicYearId"
+                                    class="mt-1 block h-10 rounded-md border bg-background px-3"
+                                >
+                                    <option
+                                        v-for="item in academicJourney"
+                                        :key="item.id"
+                                        :value="item.academic_year_id"
+                                    >
+                                        {{ item.academic_year?.name }}
+                                    </option>
+                                </select>
+                            </label>
+                        </div>
+                        <article
+                            v-if="selectedAcademicContext"
+                            class="grid gap-3 rounded-xl border bg-muted/20 p-4 sm:grid-cols-2 lg:grid-cols-4"
+                        >
+                            <div>
+                                <span class="text-xs text-muted-foreground"
+                                    >Année</span
+                                ><strong class="block">{{
+                                    selectedAcademicContext.academic_year?.name
+                                }}</strong>
+                            </div>
+                            <div>
+                                <span class="text-xs text-muted-foreground"
+                                    >Niveau</span
+                                ><strong class="block">{{
+                                    selectedAcademicContext.level?.name || '—'
+                                }}</strong>
+                            </div>
+                            <div>
+                                <span class="text-xs text-muted-foreground"
+                                    >Groupe</span
+                                ><strong class="block">{{
+                                    selectedAcademicContext.group?.name ||
+                                    'Non affecté'
+                                }}</strong>
+                            </div>
+                            <div>
+                                <span class="text-xs text-muted-foreground"
+                                    >Statut</span
+                                ><strong class="block">{{
+                                    academicStatusLabels[
+                                        selectedAcademicContext.status
+                                    ] || selectedAcademicContext.status
+                                }}</strong>
+                            </div>
+                            <div>
+                                <span class="text-xs text-muted-foreground"
+                                    >Résultat final</span
+                                ><strong class="block">{{
+                                    selectedAcademicContext.final_result
+                                        ? academicResultLabels[
+                                              selectedAcademicContext
+                                                  .final_result
+                                          ] ||
+                                          selectedAcademicContext.final_result
+                                        : 'En cours'
+                                }}</strong>
+                            </div>
+                            <div>
+                                <span class="text-xs text-muted-foreground"
+                                    >Moyenne finale</span
+                                ><strong class="block">{{
+                                    selectedAcademicContext.final_average ?? '—'
+                                }}</strong>
+                            </div>
+                            <div>
+                                <span class="text-xs text-muted-foreground"
+                                    >Niveau suivant</span
+                                ><strong class="block">{{
+                                    selectedAcademicContext.promoted_to_level
+                                        ?.name || '—'
+                                }}</strong>
+                            </div>
+                            <div>
+                                <span class="text-xs text-muted-foreground"
+                                    >Inscription d’origine</span
+                                ><strong class="block">{{
+                                    selectedAcademicContext.source_registration_id
+                                        ? `Nº ${selectedAcademicContext.source_registration_id}`
+                                        : '—'
+                                }}</strong>
+                            </div>
+                            <p
+                                v-if="selectedAcademicContext.notes"
+                                class="text-sm sm:col-span-2 lg:col-span-4"
+                            >
+                                {{ selectedAcademicContext.notes }}
+                            </p>
+                        </article>
+                        <div
+                            v-if="academicJourney?.length"
+                            class="overflow-x-auto rounded-xl border"
+                        >
+                            <table class="w-full text-sm">
+                                <thead class="bg-muted/40 text-left">
+                                    <tr>
+                                        <th class="p-3">Année</th>
+                                        <th class="p-3">Niveau</th>
+                                        <th class="p-3">Groupe</th>
+                                        <th class="p-3">Statut / résultat</th>
+                                        <th class="p-3">Moyenne</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr
+                                        v-for="item in academicJourney"
+                                        :key="item.id"
+                                        class="cursor-pointer border-t hover:bg-muted/30"
+                                        :class="
+                                            selectedAcademicYearId ===
+                                            item.academic_year_id
+                                                ? 'bg-primary/5'
+                                                : ''
+                                        "
+                                        @click="
+                                            selectedAcademicYearId =
+                                                item.academic_year_id
+                                        "
+                                    >
+                                        <td class="p-3 font-medium">
+                                            {{ item.academic_year?.name }}
+                                        </td>
+                                        <td class="p-3">
+                                            {{ item.level?.name || '—' }}
+                                        </td>
+                                        <td class="p-3">
+                                            {{
+                                                item.group?.name ||
+                                                'Non affecté'
+                                            }}
+                                        </td>
+                                        <td class="p-3">
+                                            {{
+                                                item.final_result
+                                                    ? academicResultLabels[
+                                                          item.final_result
+                                                      ] || item.final_result
+                                                    : academicStatusLabels[
+                                                          item.status
+                                                      ] || item.status
+                                            }}
+                                        </td>
+                                        <td class="p-3">
+                                            {{ item.final_average ?? '—' }}
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <p
+                            v-else
+                            class="rounded-xl border border-dashed p-8 text-center text-muted-foreground"
+                        >
+                            Aucune inscription académique enregistrée.
+                        </p>
+                    </div>
                     <div
                         v-else-if="activeTab === 'enrollments'"
                         class="space-y-3"
@@ -534,7 +860,10 @@ function saveDocuments() {
                                 Aucun paiement pour cette inscription.
                             </p>
                         </article>
-                        <Button v-if="!readOnly" as-child variant="outline"
+                        <Button
+                            v-if="!readOnly && !parentView"
+                            as-child
+                            variant="outline"
                             ><Link href="/admin/finance"
                                 >Ouvrir la gestion financière</Link
                             ></Button
@@ -656,6 +985,91 @@ function saveDocuments() {
                             >
                         </div>
                     </div>
+                    <form
+                        v-else-if="activeTab === 'medical'"
+                        class="space-y-5"
+                        @submit.prevent="saveMedical"
+                    >
+                        <div class="grid gap-4 sm:grid-cols-2">
+                            <div>
+                                <Label>Groupe sanguin</Label
+                                ><Input
+                                    v-model="medicalForm.blood_type"
+                                    placeholder="Ex. O+"
+                                />
+                            </div>
+                            <div>
+                                <Label>Contact d’urgence</Label
+                                ><Input
+                                    v-model="medicalForm.emergency_contact_name"
+                                />
+                            </div>
+                            <div>
+                                <Label>Téléphone d’urgence</Label
+                                ><Input
+                                    v-model="
+                                        medicalForm.emergency_contact_phone
+                                    "
+                                />
+                            </div>
+                            <div class="sm:col-span-2">
+                                <Label>Allergies</Label
+                                ><textarea
+                                    v-model="medicalForm.allergies"
+                                    rows="3"
+                                    class="mt-1 w-full rounded-md border bg-background p-3 text-sm"
+                                />
+                            </div>
+                            <div class="sm:col-span-2">
+                                <Label>Maladies ou conditions chroniques</Label
+                                ><textarea
+                                    v-model="medicalForm.chronic_conditions"
+                                    rows="3"
+                                    class="mt-1 w-full rounded-md border bg-background p-3 text-sm"
+                                />
+                            </div>
+                            <div class="sm:col-span-2">
+                                <Label>Traitements et médicaments</Label
+                                ><textarea
+                                    v-model="medicalForm.medications"
+                                    rows="3"
+                                    class="mt-1 w-full rounded-md border bg-background p-3 text-sm"
+                                />
+                            </div>
+                            <div class="sm:col-span-2">
+                                <Label>Notes médicales</Label
+                                ><textarea
+                                    v-model="medicalForm.medical_notes"
+                                    rows="4"
+                                    class="mt-1 w-full rounded-md border bg-background p-3 text-sm"
+                                />
+                            </div>
+                        </div>
+                        <div>
+                            <Label>Documents médicaux</Label>
+                            <FileUpload
+                                v-model="medicalTempFolders"
+                                :initial-files="medicalFiles"
+                                :allow-multiple="true"
+                                :max-files="10"
+                                :max-file-size="10 * 1024 * 1024"
+                                :allowed-file-types="[
+                                    'image/jpeg',
+                                    'image/png',
+                                    'image/webp',
+                                    'application/pdf',
+                                ]"
+                                collection="medical_documents"
+                                width="100%"
+                                @file-removed="removeMedicalDocument"
+                            />
+                        </div>
+                        <div class="flex justify-end">
+                            <Button :disabled="medicalForm.processing"
+                                >Enregistrer le dossier médical</Button
+                            >
+                        </div>
+                    </form>
                     <div
                         v-else-if="activeTab === 'observations'"
                         class="space-y-5"
@@ -665,18 +1079,29 @@ function saveDocuments() {
                             class="rounded-xl border bg-muted/20 p-4"
                             @submit.prevent="sendObservation(null)"
                         >
-                            <Label>Nouvelle observation aux parents</Label>
+                            <Label>{{
+                                parentView
+                                    ? 'Laisser une note ou une observation'
+                                    : 'Nouvelle observation aux parents'
+                            }}</Label>
                             <textarea
                                 v-model="observationForm.message"
                                 required
                                 maxlength="5000"
                                 class="mt-2 min-h-28 w-full rounded-md border bg-background p-3 text-sm"
-                                placeholder="Décrivez précisément l’observation concernant cet étudiant…"
+                                :placeholder="
+                                    parentView
+                                        ? 'Écrivez une note ou une observation concernant votre enfant…'
+                                        : 'Décrivez précisément l’observation concernant cet étudiant…'
+                                "
                             />
                             <div class="mt-3 flex justify-end">
                                 <Button :disabled="observationForm.processing"
-                                    ><Send class="mr-2 size-4" />Envoyer
-                                    l’observation</Button
+                                    ><Send class="mr-2 size-4" />{{
+                                        parentView
+                                            ? 'Envoyer la note'
+                                            : 'Envoyer l’observation'
+                                    }}</Button
                                 >
                             </div>
                         </form>
@@ -689,9 +1114,7 @@ function saveDocuments() {
                                 <div
                                     class="flex flex-wrap items-center justify-between gap-2"
                                 >
-                                    <b>{{
-                                        thread.author?.name || 'Enseignant'
-                                    }}</b
+                                    <b>{{ observationAuthor(thread.author) }}</b
                                     ><span
                                         class="text-xs text-muted-foreground"
                                         >{{ thread.created_at }}</span
@@ -716,7 +1139,9 @@ function saveDocuments() {
                                     "
                                 >
                                     <div class="flex justify-between gap-3">
-                                        <b>{{ reply.author?.name }}</b
+                                        <b>{{
+                                            observationAuthor(reply.author)
+                                        }}</b
                                         ><span
                                             class="text-xs text-muted-foreground"
                                             >{{ reply.created_at }}</span

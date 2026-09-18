@@ -4,10 +4,13 @@ namespace App\Http\Controllers\Admin;
 
 use App\Enums\StudentStatus;
 use App\Http\Controllers\Controller;
+use App\Models\AcademicYear;
 use App\Models\Formation;
 use App\Models\Student;
-use App\Services\TenantStorageService;
 use App\Services\AuthorizationService;
+use App\Services\StudentAcademicEnrollmentService;
+use App\Services\TenantStorageService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -23,11 +26,51 @@ class StudentsController extends Controller
     {
         $students = $this->authorization->apply(Student::query(), $request->user(), 'students.view')
             ->when($request->string('search')->trim()->toString(), function ($query, string $search) {
-                $query->where(function ($query) use ($search) {
-                    $query->where('first_name', 'like', "%{$search}%")
-                        ->orWhere('last_name', 'like', "%{$search}%")
-                        ->orWhere('email', 'like', "%{$search}%")
-                        ->orWhere('phone', 'like', "%{$search}%");
+                $search = preg_replace('/\s+/', ' ', trim($search));
+                $tokens = collect(preg_split('/\s+/', $search, -1, PREG_SPLIT_NO_EMPTY))
+                    ->filter(fn (string $token) => mb_strlen($token) >= 1)
+                    ->values();
+
+                $query->where(function ($query) use ($search, $tokens) {
+                    if (ctype_digit($search)) {
+                        $query->orWhere('id', (int) $search);
+                    }
+
+                    $query->orWhere(function ($match) use ($tokens) {
+                        foreach ($tokens as $token) {
+                            $like = "%{$token}%";
+                            $match->where(function ($fields) use ($like) {
+                                $fields->where('first_name', 'like', $like)
+                                    ->orWhere('last_name', 'like', $like)
+                                    ->orWhere('email', 'like', $like)
+                                    ->orWhere('phone', 'like', $like)
+                                    ->orWhere('parent_phone', 'like', $like)
+                                    ->orWhere('address', 'like', $like)
+                                    ->orWhere('notes', 'like', $like)
+                                    ->orWhereHas('parents', fn ($parent) => $parent
+                                        ->where('first_name', 'like', $like)
+                                        ->orWhere('last_name', 'like', $like)
+                                        ->orWhere('phone', 'like', $like));
+                            });
+                        }
+                    });
+
+                    $query->orWhereHas('enrollments', function ($enrollment) use ($tokens) {
+                        $enrollment->where(function ($match) use ($tokens) {
+                            foreach ($tokens as $token) {
+                                $like = "%{$token}%";
+                                $match->where(function ($fields) use ($like) {
+                                    $fields->where('email', 'like', $like)
+                                        ->orWhere('phone', 'like', $like)
+                                        ->orWhere('parent_phone', 'like', $like)
+                                        ->orWhere('level', 'like', $like)
+                                        ->orWhere('group_number', 'like', $like)
+                                        ->orWhereHas('form.course', fn ($course) => $course->where('title', 'like', $like))
+                                        ->orWhereHas('trainingPlanGroup.plan.course', fn ($course) => $course->where('title', 'like', $like));
+                                });
+                            }
+                        });
+                    });
                 });
             })
             ->when($request->filled('status'), fn ($query) => $query->where('is_active', $request->boolean('status')))
@@ -51,7 +94,8 @@ class StudentsController extends Controller
             'levels' => \App\Models\CourseEnrollment::whereNotNull('level')->distinct()->orderBy('level')->pluck('level'),
             'groups' => \App\Models\CourseEnrollment::whereNotNull('group_number')->distinct()->orderBy('group_number')->pluck('group_number'),
             'studentStatuses' => collect(StudentStatus::cases())->map(fn ($status) => $status->value),
-            'filters' => $request->only(['search', 'student_status', 'course_id', 'level', 'group', 'registered_from', 'registered_to']),
+            'filters' => $request->only(['search', 'status', 'student_status', 'course_id', 'level', 'group', 'registered_from', 'registered_to']),
+            'isPrivateSchool' => $request->user()->tenant?->organization_type === 'private_school',
         ]);
     }
 
@@ -78,7 +122,9 @@ class StudentsController extends Controller
         if ($request->hasFile('photo')) {
             $oldPhoto = $student->photo_path;
             $data['photo_path'] = $this->tenantStorage->store($request->file('photo'), 'students', 'public', TenantStorageService::PROFILE_IMAGES, 'students', $student);
-            if ($oldPhoto) $this->tenantStorage->delete($oldPhoto);
+            if ($oldPhoto) {
+                $this->tenantStorage->delete($oldPhoto);
+            }
         }
         unset($data['photo']);
         $student->fill($data);
@@ -104,9 +150,15 @@ class StudentsController extends Controller
             : "L'étudiant a été désactivé.");
     }
 
-    public function show(Student $student): Response
+    public function show(Request $request, Student $student, StudentAcademicEnrollmentService $academicEnrollments): Response
     {
         $student->load(['enrollments.form.course', 'enrollments.trainingPlanGroup.plan.level.course', 'enrollments.installments', 'enrollments.payments.recorder:id,name', 'badges.template', 'certificates.enrollment.form.course', 'histories.user:id,name', 'files', 'user:id,email,is_active', 'observations' => fn ($query) => $query->whereNull('parent_id')->with(['author:id,name,role', 'replies.author:id,name,role']), 'attendances.session.group.plan.level.course', 'attendances.session.teacher:id,name']);
+        $isPrivateSchool = $request->user()->tenant?->organization_type === 'private_school';
+        $journey = $isPrivateSchool ? $academicEnrollments->history($student) : collect();
+        $selectedYearId = $request->integer('academic_year_id') ?: $request->session()->get('academic_year_id');
+        $selectedAcademicEnrollment = $isPrivateSchool
+            ? ($journey->firstWhere('academic_year_id', (int) $selectedYearId) ?? $journey->first())
+            : null;
         $expected = \App\Models\TrainingSession::whereHas('group.enrollments', fn ($q) => $q->where('student_id', $student->id)->where('status', 'registered'))->count();
         $records = $student->attendances;
         $present = $records->whereIn('status', ['present', 'late'])->count();
@@ -119,7 +171,24 @@ class StudentsController extends Controller
         $rate = $expected ? round($present / $expected * 100, 1) : null;
         $student->setAttribute('attendance_stats', ['expected' => $expected, 'recorded' => $records->count(), 'present' => $present, 'absent' => $records->where('status', 'absent')->count(), 'late' => $records->where('status', 'late')->count(), 'excused' => $records->where('status', 'excused')->count(), 'rate' => $rate, 'consecutive_absences' => $consecutive, 'warning' => $consecutive >= config('attendance.consecutive_absence_warning', 2) || ($rate !== null && $rate < config('attendance.warning_threshold', 75))]);
 
-        return Inertia::render('Admin/Students/Show', ['student' => $student, 'statuses' => collect(StudentStatus::cases())->map(fn ($status) => $status->value)]);
+        return Inertia::render('Admin/Students/Show', ['student' => $student, 'statuses' => collect(StudentStatus::cases())->map(fn ($status) => $status->value),
+            'isPrivateSchool' => $isPrivateSchool, 'academicJourney' => $journey, 'selectedAcademicEnrollment' => $selectedAcademicEnrollment,
+            'academicallyActive' => $selectedAcademicEnrollment?->isAcademicallyActive() ?? false]);
+    }
+
+    public function academicHistory(Request $request, Student $student, StudentAcademicEnrollmentService $academicEnrollments): JsonResponse
+    {
+        abort_unless($request->user()->tenant?->organization_type === 'private_school', 404);
+
+        return response()->json(['data' => $academicEnrollments->history($student)]);
+    }
+
+    public function academicContext(Request $request, Student $student, AcademicYear $academicYear, StudentAcademicEnrollmentService $academicEnrollments): JsonResponse
+    {
+        abort_unless($request->user()->tenant?->organization_type === 'private_school', 404);
+        $context = $academicEnrollments->context($student, $academicYear);
+
+        return response()->json(['data' => $context, 'academically_active' => $context?->isAcademicallyActive() ?? false]);
     }
 
     public function updateStatus(Request $request, Student $student): RedirectResponse
@@ -144,6 +213,23 @@ class StudentsController extends Controller
         $student->histories()->create(['user_id' => $request->user()->id, 'event' => 'documents_updated', 'description' => 'Documents du dossier mis à jour.']);
 
         return back()->with('success', 'Documents mis à jour.');
+    }
+
+    public function updateMedical(Request $request, Student $student): RedirectResponse
+    {
+        $data = $request->validate([
+            'blood_type' => ['nullable', 'string', 'max:10'], 'allergies' => ['nullable', 'string', 'max:5000'],
+            'chronic_conditions' => ['nullable', 'string', 'max:5000'], 'medications' => ['nullable', 'string', 'max:5000'],
+            'medical_notes' => ['nullable', 'string', 'max:5000'], 'emergency_contact_name' => ['nullable', 'string', 'max:255'],
+            'emergency_contact_phone' => ['nullable', 'string', 'max:50'], 'medical_temp_folders' => ['array', 'max:10'],
+            'medical_temp_folders.*' => ['string'], 'medical_removed_files' => ['array'], 'medical_removed_files.*' => ['integer'],
+        ]);
+        $student->update(collect($data)->only(['blood_type', 'allergies', 'chronic_conditions', 'medications', 'medical_notes', 'emergency_contact_name', 'emergency_contact_phone'])->all());
+        $removed = $student->files()->where('collection', 'medical_documents')->whereIn('id', $data['medical_removed_files'] ?? [])->pluck('id')->all();
+        $this->filePondService->handleFileUpdates($student, $data['medical_temp_folders'] ?? [], $removed, 'medical_documents');
+        $student->histories()->create(['user_id' => $request->user()->id, 'event' => 'medical_folder_updated', 'description' => 'Dossier médical mis à jour.']);
+
+        return back()->with('success', 'Dossier médical mis à jour.');
     }
 
     private function recordStatusChange(Student $student, StudentStatus $to, Request $request, ?string $description): void

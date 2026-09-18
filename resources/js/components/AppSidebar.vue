@@ -17,18 +17,24 @@ import {
     BookOpen,
     BriefcaseBusiness,
     Building2,
+    CalendarCheck,
     CalendarClock,
+    CalendarDays,
     CalendarRange,
+    ChartNoAxesColumn,
     ClipboardCheck,
     ClipboardList,
     FileCheck2,
+    FileText,
     Files,
     GraduationCap,
     HardDrive,
     IdCard,
     LayoutDashboard,
+    MessageCircle,
     ReceiptText,
     Settings,
+    UserRound,
     Users,
     UsersRound,
     WalletCards,
@@ -37,6 +43,43 @@ import AppLogo from './AppLogo.vue';
 
 const page = usePage();
 const role = page.props.auth.user.role;
+const logoHref = role === 'parent' ? '/parent' : home();
+const accountType = {
+    parent: {
+        label: 'Espace Parent',
+        accent: 'bg-amber-300',
+        glow: 'bg-amber-300/15 ring-amber-200/20',
+    },
+    student: {
+        label: 'Espace Étudiant',
+        accent: 'bg-sky-300',
+        glow: 'bg-sky-300/15 ring-sky-200/20',
+    },
+    teacher: {
+        label: 'Espace Enseignant',
+        accent: 'bg-emerald-300',
+        glow: 'bg-emerald-300/15 ring-emerald-200/20',
+    },
+    admin: {
+        label: 'Administration',
+        accent: 'bg-violet-300',
+        glow: 'bg-violet-300/15 ring-violet-200/20',
+    },
+    super_admin: {
+        label: 'Super Administration',
+        accent: 'bg-fuchsia-300',
+        glow: 'bg-fuchsia-300/15 ring-fuchsia-200/20',
+    },
+    employee: {
+        label: 'Espace Personnel',
+        accent: 'bg-teal-300',
+        glow: 'bg-teal-300/15 ring-teal-200/20',
+    },
+}[role] ?? {
+    label: 'Espace Personnel',
+    accent: 'bg-slate-300',
+    glow: 'bg-white/10 ring-white/15',
+};
 const permissions = new Set<string>(
     (page.props.auth.permissions as string[] | undefined) ?? [],
 );
@@ -109,9 +152,14 @@ const rawMainNavItems: NavItem[] = [
                                     icon: CalendarClock,
                                 },
                                 {
-                                    title: 'Présences',
-                                    href: '/admin/school-attendance',
+                                    title: 'Absences',
+                                    href: '/admin/school-absence',
                                     icon: ClipboardCheck,
+                                },
+                                {
+                                    title: 'Rapports d’absences',
+                                    href: '/admin/school-absence/reports',
+                                    icon: FileText,
                                 },
                                 {
                                     title: 'Groupes & niveaux',
@@ -122,6 +170,21 @@ const rawMainNavItems: NavItem[] = [
                                     title: 'Matières',
                                     href: '/admin/subjects',
                                     icon: BookMarked,
+                                },
+                                {
+                                    title: 'Bulletins / Relevés',
+                                    href: '/admin/report-cards',
+                                    icon: FileText,
+                                },
+                                {
+                                    title: 'Exams & Grades',
+                                    href: '/admin/assessments',
+                                    icon: ClipboardCheck,
+                                },
+                                {
+                                    title: 'Gradebook',
+                                    href: '/admin/gradebook',
+                                    icon: ClipboardList,
                                 },
                                 {
                                     title: 'Documents scolaires',
@@ -154,6 +217,7 @@ const rawMainNavItems: NavItem[] = [
                   ],
               },
               { title: 'Parents', href: '/admin/parents', icon: Users },
+              { title: 'Annonces parents', href: '/admin/announcements', icon: Bell },
               { title: 'Sites', href: '/admin/sites', icon: Building2 },
               { title: 'Salles', href: '/admin/classrooms', icon: Building2 },
               {
@@ -162,7 +226,7 @@ const rawMainNavItems: NavItem[] = [
                   children: [
                       { title: 'Personnel', href: '/admin/users', icon: Users },
                       {
-                          title: 'Présences',
+                          title: 'Absences',
                           href: '/admin/attendance',
                           icon: ClipboardCheck,
                       },
@@ -189,7 +253,22 @@ const rawMainNavItems: NavItem[] = [
                   href: '/admin/certificates',
                   icon: IdCard,
               },
-              { title: 'Rapports', href: '/admin/reports', icon: ReceiptText },
+              {
+                  title: 'Rapports',
+                  icon: ReceiptText,
+                  children: [
+                      {
+                          title: 'Rapports de gestion',
+                          href: '/admin/reports',
+                          icon: ReceiptText,
+                      },
+                      {
+                          title: 'Tableau de bord détaillé',
+                          href: '/dashboard',
+                          icon: LayoutDashboard,
+                      },
+                  ],
+              },
               {
                   title: 'Journal d’audit',
                   href: '/admin/audit',
@@ -237,11 +316,65 @@ const rawMainNavItems: NavItem[] = [
         : []),
     ...(role === 'parent'
         ? [
-              { title: 'Espace parent', href: '/portal', icon: Users },
               {
-                  title: notificationsTitle,
-                  href: '/portal/notifications',
+                  title: 'Mes enfants',
+                  href: '/parent/children',
+                  icon: Users,
+              },
+              {
+                  title: 'Emploi du temps',
+                  href: '/parent/timetable',
+                  icon: CalendarRange,
+              },
+              {
+                  title: 'Absences',
+                  href: '/parent/absences',
+                  icon: ClipboardCheck,
+              },
+              {
+                  title: 'Notes & résultats',
+                  href: '/parent/grades',
+                  icon: ChartNoAxesColumn,
+              },
+              {
+                  title: 'Examens',
+                  href: '/parent/exams',
+                  icon: CalendarCheck,
+              },
+              {
+                  title: 'Bulletins',
+                  href: '/parent/report-cards',
+                  icon: FileText,
+              },
+              {
+                  title: 'Devoirs',
+                  href: '/parent/homework',
+                  icon: BookOpen,
+              },
+              {
+                  title: 'Événements',
+                  href: '/parent/events',
+                  icon: CalendarDays,
+              },
+              {
+                  title: 'Annonces',
+                  href: '/parent/announcements',
                   icon: Bell,
+              },
+              {
+                  title: 'Paiements',
+                  href: '/parent/payments',
+                  icon: ReceiptText,
+              },
+              {
+                  title: 'Messages',
+                  href: '/parent/messages',
+                  icon: MessageCircle,
+              },
+              {
+                  title: 'Mon profil',
+                  href: '/settings/profile',
+                  icon: UserRound,
               },
           ]
         : []),
@@ -295,10 +428,12 @@ const routePermissions: Record<string, string> = {
     '/admin/students': 'students.view',
     '/admin/account': 'users.view',
     '/admin/academic-years': 'academic_years.view',
+    '/admin/report-cards': 'report_cards.view',
     '/admin/inscription-campaigns': 'enrollments.view',
     '/school-inscription': 'enrollments.view',
     '/admin/timetable': 'timetables.view',
-    '/admin/school-attendance': 'student_attendance.view',
+    '/admin/school-absence': 'absences.view',
+    '/admin/school-absence/reports': 'absences.view',
     '/admin/groups': 'groups.view',
     '/admin/subjects': 'groups.view',
     '/admin/school-documents': 'administrative_documents.view',
@@ -347,10 +482,40 @@ const mainNavItems = filterAuthorized(rawMainNavItems);
                         as-child
                         class="h-12 rounded-xl bg-white/5 text-white shadow-sm ring-1 ring-white/10 transition hover:bg-white/10 hover:text-white hover:shadow-md data-[state=open]:bg-white/10"
                     >
-                        <Link :href="home()">
+                        <Link :href="logoHref">
                             <AppLogo />
                         </Link>
                     </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem class="group-data-[collapsible=icon]:hidden">
+                    <div
+                        class="flex items-center gap-2.5 rounded-xl px-3 py-2 ring-1 ring-inset"
+                        :class="accountType.glow"
+                        :aria-label="`Type de compte : ${accountType.label}`"
+                    >
+                        <span class="relative flex size-2.5 shrink-0">
+                            <span
+                                class="absolute inline-flex size-full animate-ping rounded-full opacity-40"
+                                :class="accountType.accent"
+                            />
+                            <span
+                                class="relative inline-flex size-2.5 rounded-full shadow-[0_0_12px_currentColor]"
+                                :class="accountType.accent"
+                            />
+                        </span>
+                        <div class="min-w-0 leading-none">
+                            <p
+                                class="mb-1 text-[10px] font-semibold tracking-[0.16em] text-white/50 uppercase"
+                            >
+                                Type de compte
+                            </p>
+                            <p
+                                class="truncate text-xs font-semibold text-white"
+                            >
+                                {{ accountType.label }}
+                            </p>
+                        </div>
+                    </div>
                 </SidebarMenuItem>
                 <SidebarMenuItem
                     v-if="

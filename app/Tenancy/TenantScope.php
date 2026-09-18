@@ -14,6 +14,8 @@ final class TenantScope
 {
     public const MODELS = [
         \App\Models\AnnualLeave::class, \App\Models\AnnualLeaveEvent::class,
+        \App\Models\Assessment::class, \App\Models\Grade::class,
+        \App\Models\ReportCard::class, \App\Models\ReportCardSubject::class,
         \App\Models\AttendanceHistory::class, \App\Models\AuditLog::class,
         \App\Models\Badge::class, \App\Models\BadgeTemplate::class,
         \App\Models\Car::class, \App\Models\Certificate::class,
@@ -33,6 +35,7 @@ final class TenantScope
         \App\Models\PayrollRegulation::class, \App\Models\PayrollDeclaration::class, \App\Models\SalaryStatutoryLine::class,
         \App\Models\SalaryPayment::class, \App\Models\SalaryStatement::class,
         \App\Models\SchoolParent::class, \App\Models\SchoolSite::class,
+        \App\Models\SchoolAnnouncement::class,
         \App\Models\PrivateSchoolInscriptionCampaign::class, \App\Models\PrivateSchoolCampaignLevel::class, \App\Models\PrivateSchoolInscription::class,
         \App\Models\AcademicYear::class, \App\Models\AcademicYearCalendarEvent::class, \App\Models\AttendanceException::class, \App\Models\AttendanceSetting::class, \App\Models\StudentAcademicEnrollment::class, \App\Models\TeacherAcademicAssignment::class,
         \App\Models\SchoolCycle::class, \App\Models\SchoolLevel::class, \App\Models\SchoolGroup::class, \App\Models\SchoolStream::class,

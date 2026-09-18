@@ -28,6 +28,18 @@ const user = computed(() => page.props.auth.user);
 const pageTitle = computed(() => {
     const path = page.url.split('?')[0];
     const titles: Array<[string, string]> = [
+        ['/parent/children', 'Mes enfants'],
+        ['/parent/timetable', 'Emploi du temps'],
+        ['/parent/absences', 'Absences'],
+        ['/parent/grades', 'Notes & résultats'],
+        ['/parent/exams', 'Examens'],
+        ['/parent/report-cards', 'Bulletins'],
+        ['/parent/homework', 'Devoirs'],
+        ['/parent/events', 'Événements'],
+        ['/parent/announcements', 'Annonces'],
+        ['/parent/payments', 'Paiements'],
+        ['/parent/messages', 'Messages'],
+        ['/parent', 'Espace parent'],
         ['/admin/enrollment-forms', 'Inscriptions'],
         ['/admin/planifications', 'Planifications'],
         ['/admin/students', 'Étudiants'],

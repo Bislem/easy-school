@@ -16,7 +16,7 @@ type Role = {
 type Module = {
     key: string;
     label: string;
-    permissions: { key: string; label: string; action: string }[];
+    permissions: { key: unknown; label: unknown; action: string }[];
 };
 const props = defineProps<{ roles: Role[]; permissionModules: Module[] }>();
 const page = usePage();
@@ -48,6 +48,25 @@ const labels: { [k: string]: string } = {
     manage: 'Gérer',
 };
 const role = computed(() => props.roles.find((r) => r.id === roleId.value));
+function permissionKey(permission: { key: unknown } | string): string {
+    if (typeof permission === 'string') return permission;
+    if (typeof permission.key === 'string') return permission.key;
+    if (permission.key && typeof permission.key === 'object') {
+        const nested = permission.key as { key?: unknown; value?: unknown };
+        if (typeof nested.key === 'string') return nested.key;
+        if (typeof nested.value === 'string') return nested.value;
+    }
+    return String(permission.key ?? '');
+}
+function permissionLabel(permission: { key: unknown; label: unknown }): string {
+    if (typeof permission.label === 'string' && permission.label.trim()) {
+        return permission.label;
+    }
+
+    return permissionKey(permission)
+        .replace(/[._-]+/g, ' ')
+        .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
 const modules = computed(() =>
     props.permissionModules.filter((m) =>
         `${m.label} ${m.permissions.map((p) => p.label).join(' ')}`
@@ -63,7 +82,8 @@ const dirty = computed(
 watch(
     roleId,
     () => {
-        selected.value = role.value?.permissions.map((p) => p.key) ?? [];
+        selected.value =
+            role.value?.permissions.map((p) => permissionKey(p)) ?? [];
         baseline.value = [...selected.value];
     },
     { immediate: true },
@@ -98,7 +118,7 @@ function toggle(key: string) {
         : [...selected.value, key];
 }
 function toggleModule(module: Module) {
-    const keys = module.permissions.map((p) => p.key);
+    const keys = module.permissions.map((p) => permissionKey(p));
     const all = keys.every(checked);
     selected.value = all
         ? selected.value.filter((k) => !keys.includes(k))
@@ -220,25 +240,22 @@ function save() {
                                     >
                                         <label
                                             v-for="p in permissions(m, a)"
-                                            :key="p.key"
+                                            :key="permissionKey(p)"
                                             class="flex items-center gap-1"
-                                            :title="p.label"
+                                            :title="permissionLabel(p)"
                                         >
                                             <Checkbox
-                                                :model-value="checked(p.key)"
+                                                :model-value="
+                                                    checked(permissionKey(p))
+                                                "
                                                 :disabled="!canManage"
                                                 @update:model-value="
-                                                    toggle(p.key)
+                                                    toggle(permissionKey(p))
                                                 "
                                             />
                                             <span
-                                                v-if="
-                                                    permissions(m, a).length > 1
-                                                "
-                                                class="max-w-20 truncate text-[10px]"
-                                                >{{
-                                                    p.key.split('.').pop()
-                                                }}</span
+                                                class="max-w-36 truncate text-left text-[10px] leading-tight"
+                                                >{{ permissionLabel(p) }}</span
                                             >
                                         </label>
                                     </div>

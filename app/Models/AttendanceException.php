@@ -9,11 +9,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class AttendanceException extends Model
 {
-    protected $fillable = ['academic_year_id', 'date', 'end_date', 'timetable_session_id', 'person_type', 'student_id', 'teacher_id', 'status', 'minutes_late', 'reason', 'justification', 'justified_at', 'created_by', 'notes'];
+    protected $fillable = ['academic_year_id', 'date', 'end_date', 'timetable_session_id', 'person_type', 'student_id', 'teacher_id', 'status', 'minutes_late', 'reason', 'justification', 'justified_at', 'parent_justification_submitted_at', 'parent_justification_submitted_by', 'parent_justification_attachment_path', 'parent_justification_attachment_name', 'created_by', 'notes'];
 
     protected function casts(): array
     {
-        return ['date' => 'date:Y-m-d', 'end_date' => 'date:Y-m-d', 'justified_at' => 'datetime', 'person_type' => AttendancePersonType::class, 'status' => AttendanceExceptionStatus::class, 'minutes_late' => 'integer'];
+        return ['date' => 'date:Y-m-d', 'end_date' => 'date:Y-m-d', 'justified_at' => 'datetime', 'parent_justification_submitted_at' => 'datetime', 'person_type' => AttendancePersonType::class, 'status' => AttendanceExceptionStatus::class, 'minutes_late' => 'integer'];
     }
 
     public function academicYear(): BelongsTo

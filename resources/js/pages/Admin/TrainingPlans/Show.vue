@@ -150,7 +150,7 @@ const attendanceSession = ref<Session | null>(null);
 const attendanceReadOnly = computed(
     () =>
         !props.access.record_attendance ||
-        attendanceSession.value?.attendance_status !== 'pending',
+        attendanceSession.value?.attendance_status === 'validated',
 );
 const studentSearch = ref('');
 const groupForm = useForm({ name: '', classroom_id: '', capacity: '' });
@@ -180,9 +180,8 @@ const studentForm = useForm({
 });
 const moveForm = useForm({ training_plan_group_id: '' });
 const attendanceForm = useForm<{
-    attendances: Record<number, string>;
-    validate_session: boolean;
-}>({ attendances: {}, validate_session: false });
+    student_ids: number[];
+}>({ student_ids: [] });
 const attendanceSelectedIds = ref<number[]>([]);
 const filteredStudents = computed(() => {
     const search = studentSearch.value.trim().toLocaleLowerCase('fr');
@@ -440,18 +439,10 @@ function quickMove(enrollment: Enrollment, target: Group) {
 function openAttendance(group: Group, session: Session) {
     rosterGroup.value = group;
     attendanceSession.value = session;
-    const existing = Object.fromEntries(
-        session.attendances.map((item) => [item.student_id, item.status]),
-    );
-    attendanceForm.attendances = Object.fromEntries(
-        group.enrollments.map((item) => [
-            item.student_id,
-            existing[item.student_id] ?? 'present',
-        ]),
-    );
-    attendanceSelectedIds.value = group.enrollments.map(
-        (item) => item.student_id,
-    );
+    attendanceSelectedIds.value = session.attendances
+        .filter((item) => ['absent', 'excused'].includes(item.status))
+        .map((item) => item.student_id);
+    attendanceForm.student_ids = [...attendanceSelectedIds.value];
     attendanceDialog.value = true;
 }
 function toggleAttendanceStudent(studentId: number) {
@@ -460,31 +451,19 @@ function toggleAttendanceStudent(studentId: number) {
     )
         ? attendanceSelectedIds.value.filter((id) => id !== studentId)
         : [...attendanceSelectedIds.value, studentId];
+    attendanceForm.student_ids = [...attendanceSelectedIds.value];
 }
 function toggleAllAttendance() {
     if (!rosterGroup.value) return;
     attendanceSelectedIds.value =
-        attendanceSelectedIds.value.length ===
-        rosterGroup.value.enrollments.length
+        attendanceSelectedIds.value.length === rosterGroup.value.enrollments.length
             ? []
             : rosterGroup.value.enrollments.map((item) => item.student_id);
+    attendanceForm.student_ids = [...attendanceSelectedIds.value];
 }
-function applyAttendanceStatus(status: string) {
-    attendanceSelectedIds.value.forEach((studentId) => {
-        attendanceForm.attendances[studentId] = status;
-    });
-}
-async function saveAttendance() {
+function saveAttendance() {
     if (!rosterGroup.value || !attendanceSession.value) return;
-    attendanceForm.validate_session = await appConfirm(
-        'Voulez-vous aussi valider définitivement cette séance ? Le formateur sera marqué présent et les présences seront verrouillées.',
-        {
-            title: 'Valider la séance ?',
-            tone: 'warning',
-            confirmText: 'Enregistrer et valider',
-            cancelText: 'Présences uniquement',
-        },
-    );
+    attendanceForm.student_ids = [...attendanceSelectedIds.value];
     attendanceForm.put(
         `/admin/planifications/${props.plan.id}/groupes/${rosterGroup.value.id}/seances/${attendanceSession.value.id}/presences`,
         {
@@ -773,8 +752,8 @@ watch(
                                     variant="ghost"
                                     :title="
                                         session.attendance_status === 'pending'
-                                            ? 'Saisir les présences'
-                                            : 'Voir les présences'
+                                            ? 'Saisir les absences'
+                                            : 'Voir les absences'
                                     "
                                     @click="openAttendance(group, session)"
                                     ><ClipboardCheck class="size-4"
@@ -1516,8 +1495,8 @@ watch(
                     <DialogTitle
                         >{{
                             attendanceReadOnly
-                                ? 'Présences enregistrées'
-                                : 'Saisir les présences'
+                                ? 'Absences enregistrées'
+                                : 'Enregistrer les absences'
                         }}
                         · {{ attendanceSession?.title }}</DialogTitle
                     >
@@ -1526,7 +1505,7 @@ watch(
                         {{
                             attendanceReadOnly
                                 ? 'consultation en lecture seule'
-                                : 'sélectionnez le statut de chaque étudiant'
+                                : 'cochez uniquement les étudiants absents ; les autres sont considérés présents'
                         }}.</DialogDescription
                     >
                 </DialogHeader>
@@ -1547,54 +1526,22 @@ watch(
                             >{{
                                 attendanceSelectedIds.length ===
                                 rosterGroup.enrollments.length
-                                    ? 'Tout désélectionner'
-                                    : 'Tout sélectionner'
+                                    ? 'Aucun absent'
+                                    : 'Tous absents'
                             }}</Button
                         >
                         <span class="mr-auto text-sm text-muted-foreground"
                             >{{
                                 attendanceSelectedIds.length
                             }}
-                            sélectionné(s)</span
-                        >
-                        <Button
-                            type="button"
-                            size="sm"
-                            class="bg-emerald-600 hover:bg-emerald-700"
-                            :disabled="!attendanceSelectedIds.length"
-                            @click="applyAttendanceStatus('present')"
-                            >Présents</Button
-                        >
-                        <Button
-                            type="button"
-                            size="sm"
-                            variant="destructive"
-                            :disabled="!attendanceSelectedIds.length"
-                            @click="applyAttendanceStatus('absent')"
-                            >Absents</Button
-                        >
-                        <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            :disabled="!attendanceSelectedIds.length"
-                            @click="applyAttendanceStatus('late')"
-                            >En retard</Button
-                        >
-                        <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            :disabled="!attendanceSelectedIds.length"
-                            @click="applyAttendanceStatus('excused')"
-                            >Excusés</Button
+                            absence(s) sélectionnée(s)</span
                         >
                     </div>
                     <div class="overflow-hidden rounded-lg border">
                         <div
                             v-for="enrollment in rosterGroup.enrollments"
                             :key="enrollment.id"
-                            class="grid grid-cols-[28px_1fr] items-center gap-3 border-b p-3 last:border-0 sm:grid-cols-[32px_1fr_150px]"
+                            class="grid grid-cols-[28px_1fr_auto] items-center gap-3 border-b p-3 last:border-0 sm:grid-cols-[32px_1fr_auto]"
                             :class="
                                 attendanceSelectedIds.includes(
                                     enrollment.student_id,
@@ -1625,20 +1572,10 @@ watch(
                                     class="size-8 rounded-full object-cover"
                                 />{{ studentName(enrollment.student) }}</span
                             >
-                            <select
-                                v-model="
-                                    attendanceForm.attendances[
-                                        enrollment.student_id
-                                    ]
-                                "
-                                :disabled="attendanceReadOnly"
-                                class="col-span-2 h-10 w-full rounded-md border bg-background px-2 text-sm disabled:cursor-default disabled:opacity-100 sm:col-span-1 sm:h-9"
-                            >
-                                <option value="present">Présent</option>
-                                <option value="absent">Absent</option>
-                                <option value="late">En retard</option>
-                                <option value="excused">Excusé</option>
-                            </select>
+                            <span
+                                class="rounded-full px-2.5 py-1 text-xs font-semibold"
+                                :class="attendanceSelectedIds.includes(enrollment.student_id) ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'"
+                            >{{ attendanceSelectedIds.includes(enrollment.student_id) ? 'Absent' : 'Présent' }}</span>
                         </div>
                         <p
                             v-if="!rosterGroup.enrollments.length"
@@ -1657,7 +1594,7 @@ watch(
                                     attendanceForm.processing ||
                                     !rosterGroup.enrollments.length
                                 "
-                                >Enregistrer les présences</Button
+                                >Enregistrer les absences</Button
                             ></DialogFooter
                         >
                     </template>

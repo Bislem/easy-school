@@ -76,6 +76,9 @@ const emit = defineEmits([
     'fileAdded',
     'fileRemoved',
     'error',
+    'uploadStarted',
+    'uploadFinished',
+    'fileSelected',
 ]);
 
 // Reactive state
@@ -83,6 +86,24 @@ const page = usePage<any>();
 const files = ref<any[]>([]);
 const tempFolders = ref<string[]>([]);
 const filePondRef = ref<any>(null);
+const uploadInProgress = ref(false);
+
+function markUploadStarted() {
+    if (uploadInProgress.value) return;
+    uploadInProgress.value = true;
+    emit('uploadStarted');
+}
+
+function handleAddFileStart(file: any) {
+    markUploadStarted();
+    emit('fileSelected', file);
+}
+
+function markUploadFinished() {
+    if (!uploadInProgress.value) return;
+    uploadInProgress.value = false;
+    emit('uploadFinished');
+}
 
 const wrapperStyle = computed(() => ({
     width: props.width,
@@ -421,6 +442,10 @@ defineExpose({
             v-model="files"
             v-bind="filePondOptions"
             :files="files"
+            @addfilestart="handleAddFileStart"
+            @processfile="markUploadFinished"
+            @processfileabort="markUploadFinished"
+            @error="markUploadFinished"
             @removefile="handleFileRemove"
         />
         <input

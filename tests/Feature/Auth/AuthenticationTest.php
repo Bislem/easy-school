@@ -1,7 +1,11 @@
 <?php
 
 use App\Enums\UserRole;
+use App\Models\MobileMembership;
+use App\Models\SchoolParent;
+use App\Models\Tenant;
 use App\Models\User;
+use App\Tenancy\TenantContext;
 use Illuminate\Support\Facades\RateLimiter;
 use Laravel\Fortify\Features;
 
@@ -9,6 +13,12 @@ test('login screen can be rendered', function () {
     $response = $this->get(route('login'));
 
     $response->assertStatus(200);
+});
+
+test('parent login screen can be rendered', function () {
+    $this->get(route('parent.login'))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page->component('Parent/Auth/Login'));
 });
 
 test('users can authenticate using the login screen', function () {
@@ -36,7 +46,7 @@ test('inertia logins perform a full navigation with the regenerated session', fu
         ->assertHeader('X-Inertia-Location', route('dashboard'));
 });
 
-test('parents can authenticate using the shared login portal', function () {
+test('parents must use their dedicated login portal', function () {
     $parent = User::factory()->create([
         'role' => UserRole::PARENT,
         'is_active' => true,
@@ -49,8 +59,71 @@ test('parents can authenticate using the shared login portal', function () {
         'password' => 'password',
     ]);
 
+    $this->assertGuest();
+    $response->assertSessionHasErrors('email');
+});
+
+test('parents can authenticate using the parent login portal', function () {
+    $parent = User::factory()->create([
+        'role' => UserRole::PARENT,
+        'is_active' => true,
+        'can_login' => true,
+        'email_verified_at' => now(),
+    ]);
+
+    $response = $this->post(route('parent.login.store'), [
+        'email' => $parent->email,
+        'password' => 'password',
+    ]);
+
     $this->assertAuthenticatedAs($parent);
-    $response->assertRedirect(route('dashboard', absolute: false));
+    $response->assertRedirect(route('parent.dashboard', absolute: false));
+});
+
+test('global parent accounts authenticate through their active school membership', function () {
+    $tenant = Tenant::factory()->create(['status' => 'active']);
+    $parent = User::factory()->create([
+        'tenant_id' => null,
+        'role' => UserRole::PARENT,
+        'is_active' => true,
+        'can_login' => true,
+        'email_verified_at' => now(),
+    ]);
+    app(TenantContext::class)->set($tenant);
+    $profile = SchoolParent::create([
+        'user_id' => $parent->id,
+        'first_name' => 'Nadia',
+        'last_name' => 'Kaci',
+    ]);
+    app(TenantContext::class)->clear();
+    MobileMembership::create([
+        'user_id' => $parent->id,
+        'tenant_id' => $tenant->id,
+        'role' => UserRole::PARENT,
+        'parent_id' => $profile->id,
+        'is_active' => true,
+    ]);
+
+    $this->post(route('parent.login.store'), [
+        'email' => $parent->email,
+        'password' => 'password',
+    ])->assertRedirect(route('parent.dashboard', absolute: false))
+        ->assertSessionHas('parent.tenant_id', $tenant->id);
+
+    $this->assertAuthenticatedAs($parent);
+    $this->get(route('parent.dashboard'))->assertOk();
+});
+
+test('non parent users cannot authenticate through the parent login portal', function () {
+    $user = User::factory()->create();
+
+    $response = $this->post(route('parent.login.store'), [
+        'email' => $user->email,
+        'password' => 'password',
+    ]);
+
+    $this->assertGuest();
+    $response->assertSessionHasErrors('email');
 });
 
 test('users with two factor enabled are redirected to two factor challenge', function () {
@@ -99,6 +172,15 @@ test('users can logout', function () {
 
     $this->assertGuest();
     $response->assertRedirect(route('home'));
+});
+
+test('parents return to the parent login portal after logout', function () {
+    $parent = User::factory()->create(['role' => UserRole::PARENT]);
+
+    $response = $this->actingAs($parent)->post(route('logout'));
+
+    $this->assertGuest();
+    $response->assertRedirect(route('parent.login'));
 });
 
 test('users are rate limited', function () {

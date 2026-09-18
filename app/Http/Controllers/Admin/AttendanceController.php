@@ -10,6 +10,7 @@ use App\Models\Staff;
 use App\Models\Student;
 use App\Models\TeacherAttendance;
 use App\Models\TrainingSession;
+use App\Models\TrainingPlanGroup;
 use App\Models\User;
 use App\Services\AttendanceService;
 use Illuminate\Http\RedirectResponse;
@@ -29,18 +30,56 @@ class AttendanceController extends Controller
         Gate::authorize(AttendancePermission::VIEW->value);
         $type = $request->string('person_type')->toString() === 'employee' ? 'employee' : 'student';
         $personId = $request->integer('person_id') ?: null;
+        $groupId = $request->integer('group_id') ?: null;
+        $date = $request->input('date', now()->toDateString());
         $status = $request->string('status')->trim()->toString();
         $from = $request->date('date_from');
         $to = $request->date('date_to');
 
-        $students = Student::query()->orderBy('last_name')->orderBy('first_name')
-            ->get(['id', 'first_name', 'last_name', 'email', 'phone', 'photo_path', 'status']);
+        $groups = TrainingPlanGroup::with('plan.level.course')
+            ->whereHas('enrollments')->orderBy('name')->get()
+            ->map(fn (TrainingPlanGroup $group) => [
+                'id' => $group->id,
+                'name' => $group->name,
+                'planning' => $group->plan?->title,
+                'course' => $group->plan?->level?->course?->title,
+            ]);
+        $students = $groupId
+            ? Student::whereHas('enrollments', fn ($query) => $query
+                ->where('training_plan_group_id', $groupId)->where('status', 'registered'))
+                ->orderBy('last_name')->orderBy('first_name')
+                ->get(['id', 'first_name', 'last_name', 'email', 'phone', 'photo_path', 'status'])
+            : collect();
         $employees = Staff::with(['employeeType:id,name,is_teacher', 'user:id,name'])
             ->orderBy('last_name')->orderBy('first_name')->get();
         $selectedPerson = $type === 'student'
             ? ($personId ? $students->firstWhere('id', $personId) : null)
             : ($personId ? $employees->firstWhere('id', $personId) : null);
         $records = collect();
+        $daySessions = collect();
+
+        if ($type === 'student' && $groupId && $selectedPerson instanceof Student) {
+            $daySessions = TrainingSession::with(['classroom:id,name,code', 'teacher:id,name'])
+                ->where('training_plan_group_id', $groupId)
+                ->whereDate('starts_at', $date)
+                ->where('status', '!=', 'cancelled')
+                ->orderBy('starts_at')->get()
+                ->map(function (TrainingSession $session) use ($selectedPerson) {
+                    $absence = SessionAttendance::where('training_session_id', $session->id)
+                        ->where('student_id', $selectedPerson->id)->first();
+
+                    return [
+                        'id' => $session->id,
+                        'title' => $session->title,
+                        'starts_at' => $session->starts_at?->toIso8601String(),
+                        'ends_at' => $session->ends_at?->toIso8601String(),
+                        'room' => $session->classroom?->name,
+                        'teacher' => $session->teacher?->name,
+                        'is_absent' => $absence && in_array($absence->status, ['absent', 'excused'], true),
+                        'is_locked' => (bool) $session->attendance_locked_at || $session->attendance_status === 'validated',
+                    ];
+                });
+        }
 
         if ($selectedPerson instanceof Student) {
             $records = SessionAttendance::with(['session.group.plan.level.course', 'session.group.plan', 'session.classroom:id,name,code', 'session.teacher:id,name'])
@@ -98,12 +137,35 @@ class AttendanceController extends Controller
 
         return Inertia::render('Admin/Attendance/Index', [
             'personType' => $type, 'selectedPerson' => $selectedPerson, 'students' => $students, 'employees' => $employees,
+            'groups' => $groups, 'daySessions' => $daySessions,
             'records' => $paginatedRecords, 'teachers' => User::where('role', 'teacher')->where('is_active', true)->orderBy('name')->get(['id', 'name']),
-            'filters' => ['person_type' => $type, 'person_id' => $personId, 'date_from' => $request->input('date_from'), 'date_to' => $request->input('date_to'), 'status' => $status],
+            'filters' => ['person_type' => $type, 'person_id' => $personId, 'group_id' => $groupId, 'date' => $date, 'date_from' => $request->input('date_from'), 'date_to' => $request->input('date_to'), 'status' => $status],
             'stats' => ['total' => $records->count(), 'present' => $present, 'absent' => $records->whereIn('status', ['absent', 'excused', 'leave'])->count(),
                 'late' => $records->where('status', 'late')->count(), 'rate' => $records->count() ? round($present / $records->count() * 100, 1) : null,
                 'worked_hours' => round($records->sum('worked_minutes') / 60, 2)],
         ]);
+    }
+
+    public function studentDayAbsences(Request $request): RedirectResponse
+    {
+        Gate::authorize(AttendancePermission::MANAGE_STUDENTS->value);
+        $data = $request->validate([
+            'group_id' => ['required', 'integer', 'exists:training_plan_groups,id'],
+            'student_id' => ['required', 'integer', 'exists:students,id'],
+            'date' => ['required', 'date'],
+            'session_ids' => ['present', 'array'],
+            'session_ids.*' => ['integer', 'distinct'],
+        ]);
+
+        $this->attendance->syncStudentDayAbsences(
+            TrainingPlanGroup::findOrFail($data['group_id']),
+            Student::findOrFail($data['student_id']),
+            $data['date'],
+            $data['session_ids'] ?? [],
+            $request->user()->id,
+        );
+
+        return back()->with('success', 'Absences enregistrées. Les séances non cochées sont considérées comme présentes.');
     }
 
     public function students(Request $request, TrainingSession $session): RedirectResponse

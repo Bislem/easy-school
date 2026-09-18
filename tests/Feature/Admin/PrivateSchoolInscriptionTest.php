@@ -9,8 +9,10 @@ use App\Models\SchoolCycle;
 use App\Models\SchoolLevel;
 use App\Models\SchoolParent;
 use App\Models\Student;
+use App\Models\StudentAcademicEnrollment;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Services\DefaultTenantRoles;
 use App\Tenancy\TenantContext;
 
 function privateSchoolFixture(): array
@@ -23,6 +25,7 @@ function privateSchoolFixture(): array
     $level = SchoolLevel::create(['school_cycle_id' => $cycle->id, 'name' => '1AP', 'code' => '1AP', 'sort_order' => 1, 'is_active' => true]);
     $campaign = PrivateSchoolInscriptionCampaign::create(['academic_year_id' => $year->id, 'title' => 'Inscription 2026/2027', 'status' => 'open']);
     $campaignLevel = PrivateSchoolCampaignLevel::create(['campaign_id' => $campaign->id, 'school_level_id' => $level->id, 'max_places' => 1, 'is_open' => true]);
+    app(DefaultTenantRoles::class)->provision($tenant);
     app(TenantContext::class)->clear();
 
     return compact('tenant', 'admin', 'year', 'level', 'campaign', 'campaignLevel');
@@ -85,6 +88,7 @@ test('one parent can register multiple children in a single request', function (
     $items = $items->map->fresh();
     expect($items->pluck('parent_id')->unique())->toHaveCount(1)
         ->and(Student::withoutGlobalScope('tenant')->whereIn('email', ['lina-family@example.com', 'sami-family@example.com'])->count())->toBe(2)
+        ->and(StudentAcademicEnrollment::withoutGlobalScope('tenant')->where('academic_year_id', $campaign->academic_year_id)->count())->toBe(2)
         ->and(SchoolParent::withoutGlobalScope('tenant')->count())->toBe(1);
 });
 

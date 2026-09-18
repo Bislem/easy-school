@@ -2,8 +2,12 @@
 
 use App\Http\Controllers\AccountStatusController;
 use App\Http\Controllers\Admin\AcademicYearsController;
+use App\Http\Controllers\Admin\AccessManagementController;
+use App\Http\Controllers\Admin\AccountSubscriptionController;
 use App\Http\Controllers\Admin\AnnouncementsController;
 use App\Http\Controllers\Admin\AnnualLeavesController;
+use App\Http\Controllers\Admin\AssessmentGradesController;
+use App\Http\Controllers\Admin\AssessmentsController;
 use App\Http\Controllers\Admin\AttendanceController;
 use App\Http\Controllers\Admin\AuditController;
 use App\Http\Controllers\Admin\BadgesController;
@@ -15,15 +19,15 @@ use App\Http\Controllers\Admin\EmployeeHrRecordsController;
 use App\Http\Controllers\Admin\EmployeeTypesController;
 use App\Http\Controllers\Admin\EnrollmentFormsController;
 use App\Http\Controllers\Admin\ExpensesController;
+use App\Http\Controllers\Admin\GradebookController;
 use App\Http\Controllers\Admin\GroupsController;
 use App\Http\Controllers\Admin\ParentsController;
 use App\Http\Controllers\Admin\PortalAccountsController;
-use App\Http\Controllers\Admin\AccountSubscriptionController;
-use App\Http\Controllers\Admin\RolesController;
-use App\Http\Controllers\Admin\AccessManagementController;
 use App\Http\Controllers\Admin\PrivateSchoolCampaignsController;
 use App\Http\Controllers\Admin\PrivateSchoolInscriptionsController;
+use App\Http\Controllers\Admin\ReportCardsController;
 use App\Http\Controllers\Admin\ReportsController;
+use App\Http\Controllers\Admin\RolesController;
 use App\Http\Controllers\Admin\SalariesController;
 use App\Http\Controllers\Admin\SchoolAttendanceController;
 use App\Http\Controllers\Admin\SchoolAttendanceReportController;
@@ -49,6 +53,7 @@ use App\Http\Controllers\ContactController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DemoRequestController;
 use App\Http\Controllers\FcmTokenController;
+use App\Http\Controllers\ParentPortalController;
 use App\Http\Controllers\PortalController;
 use App\Http\Controllers\PricingController;
 use App\Http\Controllers\PublicEnrollmentController;
@@ -150,6 +155,28 @@ Route::middleware(['auth', 'verified', 'active'])->group(function () {
     Route::get('/portal/payments/{payment}/receipt', [PortalController::class, 'receipt'])->name('portal.payments.receipt');
 });
 
+Route::middleware(['auth', 'verified', 'active', 'parent'])
+    ->prefix('parent')->as('parent.')
+    ->group(function () {
+        Route::get('/', [ParentPortalController::class, 'dashboard'])->name('dashboard');
+        Route::post('/selected-child', [ParentPortalController::class, 'selectChild'])->name('selected-child');
+        Route::get('/children', [ParentPortalController::class, 'children'])->name('children.index');
+        Route::get('/children/{student}', [ParentPortalController::class, 'child'])->whereNumber('student')->name('children.show');
+        Route::patch('/children/{student}/details', [ParentPortalController::class, 'updateChildDetails'])->whereNumber('student')->name('children.details.update');
+        Route::put('/children/{student}/documents', [ParentPortalController::class, 'updateChildDocuments'])->whereNumber('student')->name('children.documents.update');
+        Route::put('/children/{student}/medical', [ParentPortalController::class, 'updateChildMedical'])->whereNumber('student')->name('children.medical.update');
+        Route::get('/timetable', [ParentPortalController::class, 'timetable'])->name('timetable');
+        Route::get('/absences', [ParentPortalController::class, 'absences'])->name('absences');
+        Route::patch('/absences/{attendanceException}/justification', [ParentPortalController::class, 'justifyAbsence'])->whereNumber('attendanceException')->name('absences.justification');
+        Route::get('/absences/{attendanceException}/attachment', [ParentPortalController::class, 'downloadAbsenceAttachment'])->whereNumber('attendanceException')->name('absences.attachment');
+        Route::get('/grades', [ParentPortalController::class, 'grades'])->name('grades');
+        Route::get('/exams', [ParentPortalController::class, 'exams'])->name('exams');
+        Route::get('/announcements', [ParentPortalController::class, 'announcements'])->name('announcements');
+        Route::get('/{module}', [ParentPortalController::class, 'module'])
+            ->where('module', 'timetable|attendance|grades|report-cards|homework|events|announcements|payments|messages|profile')
+            ->name('module');
+    });
+
 Route::middleware(['auth', 'verified', 'active', 'admin', 'permission'])
     ->prefix('admin')
     ->as('admin.')
@@ -172,16 +199,44 @@ Route::middleware(['auth', 'verified', 'active', 'admin', 'permission'])
             Route::patch('inscription-campaigns/{campaign}/status', [PrivateSchoolCampaignsController::class, 'status'])->name('private-school-campaigns.status');
             Route::get('school-inscriptions', [PrivateSchoolInscriptionsController::class, 'index'])->name('private-school-inscriptions.index');
             Route::patch('school-inscriptions/{inscription}/status', [PrivateSchoolInscriptionsController::class, 'updateStatus'])->name('private-school-inscriptions.status');
-            Route::get('school-attendance', [SchoolAttendanceController::class, 'index'])->name('school-attendance.index');
-            Route::post('school-attendance/exceptions', [SchoolAttendanceController::class, 'store'])->name('school-attendance.store');
-            Route::post('school-attendance/students/bulk', [SchoolAttendanceController::class, 'bulkStudents'])->name('school-attendance.students.bulk');
-            Route::delete('school-attendance/exceptions/{attendanceException}', [SchoolAttendanceController::class, 'destroy'])->name('school-attendance.destroy');
-            Route::get('school-attendance/teacher-preview', [SchoolAttendanceController::class, 'teacherPreview'])->name('school-attendance.teacher-preview');
-            Route::get('school-attendance/reports', [SchoolAttendanceReportController::class, 'index'])->name('school-attendance.reports');
-            Route::get('school-attendance/reports/export/{format}', [SchoolAttendanceReportController::class, 'export'])->whereIn('format', ['csv', 'pdf'])->name('school-attendance.reports.export');
-            Route::put('school-attendance/settings', [SchoolAttendanceReportController::class, 'updateSettings'])->name('school-attendance.settings.update');
+            Route::get('school-absence', [SchoolAttendanceController::class, 'index'])->name('school-absence.index');
+            Route::post('school-absence/exceptions', [SchoolAttendanceController::class, 'store'])->name('school-absence.store');
+            Route::post('school-absence/students/bulk', [SchoolAttendanceController::class, 'bulkStudents'])->name('school-absence.students.bulk');
+            Route::delete('school-absence/exceptions/{attendanceException}', [SchoolAttendanceController::class, 'destroy'])->name('school-absence.destroy');
+            Route::get('school-absence/exceptions/{attendanceException}/attachment', [SchoolAttendanceController::class, 'downloadAttachment'])->name('school-absence.attachment');
+            Route::get('school-absence/teacher-preview', [SchoolAttendanceController::class, 'teacherPreview'])->name('school-absence.teacher-preview');
+            Route::get('school-absence/session-options', [SchoolAttendanceController::class, 'sessionOptions'])->name('school-absence.session-options');
+            Route::get('school-absence/reports', [SchoolAttendanceReportController::class, 'index'])->name('school-absence.reports');
+            Route::get('school-absence/reports/export/{format}', [SchoolAttendanceReportController::class, 'export'])->whereIn('format', ['csv', 'pdf'])->name('school-absence.reports.export');
+            Route::get('school-absence/settings', [SchoolAttendanceReportController::class, 'settings'])->name('school-absence.settings');
+            Route::put('school-absence/settings', [SchoolAttendanceReportController::class, 'updateSettings'])->name('school-absence.settings.update');
             Route::get('school-documents', [SchoolDocumentsController::class, 'index'])->name('school-documents.index');
             Route::post('school-documents/download', [SchoolDocumentsController::class, 'download'])->name('school-documents.download');
+            Route::get('report-cards', [ReportCardsController::class, 'index'])->name('report-cards.index');
+            Route::get('assessments', [AssessmentsController::class, 'index'])->name('assessments.index');
+            Route::post('assessments', [AssessmentsController::class, 'store'])->name('assessments.store');
+            Route::put('assessments/{assessment}', [AssessmentsController::class, 'update'])->name('assessments.update');
+            Route::delete('assessments/{assessment}', [AssessmentsController::class, 'destroy'])->name('assessments.destroy');
+            Route::post('assessments/{assessment}/open', [\App\Http\Controllers\Admin\AssessmentLifecycleController::class, 'open'])->name('assessments.open');
+            Route::post('assessments/{assessment}/complete', [\App\Http\Controllers\Admin\AssessmentLifecycleController::class, 'complete'])->name('assessments.complete');
+            Route::post('assessments/{assessment}/lock', [\App\Http\Controllers\Admin\AssessmentLifecycleController::class, 'lock'])->name('assessments.lock');
+            Route::post('assessments/{assessment}/publish', [\App\Http\Controllers\Admin\AssessmentLifecycleController::class, 'publish'])->name('assessments.publish');
+            Route::post('assessments/{assessment}/reopen', [\App\Http\Controllers\Admin\AssessmentLifecycleController::class, 'reopen'])->name('assessments.reopen');
+            Route::get('assessments/{assessment}/grades', [AssessmentGradesController::class, 'index'])->name('assessments.grades.index');
+            Route::post('assessments/{assessment}/grades', [AssessmentGradesController::class, 'save'])->name('assessments.grades.save');
+            Route::get('gradebook', [GradebookController::class, 'index'])->name('gradebook.index');
+            Route::post('report-cards/generate', [ReportCardsController::class, 'generate'])->name('report-cards.generate');
+            Route::post('report-cards/recalculate-group', [ReportCardsController::class, 'recalculateGroup'])->name('report-cards.recalculate-group');
+            Route::post('report-cards/validate-group', [ReportCardsController::class, 'validateGroup'])->name('report-cards.validate-group');
+            Route::post('report-cards/publish-group', [ReportCardsController::class, 'publishGroup'])->name('report-cards.publish-group');
+            Route::post('report-cards/{reportCard}/validate', [ReportCardsController::class, 'validateCard'])->name('report-cards.validate');
+            Route::post('report-cards/{reportCard}/publish', [ReportCardsController::class, 'publish'])->name('report-cards.publish');
+            Route::post('report-cards/{reportCard}/lock', [ReportCardsController::class, 'lock'])->name('report-cards.lock');
+            Route::post('report-cards/{reportCard}/reopen', [ReportCardsController::class, 'reopen'])->name('report-cards.reopen');
+            Route::post('report-cards/{reportCard}/recalculate', [ReportCardsController::class, 'recalculate'])->name('report-cards.recalculate');
+            Route::get('report-cards/{reportCard}', [\App\Http\Controllers\Admin\ReportCardDetailsController::class, 'show'])->name('report-cards.show');
+            Route::put('report-cards/{reportCard}', [\App\Http\Controllers\Admin\ReportCardDetailsController::class, 'update'])->name('report-cards.update');
+            Route::get('report-cards/{reportCard}/print', \App\Http\Controllers\Admin\ReportCardPrintController::class)->name('report-cards.print');
         });
         Route::get('timetable', TimetableController::class)->name('timetable.index');
         Route::prefix('timetable-api')->as('timetable-api.')->group(function () {
@@ -221,6 +276,7 @@ Route::middleware(['auth', 'verified', 'active', 'admin', 'permission'])
         Route::delete('subjects/{subject}', [SubjectsController::class, 'destroy'])->name('subjects.destroy');
         Route::patch('subjects/{subject}/toggle', [SubjectsController::class, 'toggle'])->name('subjects.toggle');
         Route::get('attendance', [AttendanceController::class, 'index'])->name('attendance.index');
+        Route::put('attendance/student-day-absences', [AttendanceController::class, 'studentDayAbsences'])->name('attendance.student-day-absences');
         Route::put('attendance/sessions/{session}/students', [AttendanceController::class, 'students'])->name('attendance.students');
         Route::patch('attendance/sessions/{session}/validate', [AttendanceController::class, 'validateSheet'])->name('attendance.validate');
         Route::put('attendance/sessions/{session}/teacher', [AttendanceController::class, 'teacher'])->name('attendance.teacher');
@@ -291,15 +347,20 @@ Route::middleware(['auth', 'verified', 'active', 'admin', 'permission'])
         Route::get('parents/lookup', [ParentsController::class, 'lookup'])->name('parents.lookup');
         Route::put('parents/{parent}', [ParentsController::class, 'update'])->name('parents.update');
         Route::patch('parents/{parent}/toggle', [ParentsController::class, 'toggle'])->name('parents.toggle');
-        Route::patch('parents/{parent}/children/{student}/visibility', [ParentsController::class, 'toggleChildVisibility'])->name('parents.children.visibility');
         Route::post('students', [StudentsController::class, 'store'])->name('students.store');
         Route::get('students/{student}', [StudentsController::class, 'show'])->name('students.show');
+        Route::get('students/{student}/academic-history', [StudentsController::class, 'academicHistory'])->name('students.academic-history');
+        Route::get('students/{student}/academic-context/{academicYear}', [StudentsController::class, 'academicContext'])->name('students.academic-context');
         Route::put('students/{student}', [StudentsController::class, 'update'])->name('students.update');
         Route::patch('students/{student}/status', [StudentsController::class, 'updateStatus'])->name('students.status');
         Route::put('students/{student}/documents', [StudentsController::class, 'updateDocuments'])->name('students.documents');
+        Route::put('students/{student}/medical', [StudentsController::class, 'updateMedical'])->name('students.medical');
         Route::patch('students/{student}/toggle-active', [StudentsController::class, 'toggleActive'])->name('students.toggle-active');
         Route::post('students/{student}/portal-account', [PortalAccountsController::class, 'student'])->name('students.portal-account');
-        Route::post('notifications/announcements', [AnnouncementsController::class, 'store'])->name('notifications.announcements.store');
+        Route::get('announcements', [AnnouncementsController::class, 'index'])->name('announcements.index');
+        Route::post('announcements', [AnnouncementsController::class, 'store'])->name('announcements.store');
+        Route::patch('announcements/{announcement}/status', [AnnouncementsController::class, 'status'])->name('announcements.status');
+        Route::delete('announcements/{announcement}', [AnnouncementsController::class, 'destroy'])->name('announcements.destroy');
         Route::get('certificates', [CertificatesController::class, 'index'])->name('certificates.index');
         Route::post('certificates', [CertificatesController::class, 'store'])->name('certificates.store');
         Route::post('certificates/bulk', [CertificatesController::class, 'storeBulk'])->name('certificates.bulk.store');

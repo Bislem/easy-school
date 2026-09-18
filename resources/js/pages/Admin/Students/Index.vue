@@ -14,6 +14,7 @@ const props = defineProps<{
     groups: number[];
     studentStatuses: string[];
     filters: any;
+    isPrivateSchool?: boolean;
 }>();
 const labels: Record<string, string> = {
     active: 'Actif',
@@ -27,6 +28,7 @@ const labels: Record<string, string> = {
 const filters = ref({
     search: props.filters.search ?? '',
     course_id: props.filters.course_id ?? '',
+    status: props.filters.status ?? '',
     level: props.filters.level ?? '',
     group: props.filters.group ?? '',
     student_status: props.filters.student_status ?? '',
@@ -100,7 +102,7 @@ function pageLabel(v: string) {
                         /><Input
                             v-model="filters.search"
                             class="pl-9"
-                            placeholder="Nom, e-mail ou téléphone"
+                            placeholder="Nom, e-mail, téléphone, parent, formation ou ID…"
                         />
                     </div>
                     <select
@@ -115,6 +117,13 @@ function pageLabel(v: string) {
                         >
                             {{ c.title }}
                         </option></select
+                    ><select
+                        v-model="filters.status"
+                        class="h-9 rounded-md border bg-background px-3"
+                    >
+                        <option value="">Tous les accès</option>
+                        <option value="1">Étudiants actifs</option>
+                        <option value="0">Étudiants inactifs</option></select
                     ><select
                         v-model="filters.student_status"
                         class="h-9 rounded-md border bg-background px-3"
@@ -261,8 +270,8 @@ function pageLabel(v: string) {
                             'bg-primary text-primary-foreground': l.active,
                             'pointer-events-none opacity-40': !l.url,
                         }"
-                        v-html="pageLabel(l.label)"
-                    />
+                        ><span v-html="pageLabel(l.label)"
+                    /></Link>
                 </nav>
             </div>
         </main>
@@ -315,7 +324,7 @@ function pageLabel(v: string) {
                         <Label>Date d’inscription</Label
                         ><Input v-model="form.registration_date" type="date" />
                     </div>
-                    <div>
+                    <div v-if="!isPrivateSchool">
                         <Label>Niveau scolaire</Label
                         ><Input v-model="form.school_level" />
                     </div>

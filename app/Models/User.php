@@ -126,6 +126,14 @@ class User extends Authenticatable
         if ($this->role === UserRole::SUPER_ADMIN) {
             return false;
         }
+        // Tenant administrators are the owner of the tenant's access model.
+        // Keep this true even when an older tenant has incomplete role
+        // assignments; otherwise the access-management screens themselves
+        // become inaccessible and the Inertia client only shows a generic
+        // page error.
+        if ($this->role === UserRole::ADMIN) {
+            return true;
+        }
         $key = PermissionCatalog::normalize($key);
         $roles = $this->relationLoaded('roles')
             ? $this->roles->where('is_active', true)
@@ -138,7 +146,10 @@ class User extends Authenticatable
             };
         }
 
-        return $roles->contains(fn (Role $role) => $role->permissions->contains('key', $key));
+        $legacy = PermissionCatalog::legacyFor($key);
+
+        return $roles->contains(fn (Role $role) => $role->permissions->contains('key', $key)
+            || ($legacy && $role->permissions->contains('key', $legacy)));
     }
 
     public function hasSystemRole(string $systemKey): bool

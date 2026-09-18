@@ -31,8 +31,27 @@ async function config(): Promise<FirebasePublicConfig> {
 }
 
 async function registration(): Promise<ServiceWorkerRegistration> {
+    // Firebase only needs a registration for push events. Keeping it at the
+    // root scope made it compete with the app PWA worker for every navigation
+    // (including /admin/school-attendance). Isolate it from application routes.
+    const rootScope = new URL('/', window.location.origin).href;
+    const legacyRegistrations = await navigator.serviceWorker.getRegistrations();
+    await Promise.all(
+        legacyRegistrations
+            .filter(
+                (item) => {
+                    const worker = item.active ?? item.waiting ?? item.installing;
+                    return (
+                        item.scope === rootScope &&
+                        worker?.scriptURL.endsWith('/firebase-messaging-sw.js')
+                    );
+                },
+            )
+            .map((item) => item.unregister()),
+    );
+
     return navigator.serviceWorker.register('/firebase-messaging-sw.js', {
-        scope: '/',
+        scope: '/firebase/',
     });
 }
 

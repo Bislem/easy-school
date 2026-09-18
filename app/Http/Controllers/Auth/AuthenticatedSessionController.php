@@ -6,6 +6,8 @@ use App\Enums\UserRole;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\LoginRequest;
 use App\Models\CompanySetting;
+use App\Models\MobileMembership;
+use App\Models\Tenant;
 use App\Tenancy\TenantContext;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -29,29 +31,85 @@ class AuthenticatedSessionController extends Controller
         ]);
     }
 
+    public function createParent(Request $request): Response
+    {
+        return Inertia::render('Parent/Auth/Login', [
+            'canResetPassword' => Route::has('password.request'),
+            'status' => $request->session()->get('status'),
+        ]);
+    }
+
     /**
      * Handle an incoming authentication request.
      */
     public function store(LoginRequest $request): SymfonyResponse
     {
+        return $this->authenticate($request, false);
+    }
+
+    public function storeParent(LoginRequest $request): SymfonyResponse
+    {
+        return $this->authenticate($request, true);
+    }
+
+    private function authenticate(LoginRequest $request, bool $parentPortal): SymfonyResponse
+    {
         $user = $request->validateCredentials();
-        app(TenantContext::class)->set($user->tenant_id);
         $role = $user->getRawOriginal('role');
 
-        if (in_array($user->tenant?->status, ['pending', 'rejected'], true)) {
+        if ($parentPortal && $role !== UserRole::PARENT->value) {
+            return back()->withErrors([
+                'email' => 'Cet espace est réservé aux comptes parents.',
+            ])->onlyInput('email');
+        }
+
+        if (! $parentPortal && $role === UserRole::PARENT->value) {
+            return back()->withErrors([
+                'email' => 'Veuillez utiliser l’espace de connexion réservé aux parents.',
+            ])->onlyInput('email');
+        }
+
+        $tenant = $parentPortal
+            ? MobileMembership::with('tenant')
+                ->where('user_id', $user->id)
+                ->where('role', UserRole::PARENT->value)
+                ->where('is_active', true)
+                ->first()?->tenant
+            : $user->tenant;
+
+        // Older parent accounts were tenant-bound before parent identities
+        // became global. Keep those accounts working during the transition.
+        $tenant ??= $parentPortal && $user->tenant_id
+            ? Tenant::find($user->tenant_id)
+            : null;
+
+        if (! $tenant) {
+            return back()->withErrors([
+                'email' => $parentPortal
+                    ? 'Aucun établissement actif n’est associé à ce compte parent.'
+                    : "Aucun établissement n’est associé à ce compte.",
+            ])->onlyInput('email');
+        }
+
+        app(TenantContext::class)->set($tenant);
+        if ($parentPortal) {
+            $request->session()->put('parent.tenant_id', $tenant->id);
+        }
+
+        if (in_array($tenant->status, ['pending', 'rejected'], true)) {
             Auth::login($user, $request->boolean('remember'));
             $request->session()->regenerate();
 
             return Inertia::location(route('account.pending', absolute: false));
         }
 
-        if ($user->tenant?->status !== 'active') {
+        if ($tenant->status !== 'active') {
             Auth::logout();
 
             return back()->withErrors(['email' => "L'accès de cette école est actuellement désactivé."])->onlyInput('email');
         }
 
-        if ($user->tenant?->demoExpired()) {
+        if ($tenant->demoExpired()) {
             Auth::logout();
 
             return back()->withErrors(['email' => 'Votre période de démonstration est terminée. Contactez-nous pour activer votre abonnement.'])->onlyInput('email');
@@ -80,6 +138,9 @@ class AuthenticatedSessionController extends Controller
         }
 
         if (Features::enabled(Features::twoFactorAuthentication()) && $user->hasEnabledTwoFactorAuthentication()) {
+            if ($parentPortal) {
+                $request->session()->put('url.intended', route('parent.dashboard', absolute: false));
+            }
             $request->session()->put([
                 'login.id' => $user->getKey(),
                 'login.remember' => $request->boolean('remember'),
@@ -91,7 +152,9 @@ class AuthenticatedSessionController extends Controller
         Auth::login($user, $request->boolean('remember'));
         $request->session()->regenerate();
 
-        $destination = redirect()->intended(route('dashboard', absolute: false));
+        $destination = $parentPortal
+            ? redirect()->intended(route('parent.dashboard', absolute: false))
+            : redirect()->intended(route('dashboard', absolute: false));
 
         // Authentication regenerates the session. Force a full navigation for
         // Inertia logins so the dashboard request always uses the new cookie.
@@ -103,11 +166,12 @@ class AuthenticatedSessionController extends Controller
      */
     public function destroy(Request $request): RedirectResponse
     {
+        $wasParent = $request->user()?->getRawOriginal('role') === UserRole::PARENT->value;
         Auth::guard('web')->logout();
 
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 
-        return redirect('/');
+        return redirect()->route($wasParent ? 'parent.login' : 'home');
     }
 }

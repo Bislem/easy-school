@@ -1,1121 +1,1047 @@
 <script setup lang="ts">
-import { publicLocale } from '@/composables/usePublicLocale';
 import HomeLayout from '@/layouts/HomeLayout.vue';
 import { Head, Link } from '@inertiajs/vue3';
 import {
+    Apple,
     ArrowRight,
-    Award,
     BarChart3,
     Bell,
-    BookOpen,
+    Building2,
+    CalendarCheck,
     CalendarDays,
     Check,
     CheckCircle2,
-    CirclePlay,
     Clock3,
     FileBadge,
     FileText,
     GraduationCap,
-    Grid2X2,
-    HeartHandshake,
-    IdCard,
-    KeyRound,
     Layers3,
+    LockKeyhole,
+    Megaphone,
     MessageCircle,
-    Phone,
-    Printer,
-    ReceiptText,
+    Monitor,
+    School,
     ShieldCheck,
     Smartphone,
     Sparkles,
-    UserCog,
+    UserRoundCheck,
     Users,
     UsersRound,
 } from 'lucide-vue-next';
 
-const features = [
-    [
-        'Gestion des étudiants',
-        'Admission, profils, suivi et historique complet.',
-        Users,
-        'blue',
-    ],
-    [
-        'Dossiers étudiants',
-        'Documents, pièces jointes et suivis personnalisés.',
-        FileText,
-        'green',
-    ],
-    [
-        'Gestion RH',
-        'Organigramme, rôles, postes et permissions.',
-        UsersRound,
-        'violet',
-    ],
-    [
-        'Dossiers employés',
-        'Profils, contrats, salaires et évaluations.',
-        UserCog,
-        'orange',
-    ],
-    [
-        'Sessions & groupes',
-        'Planification, groupes, créneaux et salles.',
-        ShieldCheck,
-        'cyan',
-    ],
-    [
-        'Formations & cours',
-        'Programmes, modules et contenus.',
-        BookOpen,
-        'indigo',
-    ],
-    [
-        'Inscriptions',
-        'Gestion des inscriptions et réinscriptions.',
-        IdCard,
-        'rose',
-    ],
-    ['Présences', 'Suivi des présences et absences.', Clock3, 'green'],
-    [
-        'Paiements & factures',
-        'Facturation, paiements, relances et reçus.',
-        ReceiptText,
-        'amber',
-    ],
-    [
-        'Sites / campus multiples',
-        'Gérez plusieurs sites avec des stats par site.',
-        Layers3,
-        'sky',
-    ],
-    ['Certificats', 'Génération automatique de certificats.', Award, 'violet'],
-    [
-        'Badges',
-        'Badges numériques pour étudiants et employés.',
-        FileBadge,
-        'red',
-    ],
-    [
-        'Rapports & statistiques',
-        'Tableaux de bord, KPI et rapports avancés.',
-        BarChart3,
-        'blue',
-    ],
-    [
-        'Emploi du temps',
-        'Planning des cours et ressources.',
-        CalendarDays,
-        'green',
-    ],
-    [
-        'Communication parents',
-        'Messages, annonces et notifications.',
-        HeartHandshake,
-        'orange',
-    ],
-    [
-        'Portail enseignant',
-        'Suivi des classes, notes et ressources.',
-        UsersRound,
-        'violet',
-    ],
-    [
-        'Mobile parents',
-        'Suivi des enfants et infos en temps réel.',
-        Smartphone,
-        'cyan',
-    ],
+const productPillars = [
+    {
+        eyebrow: 'SCOLARITÉ',
+        title: 'Du premier contact au bulletin',
+        description:
+            'Centralisez inscriptions, dossiers, classes, notes, absences et documents dans un parcours continu.',
+        icon: GraduationCap,
+        color: 'teal',
+        items: [
+            'Inscriptions',
+            'Dossiers élèves',
+            'Notes & bulletins',
+            'Présences',
+        ],
+    },
+    {
+        eyebrow: 'ORGANISATION',
+        title: 'Une journée scolaire bien orchestrée',
+        description:
+            'Construisez les emplois du temps, coordonnez les équipes et détectez les conflits avant publication.',
+        icon: CalendarCheck,
+        color: 'blue',
+        items: [
+            'Emplois du temps',
+            'Classes & groupes',
+            'Salles & ressources',
+            'Annonces',
+        ],
+    },
+    {
+        eyebrow: 'ADMINISTRATION',
+        title: 'Les opérations sous contrôle',
+        description:
+            'Gérez les équipes, les accès, les paiements et les documents sans multiplier les fichiers.',
+        icon: Layers3,
+        color: 'violet',
+        items: [
+            'Ressources humaines',
+            'Paiements',
+            'Rôles & permissions',
+            'Rapports',
+        ],
+    },
 ];
-const colors: Record<string, string> = {
-    blue: 'bg-blue-500',
-    green: 'bg-emerald-500',
-    violet: 'bg-violet-500',
-    orange: 'bg-orange-500',
-    cyan: 'bg-cyan-600',
-    indigo: 'bg-indigo-500',
-    rose: 'bg-rose-500',
-    amber: 'bg-amber-500',
-    sky: 'bg-sky-500',
-    red: 'bg-red-400',
-};
+
+const dailyFlow = [
+    {
+        number: '01',
+        title: 'L’administration organise',
+        description:
+            'Paramètres, dossiers, planning, finance et accès sont pilotés depuis un espace central.',
+        icon: Building2,
+    },
+    {
+        number: '02',
+        title: 'Les équipes collaborent',
+        description:
+            'Chaque membre retrouve les classes, outils et informations utiles à son rôle.',
+        icon: UsersRound,
+    },
+    {
+        number: '03',
+        title: 'Les parents restent informés',
+        description:
+            'Notes, absences, emploi du temps et annonces sont disponibles dans leur portail web.',
+        icon: UserRoundCheck,
+    },
+];
+
 const assurances = [
-    [
-        KeyRound,
-        'Accès maîtrisés',
-        'Rôles personnalisables et permissions précises par équipe.',
-    ],
-    [
-        Layers3,
-        'Périmètres de données',
-        'Accès limité au site, aux classes affectées ou à ses propres données.',
-    ],
-    [
-        Printer,
-        'Documents en série',
-        'Certificats et emplois du temps générés en quelques clics.',
-    ],
-    [
-        CalendarDays,
-        'Planning intelligent',
-        'Conflits détectés, salles organisées et enseignants coordonnés.',
-    ],
-    [
-        ReceiptText,
-        'Finance centralisée',
-        'Paiements, dépenses, salaires et justificatifs dans un même flux.',
-    ],
-    [
-        ShieldCheck,
-        'Traçabilité complète',
-        'Historique des accès et actions sensibles consultable à tout moment.',
-    ],
+    {
+        title: 'Accès précis',
+        description:
+            'Des rôles et permissions adaptés aux responsabilités de chaque utilisateur.',
+        icon: LockKeyhole,
+    },
+    {
+        title: 'Données isolées',
+        description:
+            'Chaque établissement conserve son propre environnement, ses réglages et ses données.',
+        icon: ShieldCheck,
+    },
+    {
+        title: 'Multi-sites natif',
+        description:
+            'Une vue globale avec des périmètres et indicateurs propres à chaque campus.',
+        icon: School,
+    },
+    {
+        title: 'Traçabilité',
+        description:
+            'Les actions sensibles et les changements importants restent consultables.',
+        icon: FileText,
+    },
+];
+
+const portalFeatures = [
+    ['Notes et bulletins', BarChart3],
+    ['Absences et justificatifs', CalendarCheck],
+    ['Emploi du temps', CalendarDays],
+    ['Annonces de l’école', Megaphone],
 ];
 </script>
 
 <template>
-    <HomeLayout
-        ><Head title="Easy School — Gestion scolaire simplifiée" />
-        <main>
+    <HomeLayout>
+        <Head title="Easy School — La gestion scolaire, enfin fluide" />
+
+        <main class="overflow-hidden">
             <section
-                class="relative overflow-hidden bg-[#061d3b] pt-28 pb-20 text-white lg:min-h-[650px] lg:pb-10"
+                class="relative bg-[#061d3b] pt-28 pb-20 text-white lg:min-h-[760px] lg:pt-32"
             >
                 <div
-                    class="absolute inset-0 [background-image:radial-gradient(circle_at_15%_40%,#0d5174_0,transparent_31%),radial-gradient(circle_at_85%_20%,#10446d_0,transparent_35%)] opacity-30"
+                    class="pointer-events-none absolute inset-0 [background-image:radial-gradient(circle_at_9%_40%,rgba(18,203,178,.18),transparent_30%),radial-gradient(circle_at_88%_15%,rgba(21,104,157,.32),transparent_34%)] opacity-60"
                 ></div>
                 <div
-                    class="absolute top-16 -right-20 size-80 rounded-full border border-dashed border-cyan-400/30"
+                    class="hero-grid pointer-events-none absolute inset-0 opacity-[.06]"
                 ></div>
                 <div
-                    class="relative mx-auto grid max-w-[1440px] items-center gap-10 px-6 lg:grid-cols-[.78fr_1.22fr] lg:px-10"
+                    class="pointer-events-none absolute top-24 -right-40 size-[520px] rounded-full border border-dashed border-cyan-300/20"
+                ></div>
+
+                <div
+                    class="relative mx-auto grid max-w-[1380px] items-center gap-14 px-6 lg:grid-cols-[.83fr_1.17fr] lg:px-10"
                 >
-                    <div class="py-10 lg:py-16">
-                        <span
-                            class="inline-flex rounded-full bg-[#0c6b6c] px-4 py-2 text-[11px] font-extrabold tracking-wide text-[#33e3cc]"
-                            >PLATEFORME SaaS MULTI-ÉTABLISSEMENTS</span
+                    <div class="max-w-2xl py-8 lg:py-14">
+                        <div
+                            class="inline-flex items-center gap-2 rounded-full border border-[#23dcc2]/25 bg-[#23dcc2]/10 px-3.5 py-2 text-[11px] font-extrabold tracking-[.16em] text-[#6af0dc]"
                         >
+                            <span class="relative flex size-2"
+                                ><span
+                                    class="absolute inline-flex size-full animate-ping rounded-full bg-[#21d8bf] opacity-60"
+                                ></span
+                                ><span
+                                    class="relative inline-flex size-2 rounded-full bg-[#21d8bf]"
+                                ></span
+                            ></span>
+                            CONÇU POUR LES ÉTABLISSEMENTS D’AUJOURD’HUI
+                        </div>
                         <h1
-                            class="mt-7 text-4xl leading-[1.08] font-black tracking-tight sm:text-5xl xl:text-[58px]"
+                            class="mt-7 text-[42px] leading-[1.04] font-black tracking-[-.035em] sm:text-6xl lg:text-[66px]"
                         >
-                            Pilotez votre établissement<br /><span
-                                class="text-[#13cbb1]"
-                                >en toute simplicité</span
+                            Toute votre école.<br /><span
+                                class="bg-gradient-to-r from-[#1bd2ba] to-[#71ead9] bg-clip-text text-transparent"
+                                >Enfin au même endroit.</span
                             >
                         </h1>
                         <p
-                            class="mt-6 max-w-xl text-base leading-7 text-slate-200"
+                            class="mt-6 max-w-xl text-base leading-7 text-slate-300 sm:text-lg sm:leading-8"
                         >
-                            Easy School est la plateforme complète pour gérer
-                            étudiants, employés, sessions, groupes, formations,
-                            finances, RH et plusieurs sites à partir d’un seul
-                            espace sécurisé.
+                            Easy School relie la scolarité, les équipes, la
+                            finance et les parents dans une plateforme claire,
+                            sécurisée et pensée pour le quotidien.
                         </p>
-                        <div class="mt-7 flex flex-wrap gap-4">
+                        <div class="mt-8 flex flex-col gap-3 sm:flex-row">
                             <Link
                                 href="/demo"
-                                class="flex items-center gap-3 rounded-xl bg-gradient-to-r from-[#12bda8] to-[#16d4b5] px-6 py-3.5 text-sm font-bold shadow-xl"
-                                >Demander une démo
-                                <ArrowRight class="size-4" /></Link
-                            ><a
-                                href="#fonctionnalites"
-                                class="flex items-center gap-3 rounded-xl border border-white/60 px-6 py-3.5 text-sm font-bold"
-                                >Voir une démo <CirclePlay class="size-5"
-                            /></a>
+                                class="group inline-flex items-center justify-center gap-3 rounded-xl bg-[#16cdb3] px-6 py-3.5 text-sm font-extrabold text-[#052d38] shadow-xl shadow-black/20 transition hover:-translate-y-0.5 hover:bg-[#2adde0]"
+                            >
+                                Découvrir Easy School
+                                <ArrowRight
+                                    class="size-4 transition group-hover:translate-x-1"
+                                />
+                            </Link>
+                            <Link
+                                href="/parent/login"
+                                class="inline-flex items-center justify-center gap-3 rounded-xl border border-white/20 bg-white/5 px-6 py-3.5 text-sm font-bold text-white backdrop-blur transition hover:border-white/35 hover:bg-white/10"
+                            >
+                                <Users class="size-4 text-[#50e0cd]" /> Espace
+                                parents
+                            </Link>
                         </div>
                         <div
-                            class="mt-10 flex flex-wrap gap-x-8 gap-y-4 text-xs text-slate-200"
+                            class="mt-9 flex flex-wrap gap-x-6 gap-y-3 text-xs text-slate-300"
                         >
                             <span
                                 v-for="item in [
-                                    [CheckCircle2, 'Durée de démo flexible'],
-                                    [Check, 'Mise en place rapide'],
-                                    [ShieldCheck, 'Données sécurisées'],
-                                    [Grid2X2, 'Multi-sites'],
-                                ]"
-                                :key="item[1] as string"
-                                class="flex items-center gap-2"
-                                ><component
-                                    :is="item[0]"
-                                    class="size-5 text-[#13cbb1]"
-                                />{{ item[1] }}</span
-                            >
-                        </div>
-                    </div>
-                    <div
-                        class="relative pb-8 sm:pb-10 lg:-mt-2 lg:self-start lg:pt-5 lg:pb-12 xl:-mt-4 xl:pt-4"
-                        :class="
-                            publicLocale === 'ar'
-                                ? 'sm:pl-4 lg:mr-0 lg:-ml-16 lg:pr-16 lg:pl-0 xl:-ml-24 xl:pr-20'
-                                : 'sm:pr-4 lg:-mr-16 lg:pr-0 lg:pl-16 xl:-mr-24 xl:pl-20'
-                        "
-                    >
-                        <div
-                            class="absolute top-8 right-0 bottom-5 left-10 rounded-[36px] bg-cyan-400/20 blur-3xl lg:top-5 lg:left-16 xl:left-20"
-                        ></div>
-                        <div
-                            class="hero-phone-float group absolute z-30 w-28 sm:w-36 lg:w-40 xl:w-44"
-                            :class="
-                                publicLocale === 'ar'
-                                    ? 'top-[16%] right-0 sm:right-1 lg:right-0 xl:right-1'
-                                    : '-bottom-1 -left-4 sm:-bottom-2 sm:-left-5 lg:-bottom-1 lg:-left-8 xl:-left-10'
-                            "
-                        >
-                            <span
-                                class="hero-phone-orbit pointer-events-none absolute inset-[8%] -z-10 rounded-[32%] border border-cyan-300/50"
-                            ></span>
-                            <span
-                                class="hero-phone-glow pointer-events-none absolute inset-[12%] -z-20 rounded-full bg-cyan-300/35 blur-2xl"
-                            ></span>
-                            <img
-                                src="/images/mobile/welcome.png"
-                                alt="Application mobile Easy School pour les parents"
-                                class="relative w-full -rotate-2 drop-shadow-[0_24px_32px_rgba(0,0,0,0.55)] transition-all duration-700 ease-out group-hover:scale-[1.09] group-hover:rotate-1 group-hover:drop-shadow-[0_32px_42px_rgba(16,211,190,0.38)]"
-                            />
-                            <div
-                                class="absolute top-[19%] z-40 flex items-center gap-1.5 rounded-full border border-white/50 bg-white/95 px-2.5 py-1.5 text-[8px] font-black whitespace-nowrap text-[#075b63] opacity-0 shadow-xl transition-all duration-500 group-hover:-translate-y-2 group-hover:opacity-100 sm:text-[9px]"
-                                :class="
-                                    publicLocale === 'ar'
-                                        ? '-left-7'
-                                        : '-right-7'
-                                "
-                            >
-                                <span class="relative flex size-2"
-                                    ><span
-                                        class="absolute inline-flex size-full animate-ping rounded-full bg-emerald-400 opacity-75"
-                                    ></span
-                                    ><span
-                                        class="relative inline-flex size-2 rounded-full bg-emerald-500"
-                                    ></span
-                                ></span>
-                                Suivi en temps réel
-                            </div>
-                            <Sparkles
-                                class="hero-phone-sparkle absolute -top-1 -right-2 size-5 text-cyan-200 drop-shadow-[0_0_8px_rgba(103,232,249,.9)]"
-                            />
-                        </div>
-                        <div
-                            class="relative z-20 overflow-hidden rounded-2xl border border-white/20 bg-white shadow-[0_32px_80px_-18px_rgba(0,0,0,0.72)] ring-1 ring-cyan-300/25"
-                            :class="
-                                publicLocale === 'ar'
-                                    ? 'mr-8 sm:mr-12 lg:mr-10 xl:mr-12'
-                                    : 'ml-8 sm:ml-12 lg:ml-10 xl:ml-12'
-                            "
-                        >
-                            <div
-                                class="flex h-8 items-center gap-1.5 border-b border-slate-200 bg-slate-50 px-3"
-                            >
-                                <span
-                                    class="size-2 rounded-full bg-red-400"
-                                ></span>
-                                <span
-                                    class="size-2 rounded-full bg-amber-400"
-                                ></span>
-                                <span
-                                    class="size-2 rounded-full bg-emerald-400"
-                                ></span>
-                                <span
-                                    class="mx-auto h-3.5 w-2/5 rounded-full bg-slate-200/80"
-                                ></span>
-                            </div>
-                            <img
-                                src="/images/dashborad-screenshot.png"
-                                alt="Tableau de bord Easy School"
-                                class="block h-[310px] w-full bg-white object-cover object-left object-top sm:h-[360px] lg:h-[390px] xl:h-[430px]"
-                            />
-                        </div>
-                        <div
-                            v-if="false"
-                            aria-hidden="true"
-                            class="overflow-hidden rounded-2xl border border-cyan-300/40 bg-[#f6f9fd] text-[#102a4f] shadow-2xl lg:rounded-b-none"
-                        >
-                            <div class="flex min-h-[420px]">
-                                <aside
-                                    class="hidden w-36 shrink-0 bg-[#082749] p-4 text-[10px] text-slate-300 sm:block"
-                                >
-                                    <div
-                                        class="mb-6 flex items-center gap-2 text-sm font-bold text-white"
-                                    >
-                                        <GraduationCap
-                                            class="size-5 text-[#15d5bc]"
-                                        />
-                                        Easy School
-                                    </div>
-                                    <div
-                                        v-for="(n, i) in [
-                                            'Tableau de bord',
-                                            'Étudiants',
-                                            'Employés',
-                                            'Formations',
-                                            'Groupes',
-                                            'Sessions',
-                                            'Présences',
-                                            'Paiements',
-                                            'RH',
-                                            'Certificats',
-                                            'Budgets',
-                                            'Rapports',
-                                            'Parents',
-                                        ]"
-                                        :key="n"
-                                        class="mb-1.5 rounded px-2 py-1.5"
-                                        :class="
-                                            i === 0
-                                                ? 'bg-blue-600 text-white'
-                                                : ''
-                                        "
-                                    >
-                                        {{ n }}
-                                    </div>
-                                </aside>
-                                <div class="min-w-0 flex-1 p-4 sm:p-5">
-                                    <div
-                                        class="flex items-center justify-between"
-                                    >
-                                        <strong>Tableau de bord</strong>
-                                        <div
-                                            class="flex items-center gap-3 text-[9px]"
-                                        >
-                                            <span
-                                                class="rounded-md border bg-white px-4 py-2"
-                                                >Campus Central</span
-                                            ><Bell class="size-4" /><span
-                                                class="size-7 rounded-full bg-orange-100"
-                                            ></span>
-                                        </div>
-                                    </div>
-                                    <div
-                                        class="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4"
-                                    >
-                                        <div
-                                            v-for="s in [
-                                                ['Étudiants', '1 842', '+8,2%'],
-                                                ['Employés', '156', '+5,1%'],
-                                                [
-                                                    'Inscriptions',
-                                                    '2 316',
-                                                    '+9,4%',
-                                                ],
-                                                [
-                                                    'Revenus',
-                                                    '125 680 DA',
-                                                    '+12,7%',
-                                                ],
-                                            ]"
-                                            :key="s[0]"
-                                            class="rounded-lg border bg-white p-3 shadow-sm"
-                                        >
-                                            <p
-                                                class="text-[9px] text-slate-400"
-                                            >
-                                                {{ s[0] }}
-                                            </p>
-                                            <strong
-                                                class="mt-1 block text-sm"
-                                                >{{ s[1] }}</strong
-                                            ><span
-                                                class="text-[8px] text-emerald-500"
-                                                >{{ s[2] }} ce mois</span
-                                            >
-                                        </div>
-                                    </div>
-                                    <div
-                                        class="mt-3 grid gap-2 sm:grid-cols-[1.55fr_.8fr]"
-                                    >
-                                        <div
-                                            class="rounded-lg border bg-white p-4"
-                                        >
-                                            <div
-                                                class="flex justify-between text-[10px] font-bold"
-                                            >
-                                                <span
-                                                    >Évolution des
-                                                    inscriptions</span
-                                                ><span class="text-slate-400"
-                                                    >6 derniers mois</span
-                                                >
-                                            </div>
-                                            <svg
-                                                viewBox="0 0 330 130"
-                                                class="mt-3 w-full"
-                                            >
-                                                <path
-                                                    d="M8 112 L55 91 L102 72 L149 87 L196 48 L243 57 L290 20 L324 9 L324 130 L8 130Z"
-                                                    fill="#eff6ff"
-                                                />
-                                                <path
-                                                    d="M8 112 L55 91 L102 72 L149 87 L196 48 L243 57 L290 20 L324 9"
-                                                    fill="none"
-                                                    stroke="#3b82f6"
-                                                    stroke-width="3"
-                                                />
-                                            </svg>
-                                        </div>
-                                        <div
-                                            class="rounded-lg border bg-white p-3"
-                                        >
-                                            <strong class="text-[10px]"
-                                                >Activité récente</strong
-                                            >
-                                            <div
-                                                v-for="a in [
-                                                    'Nouvelle inscription',
-                                                    'Paiement reçu',
-                                                    'Absence signalée',
-                                                    'Nouveau certificat',
-                                                ]"
-                                                :key="a"
-                                                class="mt-3 flex gap-2 text-[8px]"
-                                            >
-                                                <span
-                                                    class="grid size-5 place-items-center rounded bg-emerald-100"
-                                                    >•</span
-                                                ><b>{{ a }}</b>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="mt-3 grid grid-cols-4 gap-2">
-                                        <div
-                                            v-for="(s, i) in [
-                                                'Campus Central',
-                                                'Campus Est',
-                                                'Campus Ouest',
-                                                'Campus Sud',
-                                            ]"
-                                            :key="s"
-                                            class="rounded-lg border bg-white p-2 text-[8px]"
-                                        >
-                                            <b>{{ s }}</b>
-                                            <p class="mt-2 text-sm font-bold">
-                                                {{ [1842, 782, 645, 512][i] }}
-                                            </p>
-                                            <div
-                                                class="mt-1 h-1 rounded bg-blue-100"
-                                            >
-                                                <div
-                                                    class="h-full rounded bg-blue-500"
-                                                    :style="{
-                                                        width: `${82 - i * 12}%`,
-                                                    }"
-                                                ></div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            <section class="border-b">
-                <div class="mx-auto max-w-[1380px] px-6 py-5">
-                    <p class="text-center text-xs font-semibold">
-                        Ils nous font confiance
-                    </p>
-                    <div
-                        class="mt-5 grid grid-cols-2 gap-4 text-center text-xs text-slate-500 md:grid-cols-3 lg:grid-cols-6"
-                    >
-                        <span
-                            v-for="n in [
-                                'Institut Excellence',
-                                'Académie Horizon',
-                                'Centre de Formation Atlas',
-                                'École Nouvelle Vision',
-                                'Campus Leadership',
-                                'Institut Al Falah',
-                            ]"
-                            :key="n"
-                            class="flex items-center justify-center gap-2 border-r py-2"
-                            ><Award class="size-6 text-slate-400" />{{
-                                n
-                            }}</span
-                        >
-                    </div>
-                </div>
-            </section>
-            <section
-                id="fonctionnalites"
-                class="mx-auto max-w-[1380px] px-6 py-8 lg:px-10"
-            >
-                <h2 class="text-center text-xl font-extrabold">
-                    Une plateforme complète pour chaque acteur de votre
-                    établissement
-                </h2>
-                <div
-                    id="modules"
-                    class="mt-7 grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6"
-                >
-                    <article
-                        v-for="f in features"
-                        :key="f[0] as string"
-                        class="flex min-h-24 gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
-                    >
-                        <span
-                            class="grid size-10 shrink-0 place-items-center rounded-lg text-white"
-                            :class="colors[f[3] as string]"
-                            ><component :is="f[2]" class="size-5"
-                        /></span>
-                        <div>
-                            <h3 class="text-xs font-extrabold">{{ f[0] }}</h3>
-                            <p
-                                class="mt-1 text-[10px] leading-4 text-slate-500"
-                            >
-                                {{ f[1] }}
-                            </p>
-                        </div>
-                    </article>
-                </div>
-            </section>
-
-            <section
-                class="mx-auto grid max-w-[1380px] gap-4 px-6 pb-5 lg:px-10"
-            >
-                <article
-                    class="grid items-center overflow-hidden rounded-2xl bg-gradient-to-r from-[#eef8ff] to-[#f9fcff] p-8 md:grid-cols-2"
-                >
-                    <div class="rounded-xl border bg-white p-5 shadow-lg">
-                        <div
-                            class="mb-3 flex justify-between text-[10px] font-bold"
-                        >
-                            <span>Mes établissements</span><span>Détails</span>
-                        </div>
-                        <div
-                            v-for="(r, i) in [
-                                'Campus Central',
-                                'Campus Est',
-                                'Campus Ouest',
-                                'Campus Sud',
-                            ]"
-                            :key="r"
-                            class="grid grid-cols-5 border-t py-3 text-[9px]"
-                        >
-                            <b>{{ r }}</b
-                            ><span>{{ [1842, 782, 645, 512][i] }}</span
-                            ><span>{{ [156, 68, 54, 44][i] }}</span
-                            ><span>{{ [2316, 944, 721, 593][i] }}</span
-                            ><span class="font-bold text-emerald-500"
-                                >Actif</span
-                            >
-                        </div>
-                    </div>
-                    <div class="p-3 md:pl-16">
-                        <span
-                            class="rounded-full bg-cyan-100 px-3 py-1 text-[9px] font-bold text-cyan-700"
-                            >MULTI-SITES</span
-                        >
-                        <h2 class="mt-4 text-2xl font-black">
-                            Gérez plusieurs sites depuis<br />une plateforme
-                            centrale
-                        </h2>
-                        <p class="mt-3 text-xs leading-5 text-slate-500">
-                            Easy School vous permet de piloter tous vos
-                            établissements avec une vue globale et des
-                            paramètres spécifiques à chaque site.
-                        </p>
-                        <div class="mt-5 flex flex-wrap gap-2">
-                            <span
-                                v-for="x in [
-                                    'Statistiques par site',
-                                    'Paramètres indépendants',
-                                    'Consolidation globale',
-                                    'Contrôle centralisé',
-                                ]"
-                                :key="x"
-                                class="rounded-lg border bg-white px-3 py-2 text-[9px] font-semibold"
-                                >✓ {{ x }}</span
-                            >
-                        </div>
-                    </div>
-                </article>
-                <div class="grid gap-4 lg:grid-cols-2">
-                    <article
-                        class="grid rounded-2xl bg-gradient-to-r from-[#effaff] to-white p-8 md:grid-cols-[.95fr_1.05fr]"
-                    >
-                        <div>
-                            <span class="text-[9px] font-bold text-blue-500"
-                                >RESSOURCES HUMAINES</span
-                            >
-                            <h2 class="mt-3 text-2xl font-black">
-                                Gérez vos ressources humaines<br />et
-                                l'administration facilement
-                            </h2>
-                            <p class="mt-3 text-xs leading-5 text-slate-500">
-                                Suivez vos employés, gérez les contrats,
-                                salaires, absences et évaluations.
-                            </p>
-                            <div class="mt-5 grid gap-3 text-[10px]">
-                                <span
-                                    v-for="x in [
-                                        'Contrats et documents RH',
-                                        'Gestion des salaires et primes',
-                                        'Congés, absences et pointage',
-                                        'Évaluations et suivi de performance',
-                                    ]"
-                                    :key="x"
-                                    class="flex gap-2"
-                                    ><CheckCircle2
-                                        class="size-4 text-[#10bfa9]"
-                                    />{{ x }}</span
-                                >
-                            </div>
-                        </div>
-                        <div
-                            class="mt-5 rounded-xl border bg-white p-4 shadow-lg md:mt-0"
-                        >
-                            <div class="flex gap-3">
-                                <span
-                                    class="size-12 rounded-full bg-slate-200"
-                                ></span>
-                                <div>
-                                    <b class="text-xs">Nadia Belkheir</b>
-                                    <p class="text-[9px] text-slate-400">
-                                        Enseignante
-                                    </p>
-                                </div>
-                            </div>
-                            <div class="mt-5 grid grid-cols-2 gap-3 text-[9px]">
-                                <span>Poste<br /><b>Enseignante</b></span
-                                ><span>Département<br /><b>Pédagogie</b></span
-                                ><span
-                                    >Date d'embauche<br /><b
-                                        >12/09/2021</b
-                                    ></span
-                                ><span
-                                    >Salaire mensuel<br /><b>85 000 DA</b></span
-                                >
-                            </div>
-                            <div
-                                class="mt-5 flex h-20 items-end justify-around rounded-lg bg-slate-50 p-3"
-                            >
-                                <span
-                                    v-for="h in [42, 62, 50, 72, 58]"
-                                    :key="h"
-                                    class="w-3 bg-blue-500"
-                                    :style="{ height: `${h}%` }"
-                                ></span>
-                            </div>
-                        </div>
-                    </article>
-                    <article
-                        class="grid rounded-2xl bg-gradient-to-r from-[#fff9ee] to-white p-8 md:grid-cols-[.95fr_1.05fr]"
-                    >
-                        <div>
-                            <span class="text-[9px] font-bold text-violet-500"
-                                >CERTIFICATS & BADGES</span
-                            >
-                            <h2 class="mt-3 text-2xl font-black">
-                                Certificats et badges<br />générés
-                                automatiquement
-                            </h2>
-                            <p class="mt-3 text-xs leading-5 text-slate-500">
-                                Créez et délivrez des certificats professionnels
-                                en quelques clics.
-                            </p>
-                            <div class="mt-5 flex flex-wrap gap-2">
-                                <span
-                                    v-for="x in [
-                                        'Modèles personnalisables',
-                                        'QR code & vérification',
-                                        'Export PDF / Impression',
-                                        'Émission en masse',
-                                    ]"
-                                    :key="x"
-                                    class="rounded-lg bg-amber-50 px-3 py-2 text-[9px]"
-                                    >▣ {{ x }}</span
-                                >
-                            </div>
-                        </div>
-                        <div class="relative mt-5 md:mt-0">
-                            <div
-                                class="border-[7px] border-double border-amber-300 bg-white p-7 text-center shadow-xl"
-                            >
-                                <Award class="mx-auto size-8 text-amber-500" />
-                                <p class="mt-2 font-serif text-xl font-bold">
-                                    CERTIFICAT<br /><span class="text-xs"
-                                        >DE RÉUSSITE</span
-                                    >
-                                </p>
-                                <p class="mt-4 text-[9px]">Décerné à</p>
-                                <p class="font-serif text-lg font-bold">
-                                    Ahmed Belkacem
-                                </p>
-                                <p class="mt-3 text-[8px]">
-                                    pour avoir complété avec succès la formation
-                                </p>
-                            </div>
-                        </div>
-                    </article>
-                </div>
-                <article
-                    class="grid overflow-hidden rounded-2xl bg-gradient-to-r from-[#f2faff] to-white p-8 lg:grid-cols-[.7fr_.45fr_1fr]"
-                >
-                    <div>
-                        <span class="text-[9px] font-bold text-blue-500"
-                            >APPLICATION MOBILE</span
-                        >
-                        <h2 class="mt-3 text-2xl font-black">
-                            Parents connectés,<br />enfants suivis
-                        </h2>
-                        <p class="mt-3 text-xs leading-5 text-slate-500">
-                            L'application mobile Easy School permet aux parents
-                            de suivre la scolarité de leurs enfants en temps
-                            réel.
-                        </p>
-                        <div class="mt-5 grid gap-3 text-[10px]">
-                            <span
-                                v-for="x in [
-                                    'Notes, moyennes et bulletins',
-                                    'Présences et absences',
-                                    'Observations et messages',
-                                    'Actualités et événements',
-                                ]"
-                                :key="x"
-                                class="flex gap-2"
-                                ><CheckCircle2
-                                    class="size-4 text-[#10bfa9]"
-                                />{{ x }}</span
-                            >
-                        </div>
-                    </div>
-                    <div
-                        class="mx-auto mt-5 w-56 rounded-[32px] border-[7px] border-[#071726] bg-white p-3 shadow-2xl lg:mt-0 lg:-mb-16"
-                    >
-                        <div class="rounded-xl bg-blue-600 p-3 text-white">
-                            <p class="text-[8px]">Bonjour,</p>
-                            <b>Samira</b>
-                            <div
-                                class="mt-4 rounded-lg bg-white p-3 text-[#102a4f]"
-                            >
-                                <p class="text-[8px]">Élève</p>
-                                <b class="text-xs">Yacine Belkacem</b>
-                            </div>
-                        </div>
-                        <div
-                            class="grid grid-cols-4 gap-2 py-4 text-center text-[7px]"
-                        >
-                            <span
-                                v-for="x in [
-                                    'Aperçu',
-                                    'Notes',
-                                    'Présences',
-                                    'Messages',
-                                ]"
-                                :key="x"
-                                >▣<br />{{ x }}</span
-                            >
-                        </div>
-                        <p class="text-[9px] font-bold">Moyenne générale</p>
-                        <strong class="text-xl">16,45</strong
-                        ><span class="text-[8px]"> /20</span>
-                    </div>
-                    <div class="p-3 lg:pl-16">
-                        <h3 class="mt-3 text-lg font-extrabold">
-                            Restez informé au quotidien
-                        </h3>
-                        <p class="mt-3 text-xs leading-5 text-slate-500">
-                            Recevez toutes les informations importantes
-                            concernant vos enfants.
-                        </p>
-                        <div class="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-                            <span
-                                v-for="(x, i) in [
-                                    'Notifications en temps réel',
-                                    'Messagerie sécurisée',
-                                    'Agenda et événements',
-                                    'Suivi complet des enfants',
-                                ]"
-                                :key="x"
-                                class="rounded-xl border bg-white p-4 text-center text-[9px] font-semibold shadow-sm"
-                                ><component
-                                    :is="
-                                        [
-                                            Bell,
-                                            MessageCircle,
-                                            CalendarDays,
-                                            Users,
-                                        ][i]
-                                    "
-                                    class="mx-auto mb-3 size-7 text-blue-500"
-                                />{{ x }}</span
-                            >
-                        </div>
-                        <div class="mt-8 flex flex-wrap gap-3">
-                            <span
-                                class="rounded-lg bg-black px-5 py-2 text-xs font-bold text-white"
-                                > App Store</span
-                            ><span
-                                class="rounded-lg bg-black px-5 py-2 text-xs font-bold text-white"
-                                >▶ Google Play</span
-                            >
-                        </div>
-                    </div>
-                </article>
-            </section>
-            <section
-                id="about"
-                class="relative overflow-hidden bg-slate-50 py-20"
-            >
-                <div
-                    class="absolute -top-32 -right-32 size-96 rounded-full bg-cyan-200/30 blur-3xl"
-                ></div>
-                <div class="relative mx-auto max-w-[1380px] px-6 lg:px-10">
-                    <div
-                        class="grid items-end gap-8 border-b border-slate-200 pb-10 lg:grid-cols-[1fr_.72fr]"
-                    >
-                        <div>
-                            <span
-                                class="inline-flex items-center gap-2 rounded-full bg-cyan-100 px-3 py-1.5 text-xs font-bold text-cyan-800"
-                                ><Sparkles class="size-4" />NOUVEAUTÉS EASY
-                                SCHOOL</span
-                            >
-                            <h2
-                                class="mt-5 max-w-3xl text-3xl leading-tight font-black tracking-tight text-[#071f3e] sm:text-4xl"
-                            >
-                                Plus de contrôle, moins de tâches répétitives.
-                            </h2>
-                        </div>
-                        <p class="text-base leading-7 text-slate-600">
-                            Les dernières évolutions relient désormais la
-                            gestion des accès, les documents, les opérations
-                            scolaires et la finance dans une expérience
-                            cohérente et sécurisée.
-                        </p>
-                    </div>
-                    <div class="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                        <article
-                            v-for="(a, index) in assurances"
-                            :key="a[1] as string"
-                            class="group relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition duration-300 hover:-translate-y-1 hover:border-cyan-300 hover:shadow-xl hover:shadow-cyan-900/5"
-                        >
-                            <div class="flex items-start justify-between gap-4">
-                                <span
-                                    class="flex size-12 items-center justify-center rounded-2xl bg-[#082b50] text-[#20d4bd] transition group-hover:bg-[#0b416b]"
-                                    ><component :is="a[0]" class="size-6"
-                                /></span>
-                                <span class="font-mono text-xs text-slate-300"
-                                    >0{{ index + 1 }}</span
-                                >
-                            </div>
-                            <h3
-                                class="mt-6 text-lg font-extrabold text-[#071f3e]"
-                            >
-                                {{ a[1] }}
-                            </h3>
-                            <p class="mt-2 text-sm leading-6 text-slate-500">
-                                {{ a[2] }}
-                            </p>
-                        </article>
-                    </div>
-                    <div
-                        class="mt-8 flex flex-col gap-4 rounded-2xl border border-cyan-200 bg-cyan-50/70 px-6 py-5 sm:flex-row sm:items-center sm:justify-between"
-                    >
-                        <p
-                            class="flex items-center gap-3 text-sm font-semibold text-[#07345e]"
-                        >
-                            <ShieldCheck
-                                class="size-6 shrink-0 text-[#0dbba6]"
-                            />
-                            Chaque établissement conserve ses propres rôles,
-                            données et réglages.
-                        </p>
-                        <span class="text-sm text-slate-500"
-                            >Multi-tenant · Multi-sites · Journal d’audit</span
-                        >
-                    </div>
-                </div>
-            </section>
-            <section id="tarifs" class="bg-white px-6 py-16 lg:px-10 lg:py-24">
-                <div
-                    class="relative mx-auto grid max-w-[1300px] overflow-hidden rounded-[32px] bg-[#061d3b] text-white shadow-2xl shadow-blue-950/20 lg:grid-cols-[1.05fr_.95fr]"
-                >
-                    <div
-                        class="absolute inset-0 bg-[radial-gradient(circle_at_80%_0%,rgba(19,203,177,.22),transparent_38%)]"
-                    ></div>
-                    <div class="relative p-8 sm:p-12 lg:p-16">
-                        <span
-                            class="text-xs font-bold tracking-[.18em] text-[#22d8bf]"
-                            >UNE DÉMO À VOTRE IMAGE</span
-                        >
-                        <h2
-                            class="mt-4 max-w-xl text-3xl leading-tight font-black sm:text-4xl"
-                        >
-                            Voyez Easy School fonctionner avec vos vrais
-                            besoins.
-                        </h2>
-                        <p
-                            class="mt-5 max-w-xl text-base leading-7 text-slate-300"
-                        >
-                            Échangez avec notre équipe et découvrez un parcours
-                            adapté à votre établissement : inscriptions,
-                            planning, suivi pédagogique, RH, finance et accès
-                            sécurisés.
-                        </p>
-                        <div
-                            class="mt-7 flex flex-wrap gap-x-6 gap-y-3 text-sm text-slate-200"
-                        >
-                            <span
-                                v-for="item in [
-                                    'Présentation personnalisée',
-                                    'Réponses à vos questions',
-                                    'Sans engagement',
+                                    'Démo personnalisée',
+                                    'Mise en place accompagnée',
+                                    'Support local',
                                 ]"
                                 :key="item"
                                 class="flex items-center gap-2"
-                                ><CheckCircle2
-                                    class="size-5 text-[#20d4bd]"
-                                />{{ item }}</span
-                            >
-                        </div>
-                        <div class="mt-9 flex flex-wrap gap-3">
-                            <Link
-                                href="/demo"
-                                class="flex items-center gap-3 rounded-xl bg-[#12cbb2] px-6 py-3.5 text-sm font-bold text-[#061d3b] shadow-lg shadow-cyan-950/30 transition hover:bg-[#27dbc4]"
-                                >Demander une démo <ArrowRight class="size-4"
-                            /></Link>
-                            <a
-                                href="#contact"
-                                class="flex items-center gap-3 rounded-xl border border-white/30 bg-white/5 px-6 py-3.5 text-sm font-bold transition hover:bg-white/10"
-                                ><Phone class="size-4" />Nous contacter</a
+                                ><Check class="size-4 text-[#22d8bf]" />{{
+                                    item
+                                }}</span
                             >
                         </div>
                     </div>
-                    <div class="relative hidden min-h-[470px] p-10 lg:block">
+
+                    <div class="relative lg:pt-5">
                         <div
-                            class="absolute inset-10 rounded-[28px] border border-white/10 bg-white/5 p-6 backdrop-blur"
+                            class="absolute inset-x-10 bottom-0 h-40 rounded-full bg-cyan-400/20 blur-[80px]"
+                        ></div>
+                        <div
+                            class="hero-dashboard relative overflow-hidden rounded-[22px] border border-white/20 bg-white shadow-[0_40px_100px_-24px_rgba(0,0,0,.85)] ring-1 ring-cyan-300/20"
                         >
-                            <div class="flex items-center justify-between">
-                                <div>
-                                    <p class="text-xs text-cyan-200">
-                                        Aperçu de votre journée
-                                    </p>
-                                    <h3 class="mt-1 text-xl font-bold">
-                                        Tableau de bord
-                                    </h3>
-                                </div>
-                                <span
-                                    class="rounded-full bg-emerald-400/15 px-3 py-1 text-xs text-emerald-300"
-                                    >En direct</span
-                                >
-                            </div>
-                            <div class="mt-6 grid grid-cols-2 gap-3">
-                                <div
-                                    v-for="stat in [
-                                        ['1 248', 'Élèves suivis'],
-                                        ['42', 'Classes actives'],
-                                        ['96%', 'Présences'],
-                                        ['8', 'Sites connectés'],
-                                    ]"
-                                    :key="stat[1]"
-                                    class="rounded-2xl border border-white/10 bg-[#092b4e] p-4"
-                                >
-                                    <strong class="text-2xl text-white">{{
-                                        stat[0]
-                                    }}</strong>
-                                    <p class="mt-1 text-xs text-slate-300">
-                                        {{ stat[1] }}
-                                    </p>
-                                </div>
-                            </div>
                             <div
-                                class="mt-4 rounded-2xl bg-white p-4 text-[#071f3e]"
+                                class="flex h-10 items-center gap-2 border-b border-slate-200 bg-slate-50 px-4"
                             >
-                                <div class="flex items-center justify-between">
-                                    <span class="text-sm font-bold"
-                                        >Opérations centralisées</span
-                                    ><span class="text-xs text-emerald-600"
-                                        >Tout est à jour</span
+                                <span
+                                    class="size-2.5 rounded-full bg-[#ff6b63]"
+                                ></span
+                                ><span
+                                    class="size-2.5 rounded-full bg-[#ffc34a]"
+                                ></span
+                                ><span
+                                    class="size-2.5 rounded-full bg-[#32ca6d]"
+                                ></span>
+                                <span
+                                    class="mx-auto flex h-5 w-2/5 items-center justify-center rounded-md bg-white text-[8px] font-semibold text-slate-400 shadow-sm"
+                                    >app.easyschool.dz</span
+                                >
+                            </div>
+                            <img
+                                src="/images/dashborad-screenshot.png"
+                                alt="Aperçu du tableau de bord Easy School"
+                                class="block h-[330px] w-full object-cover object-left-top sm:h-[430px] lg:h-[470px]"
+                            />
+                        </div>
+                        <div
+                            class="hero-float absolute -bottom-7 -left-4 z-20 rounded-2xl border border-white/70 bg-white/95 p-4 text-[#0a2246] shadow-2xl backdrop-blur sm:-left-8"
+                        >
+                            <div class="flex items-center gap-3">
+                                <span
+                                    class="grid size-10 place-items-center rounded-xl bg-emerald-50"
+                                    ><CheckCircle2
+                                        class="size-5 text-emerald-600"
+                                /></span>
+                                <div>
+                                    <b class="block text-xs"
+                                        >Tout est centralisé</b
+                                    ><span class="text-[10px] text-slate-500"
+                                        >Une donnée, un seul endroit</span
                                     >
                                 </div>
-                                <div class="mt-4 space-y-3">
-                                    <div
-                                        v-for="(line, i) in [
-                                            'Inscriptions et dossiers',
-                                            'Emplois du temps',
-                                            'Paiements et salaires',
-                                        ]"
-                                        :key="line"
-                                        class="flex items-center gap-3"
+                            </div>
+                        </div>
+                        <div
+                            class="hero-float-delayed absolute -top-5 -right-3 z-20 hidden rounded-2xl border border-white/15 bg-[#0b3156]/95 p-4 shadow-2xl backdrop-blur sm:block lg:-right-7"
+                        >
+                            <div class="flex items-center gap-3">
+                                <span
+                                    class="grid size-9 place-items-center rounded-xl bg-cyan-300/10"
+                                    ><ShieldCheck class="size-5 text-cyan-300"
+                                /></span>
+                                <div>
+                                    <b class="block text-xs text-white"
+                                        >Accès sécurisés</b
+                                    ><span class="text-[10px] text-slate-300"
+                                        >Selon chaque rôle</span
                                     >
-                                        <span
-                                            class="h-2 rounded-full bg-[#12cbb2]"
-                                            :style="{ width: `${72 + i * 9}%` }"
-                                        ></span
-                                        ><span
-                                            class="shrink-0 text-xs text-slate-500"
-                                            >{{ line }}</span
-                                        >
-                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
             </section>
-        </main></HomeLayout
-    >
+
+            <section
+                class="relative z-10 -mt-1 border-b border-slate-200 bg-white"
+            >
+                <div
+                    class="mx-auto grid max-w-[1180px] grid-cols-2 divide-x divide-y divide-slate-100 px-6 py-2 sm:grid-cols-4 sm:divide-y-0"
+                >
+                    <div
+                        v-for="(item, index) in [
+                            [
+                                Monitor,
+                                '100% en ligne',
+                                'Aucun logiciel à installer',
+                            ],
+                            [
+                                Building2,
+                                'Multi-établissements',
+                                'Une vue claire par site',
+                            ],
+                            [
+                                ShieldCheck,
+                                'Accès maîtrisés',
+                                'Rôles et permissions',
+                            ],
+                            [
+                                Smartphone,
+                                'Sur tous vos écrans',
+                                'Ordinateur, tablette, mobile',
+                            ],
+                        ]"
+                        :key="item[1] as string"
+                        class="flex items-center gap-3 px-3 py-6 sm:px-6"
+                        :class="index === 2 ? 'border-l-0 sm:border-l' : ''"
+                    >
+                        <component
+                            :is="item[0]"
+                            class="size-5 shrink-0 text-[#0db9a4]"
+                        />
+                        <div>
+                            <b class="block text-xs text-[#092447]">{{
+                                item[1]
+                            }}</b
+                            ><span class="text-[10px] text-slate-400">{{
+                                item[2]
+                            }}</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="modules" class="bg-[#f7fafc] py-20 lg:py-28">
+                <div class="mx-auto max-w-[1320px] px-6 lg:px-10">
+                    <div class="mx-auto max-w-3xl text-center">
+                        <span
+                            class="text-xs font-black tracking-[.18em] text-[#0ba996]"
+                            >UNE PLATEFORME, UN FIL CONDUCTEUR</span
+                        >
+                        <h2
+                            class="mt-4 text-3xl leading-tight font-black tracking-tight text-[#071f3e] sm:text-5xl"
+                        >
+                            Moins d’outils dispersés.<br />Plus de temps pour
+                            l’essentiel.
+                        </h2>
+                        <p
+                            class="mx-auto mt-5 max-w-2xl text-sm leading-7 text-slate-500 sm:text-base"
+                        >
+                            Chaque module partage le même contexte.
+                            L’information circule sans ressaisie, de
+                            l’inscription jusqu’au suivi des parents.
+                        </p>
+                    </div>
+
+                    <div class="mt-14 grid gap-5 lg:grid-cols-3">
+                        <article
+                            v-for="pillar in productPillars"
+                            :key="pillar.title"
+                            class="group relative overflow-hidden rounded-[24px] border border-slate-200 bg-white p-7 shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-slate-900/5"
+                        >
+                            <div
+                                class="absolute top-0 right-0 size-32 rounded-full opacity-40 blur-3xl"
+                                :class="
+                                    pillar.color === 'teal'
+                                        ? 'bg-teal-200'
+                                        : pillar.color === 'blue'
+                                          ? 'bg-blue-200'
+                                          : 'bg-violet-200'
+                                "
+                            ></div>
+                            <span
+                                class="relative grid size-13 place-items-center rounded-2xl text-white shadow-lg"
+                                :class="
+                                    pillar.color === 'teal'
+                                        ? 'bg-[#0bb8a4]'
+                                        : pillar.color === 'blue'
+                                          ? 'bg-[#2769d8]'
+                                          : 'bg-[#7654d4]'
+                                "
+                                ><component :is="pillar.icon" class="size-6"
+                            /></span>
+                            <p
+                                class="mt-6 text-[10px] font-black tracking-[.16em]"
+                                :class="
+                                    pillar.color === 'teal'
+                                        ? 'text-teal-600'
+                                        : pillar.color === 'blue'
+                                          ? 'text-blue-600'
+                                          : 'text-violet-600'
+                                "
+                            >
+                                {{ pillar.eyebrow }}
+                            </p>
+                            <h3 class="mt-2 text-xl font-black text-[#092447]">
+                                {{ pillar.title }}
+                            </h3>
+                            <p
+                                class="mt-3 min-h-18 text-sm leading-6 text-slate-500"
+                            >
+                                {{ pillar.description }}
+                            </p>
+                            <div
+                                class="mt-6 grid grid-cols-2 gap-2 border-t border-slate-100 pt-5"
+                            >
+                                <span
+                                    v-for="item in pillar.items"
+                                    :key="item"
+                                    class="flex items-center gap-2 text-[11px] font-semibold text-slate-600"
+                                    ><span
+                                        class="size-1.5 rounded-full bg-[#13bca7]"
+                                    ></span
+                                    >{{ item }}</span
+                                >
+                            </div>
+                        </article>
+                    </div>
+
+                    <div class="mt-5 grid gap-5 md:grid-cols-[1.25fr_.75fr]">
+                        <article
+                            class="relative overflow-hidden rounded-[24px] bg-[#082746] p-7 text-white sm:p-9"
+                        >
+                            <div
+                                class="absolute -right-10 -bottom-20 size-64 rounded-full bg-[#16cdb3]/20 blur-3xl"
+                            ></div>
+                            <div
+                                class="relative grid items-center gap-8 sm:grid-cols-[1fr_.75fr]"
+                            >
+                                <div>
+                                    <span
+                                        class="text-[10px] font-black tracking-[.16em] text-cyan-300"
+                                        >PILOTAGE MULTI-SITES</span
+                                    >
+                                    <h3 class="mt-3 text-2xl font-black">
+                                        Une vision globale.<br />Des réalités
+                                        locales.
+                                    </h3>
+                                    <p
+                                        class="mt-3 text-sm leading-6 text-slate-300"
+                                    >
+                                        Comparez les sites, adaptez les accès et
+                                        conservez des règles propres à chaque
+                                        établissement.
+                                    </p>
+                                </div>
+                                <div class="grid grid-cols-2 gap-3">
+                                    <div
+                                        v-for="(site, i) in [
+                                            'Campus central',
+                                            'Site Est',
+                                            'Site Ouest',
+                                            'Centre langues',
+                                        ]"
+                                        :key="site"
+                                        class="rounded-xl border border-white/10 bg-white/5 p-3 backdrop-blur"
+                                    >
+                                        <span
+                                            class="text-[9px] text-slate-400"
+                                            >{{ site }}</span
+                                        >
+                                        <div
+                                            class="mt-3 h-1.5 overflow-hidden rounded-full bg-white/10"
+                                        >
+                                            <div
+                                                class="h-full rounded-full bg-[#21d8bf]"
+                                                :style="{
+                                                    width: `${88 - i * 11}%`,
+                                                }"
+                                            ></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </article>
+                        <article
+                            class="rounded-[24px] border border-amber-100 bg-gradient-to-br from-[#fffaf0] to-white p-7 sm:p-9"
+                        >
+                            <span
+                                class="grid size-12 place-items-center rounded-2xl bg-amber-100 text-amber-700"
+                                ><FileBadge class="size-6"
+                            /></span>
+                            <h3 class="mt-5 text-xl font-black text-[#092447]">
+                                Documents prêts en quelques clics
+                            </h3>
+                            <p class="mt-3 text-sm leading-6 text-slate-500">
+                                Certificats, badges, bulletins, reçus et
+                                justificatifs restent liés au bon dossier.
+                            </p>
+                        </article>
+                    </div>
+                </div>
+            </section>
+
+            <section class="bg-white py-20 lg:py-28">
+                <div class="mx-auto max-w-[1240px] px-6 lg:px-10">
+                    <div
+                        class="grid items-end gap-8 lg:grid-cols-[.85fr_1.15fr]"
+                    >
+                        <div>
+                            <span
+                                class="text-xs font-black tracking-[.18em] text-[#0ba996]"
+                                >UNE MÊME INFORMATION, AU BON MOMENT</span
+                            >
+                            <h2
+                                class="mt-4 text-3xl leading-tight font-black text-[#071f3e] sm:text-4xl"
+                            >
+                                De l’administration aux familles, tout reste
+                                aligné.
+                            </h2>
+                        </div>
+                        <p
+                            class="max-w-2xl text-sm leading-7 text-slate-500 sm:text-base"
+                        >
+                            Easy School organise le passage de l’information
+                            entre chaque acteur. Moins de relances, moins de
+                            doubles saisies, et une vue adaptée à chacun.
+                        </p>
+                    </div>
+                    <div class="relative mt-14 grid gap-5 lg:grid-cols-3">
+                        <div
+                            class="absolute top-12 right-[16%] left-[16%] hidden border-t border-dashed border-teal-300 lg:block"
+                        ></div>
+                        <article
+                            v-for="step in dailyFlow"
+                            :key="step.number"
+                            class="relative rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"
+                        >
+                            <div class="flex items-center justify-between">
+                                <span
+                                    class="grid size-12 place-items-center rounded-2xl bg-[#edfafa] text-[#0cae9b]"
+                                    ><component :is="step.icon" class="size-6"
+                                /></span>
+                                <span
+                                    class="font-mono text-xs font-black text-slate-300"
+                                    >{{ step.number }}</span
+                                >
+                            </div>
+                            <h3 class="mt-5 text-lg font-black text-[#092447]">
+                                {{ step.title }}
+                            </h3>
+                            <p class="mt-2 text-sm leading-6 text-slate-500">
+                                {{ step.description }}
+                            </p>
+                        </article>
+                    </div>
+                </div>
+            </section>
+
+            <section id="parents" class="bg-[#f7fafc] py-20 lg:py-28">
+                <div class="mx-auto max-w-[1320px] px-6 lg:px-10">
+                    <article
+                        class="relative overflow-hidden rounded-[32px] bg-[#071f3e] text-white shadow-2xl shadow-blue-950/15"
+                    >
+                        <div
+                            class="absolute -top-32 -right-20 size-96 rounded-full bg-[#12cbb2]/20 blur-[90px]"
+                        ></div>
+                        <div
+                            class="relative grid items-center gap-12 p-7 sm:p-10 lg:grid-cols-[.78fr_1.22fr] lg:p-14"
+                        >
+                            <div>
+                                <span
+                                    class="inline-flex items-center gap-2 rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 py-1.5 text-[10px] font-black tracking-[.15em] text-cyan-300"
+                                    ><span
+                                        class="size-1.5 rounded-full bg-[#20d8bf]"
+                                    ></span>
+                                    PORTAIL WEB DISPONIBLE</span
+                                >
+                                <h2
+                                    class="mt-5 text-3xl leading-tight font-black sm:text-4xl"
+                                >
+                                    Les parents suivent.<br /><span
+                                        class="text-[#20d8bf]"
+                                        >L’école garde le lien.</span
+                                    >
+                                </h2>
+                                <p
+                                    class="mt-4 max-w-lg text-sm leading-7 text-slate-300"
+                                >
+                                    Aucune installation nécessaire. Depuis leur
+                                    navigateur, les parents accèdent aux
+                                    informations publiées par l’établissement,
+                                    sur ordinateur, tablette ou téléphone.
+                                </p>
+                                <div
+                                    class="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2"
+                                >
+                                    <span
+                                        v-for="feature in portalFeatures"
+                                        :key="feature[0] as string"
+                                        class="flex items-center gap-2 text-xs text-slate-200"
+                                        ><component
+                                            :is="feature[1]"
+                                            class="size-4 shrink-0 text-[#20d8bf]"
+                                        />{{ feature[0] }}</span
+                                    >
+                                </div>
+                                <Link
+                                    href="/parent/login"
+                                    class="group mt-8 inline-flex items-center gap-3 rounded-xl bg-[#16cdb3] px-5 py-3 text-sm font-extrabold text-[#052e3a] shadow-lg transition hover:bg-[#28ddc4]"
+                                    >Ouvrir l’espace parents
+                                    <ArrowRight
+                                        class="size-4 transition group-hover:translate-x-1"
+                                /></Link>
+                            </div>
+
+                            <div>
+                                <div
+                                    class="overflow-hidden rounded-2xl border border-white/15 bg-[#f5f8fc] text-[#0a2246] shadow-2xl shadow-black/30"
+                                >
+                                    <div
+                                        class="flex h-9 items-center gap-1.5 border-b border-slate-200 bg-white px-4"
+                                    >
+                                        <span
+                                            class="size-2 rounded-full bg-red-400"
+                                        ></span
+                                        ><span
+                                            class="size-2 rounded-full bg-amber-400"
+                                        ></span
+                                        ><span
+                                            class="size-2 rounded-full bg-emerald-400"
+                                        ></span
+                                        ><span
+                                            class="mx-auto rounded-md bg-slate-50 px-8 py-1 text-[8px] font-bold text-slate-400"
+                                            >parent.easyschool.dz</span
+                                        >
+                                    </div>
+                                    <div
+                                        class="grid min-h-[320px] sm:grid-cols-[140px_1fr]"
+                                    >
+                                        <div
+                                            class="hidden bg-[#0a2a4b] p-4 text-[9px] text-slate-300 sm:block"
+                                        >
+                                            <div
+                                                class="mb-6 flex items-center gap-2 font-bold text-white"
+                                            >
+                                                <GraduationCap
+                                                    class="size-4 text-[#20d8bf]"
+                                                />
+                                                Easy School
+                                            </div>
+                                            <div
+                                                v-for="(item, i) in [
+                                                    'Vue d’ensemble',
+                                                    'Mes enfants',
+                                                    'Emploi du temps',
+                                                    'Absences',
+                                                    'Notes',
+                                                    'Annonces',
+                                                ]"
+                                                :key="item"
+                                                class="mb-1 rounded-md px-2 py-2"
+                                                :class="
+                                                    i === 0
+                                                        ? 'bg-[#12cbb2] font-bold text-[#052e3a]'
+                                                        : ''
+                                                "
+                                            >
+                                                {{ item }}
+                                            </div>
+                                        </div>
+                                        <div class="p-4 sm:p-5">
+                                            <div
+                                                class="flex items-center justify-between"
+                                            >
+                                                <div>
+                                                    <p
+                                                        class="text-[9px] text-slate-400"
+                                                    >
+                                                        Bonjour Samira,
+                                                    </p>
+                                                    <b class="text-sm"
+                                                        >Vue d’ensemble</b
+                                                    >
+                                                </div>
+                                                <span class="relative"
+                                                    ><Bell
+                                                        class="size-4 text-slate-400" /><span
+                                                        class="absolute -top-1 -right-1 size-1.5 rounded-full bg-red-500"
+                                                    ></span
+                                                ></span>
+                                            </div>
+                                            <div
+                                                class="mt-4 rounded-xl bg-gradient-to-r from-[#0c4166] to-[#0d6970] p-4 text-white"
+                                            >
+                                                <p
+                                                    class="text-[9px] text-cyan-100"
+                                                >
+                                                    Enfant sélectionné
+                                                </p>
+                                                <div
+                                                    class="mt-1 flex items-center justify-between"
+                                                >
+                                                    <b>Yacine Belkacem</b
+                                                    ><span
+                                                        class="rounded-full bg-white/15 px-2 py-1 text-[8px]"
+                                                        >4e année</span
+                                                    >
+                                                </div>
+                                            </div>
+                                            <div
+                                                class="mt-3 grid grid-cols-3 gap-2"
+                                            >
+                                                <div
+                                                    v-for="stat in [
+                                                        ['Moyenne', '16,45'],
+                                                        ['Absences', '02'],
+                                                        ['À venir', '03'],
+                                                    ]"
+                                                    :key="stat[0]"
+                                                    class="rounded-lg border border-slate-200 bg-white p-3 shadow-sm"
+                                                >
+                                                    <p
+                                                        class="text-[8px] text-slate-400"
+                                                    >
+                                                        {{ stat[0] }}
+                                                    </p>
+                                                    <b
+                                                        class="mt-1 block text-sm"
+                                                        >{{ stat[1] }}</b
+                                                    >
+                                                </div>
+                                            </div>
+                                            <div
+                                                class="mt-3 rounded-lg border border-slate-200 bg-white p-3"
+                                            >
+                                                <div
+                                                    class="flex items-center justify-between text-[9px]"
+                                                >
+                                                    <b>Dernières actualités</b
+                                                    ><span class="text-teal-600"
+                                                        >Tout voir</span
+                                                    >
+                                                </div>
+                                                <div
+                                                    class="mt-3 flex items-center gap-3"
+                                                >
+                                                    <span
+                                                        class="grid size-8 place-items-center rounded-lg bg-teal-50"
+                                                        ><CalendarDays
+                                                            class="size-4 text-teal-600"
+                                                    /></span>
+                                                    <div>
+                                                        <b
+                                                            class="block text-[9px]"
+                                                            >Réunion
+                                                            parents–enseignants</b
+                                                        ><span
+                                                            class="text-[8px] text-slate-400"
+                                                            >Jeudi, 16:30</span
+                                                        >
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div
+                                    class="mt-5 rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur"
+                                >
+                                    <div
+                                        class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between"
+                                    >
+                                        <div class="flex items-center gap-3">
+                                            <span
+                                                class="grid size-10 place-items-center rounded-xl bg-white/10"
+                                                ><Smartphone
+                                                    class="size-5 text-cyan-300"
+                                            /></span>
+                                            <div>
+                                                <b class="block text-xs"
+                                                    >Applications mobiles en
+                                                    préparation</b
+                                                ><span
+                                                    class="text-[10px] text-slate-400"
+                                                    >Le portail web est
+                                                    disponible dès
+                                                    maintenant</span
+                                                >
+                                            </div>
+                                        </div>
+                                        <div class="grid grid-cols-2 gap-2">
+                                            <div
+                                                class="flex min-w-[132px] items-center gap-2 rounded-xl border border-white/15 bg-white/[.07] px-3 py-2.5"
+                                            >
+                                                <Apple
+                                                    class="size-6 fill-white text-white"
+                                                    :stroke-width="1.5"
+                                                />
+                                                <div>
+                                                    <span
+                                                        class="block text-[8px] font-semibold tracking-wide text-slate-400"
+                                                        >BIENTÔT SUR</span
+                                                    ><b
+                                                        class="block text-xs text-white"
+                                                        >iOS</b
+                                                    >
+                                                </div>
+                                            </div>
+                                            <div
+                                                class="flex min-w-[132px] items-center gap-2 rounded-xl border border-white/15 bg-white/[.07] px-3 py-2.5"
+                                            >
+                                                <svg
+                                                    viewBox="0 0 32 32"
+                                                    class="size-6"
+                                                    aria-label="Android"
+                                                >
+                                                    <path
+                                                        d="M8.6 11.2h14.8v11.4a2 2 0 0 1-2 2h-1.1v3.2a1.2 1.2 0 0 1-2.4 0v-3.2h-3.8v3.2a1.2 1.2 0 0 1-2.4 0v-3.2h-1.1a2 2 0 0 1-2-2V11.2Z"
+                                                        fill="#3ddc84"
+                                                    />
+                                                    <path
+                                                        d="M8.7 9.7a7.5 7.5 0 0 1 2.5-4.5L9.3 2.4a.7.7 0 0 1 1.2-.8l1.8 2.7A8.4 8.4 0 0 1 16 3.5c1.3 0 2.6.3 3.7.8l1.8-2.7a.7.7 0 0 1 1.2.8l-1.9 2.8a7.5 7.5 0 0 1 2.5 4.5H8.7Z"
+                                                        fill="#3ddc84"
+                                                    />
+                                                    <circle
+                                                        cx="12.5"
+                                                        cy="7"
+                                                        r=".8"
+                                                        fill="#071f3e"
+                                                    />
+                                                    <circle
+                                                        cx="19.5"
+                                                        cy="7"
+                                                        r=".8"
+                                                        fill="#071f3e"
+                                                    />
+                                                    <path
+                                                        d="M5.8 12.1a1.2 1.2 0 0 1 1.2 1.2v7.3a1.2 1.2 0 1 1-2.4 0v-7.3a1.2 1.2 0 0 1 1.2-1.2Zm20.4 0a1.2 1.2 0 0 1 1.2 1.2v7.3a1.2 1.2 0 1 1-2.4 0v-7.3a1.2 1.2 0 0 1 1.2-1.2Z"
+                                                        fill="#3ddc84"
+                                                    />
+                                                </svg>
+                                                <div>
+                                                    <span
+                                                        class="block text-[8px] font-semibold tracking-wide text-slate-400"
+                                                        >BIENTÔT SUR</span
+                                                    ><b
+                                                        class="block text-xs text-white"
+                                                        >Android</b
+                                                    >
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </article>
+                </div>
+            </section>
+
+            <section id="securite" class="bg-white py-20 lg:py-28">
+                <div class="mx-auto max-w-[1240px] px-6 lg:px-10">
+                    <div
+                        class="grid gap-12 lg:grid-cols-[.72fr_1.28fr] lg:items-center"
+                    >
+                        <div>
+                            <span
+                                class="inline-flex items-center gap-2 rounded-full bg-teal-50 px-3 py-1.5 text-[10px] font-black tracking-[.14em] text-teal-700"
+                                ><ShieldCheck class="size-4" /> SÉCURITÉ PAR
+                                CONCEPTION</span
+                            >
+                            <h2
+                                class="mt-5 text-3xl leading-tight font-black text-[#071f3e] sm:text-4xl"
+                            >
+                                La bonne information.<br />Aux bonnes personnes.
+                            </h2>
+                            <p class="mt-4 text-sm leading-7 text-slate-500">
+                                Easy School structure les accès autour des
+                                rôles, des établissements et des
+                                responsabilités. Chacun travaille dans un
+                                périmètre clair.
+                            </p>
+                            <Link
+                                href="/contact"
+                                class="mt-7 inline-flex items-center gap-2 text-sm font-extrabold text-[#099b8c]"
+                                >Parler de votre organisation
+                                <ArrowRight class="size-4"
+                            /></Link>
+                        </div>
+                        <div class="grid gap-4 sm:grid-cols-2">
+                            <article
+                                v-for="item in assurances"
+                                :key="item.title"
+                                class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:border-teal-200 hover:shadow-lg"
+                            >
+                                <span
+                                    class="grid size-11 place-items-center rounded-xl bg-[#082b50] text-[#20d4bd]"
+                                    ><component :is="item.icon" class="size-5"
+                                /></span>
+                                <h3 class="mt-5 font-black text-[#092447]">
+                                    {{ item.title }}
+                                </h3>
+                                <p
+                                    class="mt-2 text-xs leading-5 text-slate-500"
+                                >
+                                    {{ item.description }}
+                                </p>
+                            </article>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section
+                id="tarifs"
+                class="bg-[#f7fafc] px-6 py-16 lg:px-10 lg:py-24"
+            >
+                <div
+                    class="relative mx-auto max-w-[1280px] overflow-hidden rounded-[32px] bg-[#061d3b] text-white shadow-2xl shadow-blue-950/20"
+                >
+                    <div
+                        class="absolute inset-0 bg-[radial-gradient(circle_at_85%_0%,rgba(19,203,177,.23),transparent_38%)]"
+                    ></div>
+                    <div
+                        class="relative grid items-center gap-10 p-8 sm:p-12 lg:grid-cols-[1fr_.78fr] lg:p-16"
+                    >
+                        <div>
+                            <span
+                                class="text-xs font-black tracking-[.18em] text-[#22d8bf]"
+                                >VOTRE ÉCOLE, VOTRE PARCOURS</span
+                            >
+                            <h2
+                                class="mt-4 max-w-2xl text-3xl leading-tight font-black sm:text-5xl"
+                            >
+                                Prêt à voir ce que votre quotidien pourrait
+                                devenir ?
+                            </h2>
+                            <p
+                                class="mt-5 max-w-xl text-sm leading-7 text-slate-300 sm:text-base"
+                            >
+                                Nous préparons une démonstration autour de vos
+                                priorités, de votre organisation et des modules
+                                qui comptent vraiment pour vous.
+                            </p>
+                            <div class="mt-8 flex flex-col gap-3 sm:flex-row">
+                                <Link
+                                    href="/demo"
+                                    class="group inline-flex items-center justify-center gap-3 rounded-xl bg-[#12cbb2] px-6 py-3.5 text-sm font-extrabold text-[#061d3b] transition hover:bg-[#2bdcc4]"
+                                    >Demander ma démonstration
+                                    <ArrowRight
+                                        class="size-4 transition group-hover:translate-x-1"
+                                /></Link>
+                                <Link
+                                    href="/contact"
+                                    class="inline-flex items-center justify-center gap-2 rounded-xl border border-white/25 bg-white/5 px-6 py-3.5 text-sm font-bold transition hover:bg-white/10"
+                                    ><MessageCircle class="size-4" />Parler à
+                                    l’équipe</Link
+                                >
+                            </div>
+                        </div>
+                        <div class="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
+                            <div
+                                v-for="item in [
+                                    [
+                                        Clock3,
+                                        'Échange ciblé',
+                                        'Vos besoins avant la technique',
+                                    ],
+                                    [
+                                        Sparkles,
+                                        'Démo configurée',
+                                        'Un environnement qui vous ressemble',
+                                    ],
+                                    [
+                                        CheckCircle2,
+                                        'Sans engagement',
+                                        'Explorez avant de décider',
+                                    ],
+                                ]"
+                                :key="item[1] as string"
+                                class="flex items-center gap-4 rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur"
+                            >
+                                <span
+                                    class="grid size-10 shrink-0 place-items-center rounded-xl bg-[#14c8b0]/15"
+                                    ><component
+                                        :is="item[0]"
+                                        class="size-5 text-[#39dfca]"
+                                /></span>
+                                <div>
+                                    <b class="block text-xs">{{ item[1] }}</b
+                                    ><span class="text-[10px] text-slate-400">{{
+                                        item[2]
+                                    }}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </HomeLayout>
 </template>
 
 <style scoped>
-@keyframes phone-float {
-    0%,
-    100% {
-        transform: translate3d(0, 0, 0) rotate(-1deg);
-    }
-    35% {
-        transform: translate3d(3px, -13px, 0) rotate(1deg);
-    }
-    70% {
-        transform: translate3d(-2px, -6px, 0) rotate(-0.5deg);
-    }
+.hero-grid {
+    background-image:
+        linear-gradient(rgba(255, 255, 255, 0.8) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.8) 1px, transparent 1px);
+    background-size: 48px 48px;
+    mask-image: linear-gradient(to bottom, black, transparent 90%);
 }
-@keyframes phone-orbit {
+
+@keyframes dashboard-in {
+    from {
+        opacity: 0;
+        transform: translate3d(0, 22px, 0) scale(0.98);
+    }
     to {
-        transform: rotate(360deg);
-    }
-}
-@keyframes phone-glow {
-    0%,
-    100% {
-        opacity: 0.35;
-        transform: scale(0.88);
-    }
-    50% {
-        opacity: 0.8;
-        transform: scale(1.12);
-    }
-}
-@keyframes phone-sparkle {
-    0%,
-    100% {
-        opacity: 0.45;
-        transform: scale(0.7) rotate(0);
-    }
-    50% {
         opacity: 1;
-        transform: scale(1.15) rotate(16deg);
+        transform: translate3d(0, 0, 0) scale(1);
     }
 }
-.hero-phone-float {
-    animation: phone-float 5.2s ease-in-out infinite;
-    will-change: transform;
+
+@keyframes gentle-float {
+    0%,
+    100% {
+        transform: translate3d(0, 0, 0);
+    }
+    50% {
+        transform: translate3d(0, -7px, 0);
+    }
 }
-.hero-phone-orbit {
-    animation: phone-orbit 12s linear infinite;
+
+.hero-dashboard {
+    animation: dashboard-in 0.8s cubic-bezier(0.2, 0.75, 0.25, 1) both;
 }
-.hero-phone-glow {
-    animation: phone-glow 3.4s ease-in-out infinite;
+.hero-float {
+    animation: gentle-float 4.5s ease-in-out infinite;
 }
-.hero-phone-sparkle {
-    animation: phone-sparkle 2.1s ease-in-out infinite;
+.hero-float-delayed {
+    animation: gentle-float 5s ease-in-out 1.2s infinite;
 }
-.hero-phone-float:hover {
-    animation-duration: 2.6s;
-}
+
 @media (prefers-reduced-motion: reduce) {
-    .hero-phone-float,
-    .hero-phone-orbit,
-    .hero-phone-glow,
-    .hero-phone-sparkle {
+    .hero-dashboard,
+    .hero-float,
+    .hero-float-delayed {
         animation: none;
     }
 }

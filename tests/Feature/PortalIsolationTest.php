@@ -29,6 +29,9 @@ test('an administrator can open an observation for any student and notify the pa
         'message' => 'Merci de prendre contact avec l’administration.',
     ])->assertRedirect();
 
+    $notification = PortalNotification::where('recipient_id', $parentUser->id)->where('type', 'observation.admin_added')->first();
+
     expect(StudentObservation::where('student_id', $student->id)->where('author_id', $admin->id)->exists())->toBeTrue()
-        ->and(PortalNotification::where('recipient_id', $parentUser->id)->where('type', 'observation.admin_added')->exists())->toBeTrue();
+        ->and($notification)->not->toBeNull()
+        ->and($notification->data['url'])->toBe('/portal/children/'.$student->id.'?tab=observations');
 });

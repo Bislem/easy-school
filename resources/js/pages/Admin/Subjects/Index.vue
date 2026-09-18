@@ -32,6 +32,7 @@ type Level = {
         curriculum_code?: string | null;
         is_optional?: boolean;
         is_active?: boolean;
+        coefficient?: number | string;
     };
 };
 type Cycle = { id: number; name: string; code: string; levels: Level[] };
@@ -70,6 +71,7 @@ const search = ref(props.filters.search || '');
 const levelFilter = ref(props.filters.level_id || '');
 const teacherFilter = ref(props.filters.teacher_id || '');
 const statusFilter = ref(props.filters.status || '');
+const teacherSearch = ref('');
 const form = useForm({
     title: '',
     title_ar: '',
@@ -81,10 +83,25 @@ const form = useForm({
     required_room_types: [] as string[],
     is_specialized: false,
     is_active: true,
-    school_level_ids: [] as number[],
+    level_assignments: [] as Array<{
+        school_level_id: number;
+        coefficient: number | string;
+    }>,
     teacher_ids: [] as number[],
 });
 const allLevels = computed(() => props.cycles.flatMap((cycle) => cycle.levels));
+const filteredTeachers = computed(() => {
+    const query = teacherSearch.value.trim().toLocaleLowerCase();
+
+    if (!query) return props.teachers;
+
+    return props.teachers.filter((teacher) =>
+        `${teacher.name} ${teacher.email ?? ''}`
+            .toLocaleLowerCase()
+            .includes(query),
+    );
+});
+const selectedTeacherCount = computed(() => form.teacher_ids.length);
 function applyFilters() {
     router.get(
         '/admin/subjects',
@@ -107,9 +124,10 @@ function openCreate() {
         is_active: true,
         is_specialized: false,
         required_room_types: [],
-        school_level_ids: [],
+        level_assignments: [],
         teacher_ids: [],
     });
+    teacherSearch.value = '';
     modalOpen.value = true;
 }
 function openEdit(subject: Subject) {
@@ -126,34 +144,85 @@ function openEdit(subject: Subject) {
         required_room_types: subject.required_room_types || [],
         is_specialized: subject.is_specialized,
         is_active: subject.is_active,
-        school_level_ids: [
-            ...new Set(
-                subject.school_levels
-                    .filter((level) => level.pivot?.is_active !== false)
-                    .map((level) => level.id),
-            ),
-        ],
+        level_assignments: subject.school_levels
+            .filter((level) => level.pivot?.is_active !== false)
+            .map((level) => ({
+                school_level_id: level.id,
+                coefficient: Number(level.pivot?.coefficient ?? 1),
+            })),
         teacher_ids: [...new Set(subject.teachers.map((t) => t.id))],
     });
+    teacherSearch.value = '';
     modalOpen.value = true;
 }
-function toggle<T>(
-    field: 'school_level_ids' | 'teacher_ids' | 'required_room_types',
-    value: T,
-) {
+function toggle<T>(field: 'teacher_ids' | 'required_room_types', value: T) {
     const list = form[field] as T[];
     (form[field] as T[]) = list.includes(value)
         ? list.filter((item) => item !== value)
         : [...list, value];
+}
+function levelAssignment(levelId: number) {
+    return form.level_assignments.find(
+        (assignment) => assignment.school_level_id === levelId,
+    );
+}
+function toggleLevel(levelId: number) {
+    const existing = levelAssignment(levelId);
+    form.level_assignments = existing
+        ? form.level_assignments.filter(
+              (assignment) => assignment.school_level_id !== levelId,
+          )
+        : [
+              ...form.level_assignments,
+              { school_level_id: levelId, coefficient: 1 },
+          ];
+}
+function updateLevelCoefficient(levelId: number, value: string | number) {
+    const assignment = levelAssignment(levelId);
+    if (assignment) assignment.coefficient = value;
+}
+function cycleIsSelected(cycle: Cycle) {
+    return cycle.levels.every((level) => Boolean(levelAssignment(level.id)));
+}
+function cycleHasSelection(cycle: Cycle) {
+    return cycle.levels.some((level) => Boolean(levelAssignment(level.id)));
+}
+function toggleCycle(cycle: Cycle) {
+    const levelIds = new Set(cycle.levels.map((level) => level.id));
+
+    if (cycleIsSelected(cycle)) {
+        form.level_assignments = form.level_assignments.filter(
+            (assignment) => !levelIds.has(assignment.school_level_id),
+        );
+        return;
+    }
+
+    const missing = cycle.levels
+        .filter((level) => !levelAssignment(level.id))
+        .map((level) => ({ school_level_id: level.id, coefficient: 1 }));
+    form.level_assignments = [...form.level_assignments, ...missing];
+}
+function selectVisibleTeachers() {
+    form.teacher_ids = [
+        ...new Set([
+            ...form.teacher_ids,
+            ...filteredTeachers.value.map((teacher) => teacher.id),
+        ]),
+    ];
+}
+function clearTeachers() {
+    form.teacher_ids = [];
 }
 function submit() {
     const options = {
         preserveScroll: true,
         onSuccess: () => (modalOpen.value = false),
     };
-    editing.value
-        ? form.put(`/admin/subjects/${editing.value.id}`, options)
-        : form.post('/admin/subjects', options);
+    if (editing.value) {
+        form.put('/admin/subjects/' + editing.value.id, options);
+    } else {
+        form.post('/admin/subjects', options);
+    }
 }
 function toggleActive(subject: Subject) {
     router.patch(
@@ -175,7 +244,7 @@ function loadDefaultCurriculum() {
         );
 }
 const assignmentLabel = (level: Level) => {
-    return `${level.name}${level.specialization ? ` · ${level.specialization}` : ''}${level.pivot?.is_optional ? ' · Option' : ''}`;
+    return `${level.name}${level.specialization ? ` · ${level.specialization}` : ''}${level.pivot?.is_optional ? ' · Option' : ''}${level.pivot?.coefficient ? ` · Coef. ${level.pivot.coefficient}` : ''}`;
 };
 function destroySubject(subject: Subject) {
     if (confirm(`Supprimer la matière ${subject.title} ?`))
@@ -271,7 +340,12 @@ const roomTypeLabel = (value: string) =>
                             :key="level.id"
                             :value="level.id"
                         >
-                            {{ level.name }}
+                            {{ level.name
+                            }}{{
+                                level.specialization
+                                    ? ` · ${level.specialization}`
+                                    : ''
+                            }}
                         </option>
                     </optgroup></select
                 ><select v-model="teacherFilter" class="control">
@@ -411,8 +485,9 @@ const roomTypeLabel = (value: string) =>
                         'bg-blue-600 text-white': link.active,
                         'pointer-events-none opacity-40': !link.url,
                     }"
-                    v-html="paginationLabel(link.label)"
-                />
+                >
+                    {{ paginationLabel(link.label) }}
+                </Link>
             </nav>
         </main>
         <div v-if="modalOpen" class="overlay" @click.self="modalOpen = false">
@@ -427,8 +502,8 @@ const roomTypeLabel = (value: string) =>
                             }}
                         </h2>
                         <p>
-                            Les affectations servent à guider et valider la
-                            création des emplois du temps.
+                            Affectez la matière à chaque niveau ou spécialité et
+                            définissez le coefficient utilisé dans les calculs.
                         </p>
                     </div>
                     <button type="button" @click="modalOpen = false">
@@ -486,46 +561,188 @@ const roomTypeLabel = (value: string) =>
                     ><span>Description</span
                     ><textarea v-model="form.description" rows="2" />
                 </label>
-                <div class="mt-4 grid gap-5 lg:grid-cols-2">
+                <div class="mt-4 grid gap-5 lg:grid-cols-[1.25fr_0.75fr]">
                     <section>
-                        <p class="label"><GraduationCap />Niveaux concernés</p>
-                        <div class="selection">
-                            <div v-for="cycle in cycles" :key="cycle.id">
-                                <b>{{ cycle.name }}</b
-                                ><label
+                        <div class="section-heading">
+                            <div>
+                                <p class="label">
+                                    <GraduationCap />Niveaux et coefficients
+                                </p>
+                                <p class="section-help">
+                                    Cochez les niveaux concernés puis indiquez
+                                    leur coefficient.
+                                </p>
+                            </div>
+                            <span class="selection-count"
+                                >{{ form.level_assignments.length }} /
+                                {{ allLevels.length }} sélectionnés</span
+                            >
+                        </div>
+                        <div class="level-table">
+                            <div class="level-table-head">
+                                <span>Niveau / spécialité</span
+                                ><span>Coefficient</span>
+                            </div>
+                            <div
+                                v-for="cycle in cycles"
+                                :key="cycle.id"
+                                class="cycle-group"
+                            >
+                                <button
+                                    type="button"
+                                    class="cycle-heading"
+                                    @click="toggleCycle(cycle)"
+                                >
+                                    <span class="cycle-check">
+                                        <span v-if="cycleIsSelected(cycle)"
+                                            >✓</span
+                                        >
+                                        <span
+                                            v-else-if="cycleHasSelection(cycle)"
+                                            >−</span
+                                        >
+                                    </span>
+                                    <span>{{ cycle.name }}</span>
+                                    <small
+                                        >{{
+                                            cycle.levels.filter((level) =>
+                                                Boolean(
+                                                    levelAssignment(level.id),
+                                                ),
+                                            ).length
+                                        }}/{{ cycle.levels.length }}</small
+                                    >
+                                </button>
+                                <label
                                     v-for="level in cycle.levels"
                                     :key="level.id"
-                                    ><input
-                                        type="checkbox"
-                                        :checked="
-                                            form.school_level_ids.includes(
-                                                level.id,
-                                            )
-                                        "
-                                        @change="
-                                            toggle('school_level_ids', level.id)
-                                        "
-                                    />{{ assignmentLabel(level) }}</label
+                                    class="level-row"
+                                    :class="{
+                                        active: levelAssignment(level.id),
+                                    }"
                                 >
+                                    <span class="level-name">
+                                        <input
+                                            type="checkbox"
+                                            :checked="
+                                                Boolean(
+                                                    levelAssignment(level.id),
+                                                )
+                                            "
+                                            @change="toggleLevel(level.id)"
+                                        />
+                                        <span>
+                                            <strong>{{ level.name }}</strong>
+                                            <small
+                                                v-if="level.specialization"
+                                                >{{
+                                                    level.specialization
+                                                }}</small
+                                            >
+                                        </span>
+                                    </span>
+                                    <span class="coefficient-cell">
+                                        <Input
+                                            v-if="levelAssignment(level.id)"
+                                            :model-value="
+                                                levelAssignment(level.id)
+                                                    ?.coefficient
+                                            "
+                                            @update:model-value="
+                                                updateLevelCoefficient(
+                                                    level.id,
+                                                    $event,
+                                                )
+                                            "
+                                            @click.stop
+                                            type="number"
+                                            min="0.01"
+                                            max="100"
+                                            step="0.01"
+                                            class="h-8 w-24 text-center font-semibold"
+                                            :aria-label="
+                                                'Coefficient pour ' + level.name
+                                            "
+                                        />
+                                        <span v-else class="coefficient-empty"
+                                            >—</span
+                                        >
+                                    </span>
+                                </label>
                             </div>
                         </div>
-                        <InputError :message="form.errors.school_level_ids" />
+                        <InputError :message="form.errors.level_assignments" />
                     </section>
                     <section>
-                        <p class="label"><Users />Enseignants habilités</p>
-                        <div class="selection">
-                            <label v-for="teacher in teachers" :key="teacher.id"
-                                ><input
+                        <div class="section-heading">
+                            <div>
+                                <p class="label">
+                                    <Users />Enseignants habilités
+                                </p>
+                                <p class="section-help">
+                                    Recherche par nom ou adresse e-mail.
+                                </p>
+                            </div>
+                            <span class="selection-count"
+                                >{{ selectedTeacherCount }} sélectionné{{
+                                    selectedTeacherCount > 1 ? 's' : ''
+                                }}</span
+                            >
+                        </div>
+                        <div class="teacher-search">
+                            <Search />
+                            <Input
+                                v-model="teacherSearch"
+                                class="pl-9"
+                                placeholder="Rechercher un enseignant…"
+                            />
+                        </div>
+                        <div class="picker-actions">
+                            <button
+                                type="button"
+                                @click="selectVisibleTeachers"
+                            >
+                                Sélectionner les résultats
+                            </button>
+                            <button type="button" @click="clearTeachers">
+                                Tout effacer
+                            </button>
+                        </div>
+                        <div class="teacher-list">
+                            <label
+                                v-for="teacher in filteredTeachers"
+                                :key="teacher.id"
+                                :class="{
+                                    active: form.teacher_ids.includes(
+                                        teacher.id,
+                                    ),
+                                }"
+                            >
+                                <input
                                     type="checkbox"
                                     :checked="
                                         form.teacher_ids.includes(teacher.id)
                                     "
                                     @change="toggle('teacher_ids', teacher.id)"
-                                /><span
-                                    >{{ teacher.name
-                                    }}<small>{{ teacher.email }}</small></span
-                                ></label
+                                />
+                                <span class="teacher-avatar">{{
+                                    teacher.name.charAt(0).toUpperCase()
+                                }}</span>
+                                <span class="min-w-0">
+                                    <strong>{{ teacher.name }}</strong>
+                                    <small>{{
+                                        teacher.email || 'E-mail non renseigné'
+                                    }}</small>
+                                </span>
+                            </label>
+                            <div
+                                v-if="!filteredTeachers.length"
+                                class="empty-search"
                             >
+                                <Search />
+                                <span>Aucun enseignant trouvé</span>
+                                <small>Essayez un autre nom ou e-mail.</small>
+                            </div>
                         </div>
                         <InputError :message="form.errors.teacher_ids" />
                     </section>
@@ -653,7 +870,7 @@ const roomTypeLabel = (value: string) =>
 }
 .panel {
     width: 100%;
-    max-width: 760px;
+    max-width: 980px;
     max-height: 95vh;
     overflow: auto;
     border-radius: 1rem;
@@ -696,6 +913,215 @@ const roomTypeLabel = (value: string) =>
 }
 .label svg {
     width: 1rem;
+}
+.section-heading {
+    display: flex;
+    min-height: 2.75rem;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+.section-help {
+    margin-top: 0.15rem;
+    font-size: 0.7rem;
+    color: #64748b;
+}
+.selection-count {
+    flex-shrink: 0;
+    border-radius: 999px;
+    background: #eff6ff;
+    padding: 0.25rem 0.55rem;
+    font-size: 0.68rem;
+    font-weight: 600;
+    color: #1d4ed8;
+}
+.level-table,
+.teacher-list {
+    max-height: 290px;
+    overflow: auto;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.75rem;
+    background: #fff;
+}
+.level-table-head {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    display: grid;
+    grid-template-columns: 1fr 7rem;
+    border-bottom: 1px solid #e2e8f0;
+    background: #f8fafc;
+    padding: 0.55rem 0.75rem;
+    font-size: 0.66rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    color: #64748b;
+    text-transform: uppercase;
+}
+.level-table-head span:last-child {
+    text-align: center;
+}
+.cycle-group + .cycle-group {
+    border-top: 1px solid #e2e8f0;
+}
+.cycle-heading {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    gap: 0.5rem;
+    background: #f8fafc;
+    padding: 0.5rem 0.75rem;
+    text-align: left;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #334155;
+}
+.cycle-heading:hover {
+    background: #f1f5f9;
+}
+.cycle-heading small {
+    margin-left: auto;
+    color: #94a3b8;
+}
+.cycle-check {
+    display: grid;
+    width: 1rem;
+    height: 1rem;
+    place-items: center;
+    border: 1px solid #cbd5e1;
+    border-radius: 0.25rem;
+    background: #fff;
+    font-size: 0.7rem;
+    color: #2563eb;
+}
+.level-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 7rem;
+    min-height: 3rem;
+    align-items: center;
+    border-top: 1px solid #f1f5f9;
+    padding: 0.4rem 0.75rem;
+    transition: background 150ms ease;
+}
+.level-row:hover,
+.level-row.active {
+    background: #f8fbff;
+}
+.level-name {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 0.65rem;
+}
+.level-name > span {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+}
+.level-name strong {
+    overflow: hidden;
+    font-size: 0.78rem;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.level-name small {
+    overflow: hidden;
+    font-size: 0.66rem;
+    color: #64748b;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.coefficient-cell {
+    display: flex;
+    justify-content: center;
+}
+.coefficient-empty {
+    color: #cbd5e1;
+}
+.teacher-search {
+    position: relative;
+    margin-bottom: 0.45rem;
+}
+.teacher-search > svg {
+    position: absolute;
+    top: 0.65rem;
+    left: 0.75rem;
+    z-index: 1;
+    width: 1rem;
+    color: #94a3b8;
+}
+.picker-actions {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 0.45rem;
+    font-size: 0.68rem;
+}
+.picker-actions button {
+    color: #2563eb;
+}
+.picker-actions button:hover {
+    text-decoration: underline;
+}
+.teacher-list label {
+    display: grid;
+    grid-template-columns: auto auto minmax(0, 1fr);
+    align-items: center;
+    gap: 0.6rem;
+    border-bottom: 1px solid #f1f5f9;
+    padding: 0.55rem 0.65rem;
+    cursor: pointer;
+}
+.teacher-list label:hover,
+.teacher-list label.active {
+    background: #f8fbff;
+}
+.teacher-list strong,
+.teacher-list small {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.teacher-list strong {
+    font-size: 0.78rem;
+}
+.teacher-list small {
+    font-size: 0.66rem;
+    color: #94a3b8;
+}
+.teacher-avatar {
+    display: grid;
+    width: 1.8rem;
+    height: 1.8rem;
+    place-items: center;
+    border-radius: 999px;
+    background: #dbeafe;
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: #1d4ed8;
+}
+.empty-search {
+    display: flex;
+    min-height: 9rem;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: #64748b;
+}
+.empty-search svg {
+    margin-bottom: 0.4rem;
+    width: 1.25rem;
+    color: #94a3b8;
+}
+.empty-search span {
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+.empty-search small {
+    margin-top: 0.15rem;
+    font-size: 0.68rem;
+    color: #94a3b8;
 }
 .selection {
     margin-top: 0.5rem;

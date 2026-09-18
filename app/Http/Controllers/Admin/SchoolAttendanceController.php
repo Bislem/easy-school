@@ -16,6 +16,7 @@ use App\Models\AttendanceException;
 use App\Models\AttendanceSetting;
 use App\Models\SchoolCycle;
 use App\Models\SchoolGroup;
+use App\Models\SchoolSite;
 use App\Models\Student;
 use App\Models\StudentAcademicEnrollment;
 use App\Models\TimetableSession;
@@ -29,6 +30,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
@@ -48,13 +50,18 @@ class SchoolAttendanceController extends Controller
         $cycleId = $request->integer('cycle_id') ?: null;
         $levelId = $request->integer('level_id') ?: null;
         $groupId = $request->integer('group_id') ?: null;
-        $groups = SchoolGroup::with('level.cycle')->where('academic_year_id', $year->id)->where('is_active', true)
+        $siteId = $request->integer('site_id') ?: null;
+        $studentId = $request->integer('student_id') ?: null;
+        $teacherId = $request->integer('teacher_id') ?: null;
+        $justificationStatus = in_array($request->input('justification_status'), ['justified', 'unjustified'], true) ? $request->input('justification_status') : null;
+        $groups = SchoolGroup::with(['level.cycle', 'classroom.site'])->where('academic_year_id', $year->id)->where('is_active', true)
             ->when($cycleId, fn ($q) => $q->whereHas('level', fn ($l) => $l->where('school_cycle_id', $cycleId)))
-            ->when($levelId, fn ($q) => $q->where('school_level_id', $levelId))->orderBy('name')->get();
+            ->when($levelId, fn ($q) => $q->where('school_level_id', $levelId))
+            ->when($siteId, fn ($q) => $q->whereHas('classroom', fn ($room) => $room->where('school_site_id', $siteId)))->orderBy('name')->get();
         if ($groupId && ! $groups->contains('id', $groupId)) {
             $groupId = null;
         }
-        $sessions = $view === 'students' && ! $groupId ? collect() : $this->sessions($year, $date, $view === 'students' ? $groupId : null, null, $cycleId, $levelId, $view === 'teachers');
+        $sessions = $view === 'students' && ! $groupId ? collect() : $this->sessions($year, $date, $view === 'students' ? $groupId : null, $view === 'teachers' ? $teacherId : null, $cycleId, $levelId, $view === 'teachers', $siteId);
         $students = $groupId ? StudentAcademicEnrollment::with('student:id,first_name,last_name,email')
             ->where('academic_year_id', $year->id)->where('school_group_id', $groupId)->where('status', 'enrolled')
             ->get()->pluck('student')->filter()->values() : collect();
@@ -79,12 +86,50 @@ class SchoolAttendanceController extends Controller
                     'start_time' => substr($session->start_time, 0, 5), 'substitution' => ['status' => 'UNASSIGNED', 'can_assign' => false]])->values(),
             ])->values() : collect();
 
+        $absenceRecords = AttendanceException::with(['student:id,first_name,last_name', 'teacher:id,name', 'timetableSession.subject:id,title', 'timetableSession.group.level.cycle', 'timetableSession.group.classroom.site'])
+            ->where('academic_year_id', $year->id)->whereIn('status', ['ABSENT', 'EXCUSED', 'LATE'])
+            ->whereDate('date', '<=', $date)->where(fn ($q) => $q->whereNull('end_date')->whereDate('date', $date)->orWhereDate('end_date', '>=', $date))
+            ->when($studentId, fn ($q) => $q->where('student_id', $studentId))
+            ->when($teacherId, fn ($q) => $q->where('teacher_id', $teacherId))->get()
+            ->map(function (AttendanceException $exception) use ($year, $date): array {
+                $affected = $exception->timetableSession ? collect([$exception->timetableSession]) : match ($exception->person_type) {
+                    AttendancePersonType::TEACHER => $this->sessions($year, $date, null, $exception->teacher_id, forTeachers: true),
+                    AttendancePersonType::STUDENT => ($enrollment = StudentAcademicEnrollment::where('academic_year_id', $year->id)->where('student_id', $exception->student_id)->first())
+                        ? $this->sessions($year, $date, $enrollment->school_group_id) : collect(),
+                };
+
+                return [
+                    'id' => $exception->id, 'person_type' => $exception->person_type->value,
+                    'person_id' => $exception->student_id ?? $exception->teacher_id,
+                    'person' => $exception->student?->full_name ?? $exception->teacher?->name,
+                    'status' => $exception->status->value, 'reason' => $exception->reason, 'notes' => $exception->notes,
+                    'justification' => $exception->justification,
+                    'is_justified' => $exception->status->value === 'EXCUSED' || (bool) $exception->justified_at,
+                    'parent_justification_pending' => (bool) $exception->parent_justification_submitted_at && ! $exception->justified_at,
+                    'parent_justification_attachment_name' => $exception->parent_justification_attachment_name,
+                    'parent_justification_attachment_url' => $exception->parent_justification_attachment_path ? route('admin.school-absence.attachment', $exception->id, false) : null,
+                    'scope' => $exception->timetable_session_id ? 'session' : 'day',
+                    'sessions' => $affected->map(fn ($session) => ['id' => $session->id, 'group_id' => $session->school_group_id,
+                        'level_id' => $session->group?->school_level_id, 'cycle_id' => $session->group?->level?->school_cycle_id,
+                        'site_id' => $session->group?->classroom?->school_site_id,
+                        'group' => $session->group?->name, 'subject' => $session->subject?->title, 'start_time' => substr($session->start_time, 0, 5)])->values(),
+                ];
+            })->filter(fn ($record) => (! $groupId || collect($record['sessions'])->contains('group_id', $groupId))
+                && (! $levelId || collect($record['sessions'])->contains('level_id', $levelId))
+                && (! $cycleId || collect($record['sessions'])->contains('cycle_id', $cycleId))
+                && (! $siteId || collect($record['sessions'])->contains('site_id', $siteId))
+                && (! $justificationStatus || $record['is_justified'] === ($justificationStatus === 'justified')))->values();
+
         return Inertia::render('Admin/SchoolAttendance/Index', [
             'academicYears' => AcademicYear::orderByDesc('start_date')->get(['id', 'name', 'start_date', 'end_date', 'status']),
             'academicYear' => $year, 'date' => $date->toDateString(), 'view' => $view,
-            'filters' => ['cycle_id' => $cycleId, 'level_id' => $levelId, 'group_id' => $groupId],
+            'filters' => ['cycle_id' => $cycleId, 'level_id' => $levelId, 'group_id' => $groupId, 'site_id' => $siteId,
+                'student_id' => $studentId, 'teacher_id' => $teacherId, 'justification_status' => $justificationStatus],
             'cycles' => SchoolCycle::with(['levels' => fn ($q) => $q->where('is_active', true)])->where('is_active', true)->orderBy('sort_order')->get(),
-            'groups' => $groups, 'sessions' => $sessions,
+            'groups' => $groups, 'sessions' => $sessions, 'absenceRecords' => $absenceRecords,
+            'students' => Student::with(['academicEnrollments' => fn ($q) => $q->where('academic_year_id', $year->id)->where('status', 'enrolled')->with(['group:id,name,school_level_id', 'level:id,name'])])->whereHas('academicEnrollments', fn ($q) => $q->where('academic_year_id', $year->id)->where('status', 'enrolled'))->orderBy('last_name')->get(['id', 'first_name', 'last_name', 'photo_path'])->map(fn ($student) => ['id' => $student->id, 'first_name' => $student->first_name, 'last_name' => $student->last_name, 'photo_url' => $student->photo_url, 'group' => $student->academicEnrollments->first()?->group?->name, 'level' => $student->academicEnrollments->first()?->level?->name]),
+            'teachers' => User::with('taughtSubjects:id,title')->where('role', UserRole::TEACHER->value)->orderBy('name')->get(['id', 'name'])->map(fn ($teacher) => ['id' => $teacher->id, 'name' => $teacher->name, 'photo_url' => null, 'subjects' => $teacher->taughtSubjects->pluck('title')->values()]),
+            'sites' => SchoolSite::where('is_active', true)->orderBy('name')->get(['id', 'name']),
             'statuses' => array_column(AttendanceExceptionStatus::cases(), 'value'),
             'dashboard' => $reporting->todayDashboard($year, $date),
             'warnings' => $reporting->warnings($year, $date),
@@ -95,16 +140,23 @@ class SchoolAttendanceController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
-        Gate::authorize(SchoolAttendancePermission::MANAGE->value);
+        Gate::authorize(SchoolAttendancePermission::CREATE->value);
         $year = $this->year($request);
-        $this->save($request->validate($this->rules($year)), $year, $request->user());
+        $data = $request->validate($this->rules($year));
+        Gate::authorize($data['person_type'] === AttendancePersonType::STUDENT->value
+            ? SchoolAttendancePermission::MANAGE_STUDENTS->value
+            : SchoolAttendancePermission::MANAGE_TEACHERS->value);
+        if (! empty($data['justification'])) {
+            Gate::authorize(SchoolAttendancePermission::MANAGE_JUSTIFICATIONS->value);
+        }
+        $this->save($data, $year, $request->user());
 
-        return back()->with('success', 'Exception de présence enregistrée.');
+        return back()->with('success', 'Absence enregistrée.');
     }
 
     public function bulkStudents(Request $request): RedirectResponse
     {
-        Gate::authorize(SchoolAttendancePermission::MANAGE->value);
+        Gate::authorize(SchoolAttendancePermission::MANAGE_STUDENTS->value);
         $year = $this->year($request);
         $data = $request->validate([
             'date' => ['required', 'date'], 'timetable_session_id' => ['nullable', 'integer', TenantRule::exists('timetable_sessions')->where('academic_year_id', $year->id)],
@@ -125,7 +177,7 @@ class SchoolAttendanceController extends Controller
 
     public function teacherPreview(Request $request): JsonResponse
     {
-        Gate::authorize(SchoolAttendancePermission::VIEW->value);
+        Gate::authorize(SchoolAttendancePermission::MANAGE_TEACHERS->value);
         $year = $this->year($request);
         $data = $request->validate([
             'teacher_id' => ['required', 'integer', TenantRule::exists('users')->where('role', UserRole::TEACHER->value)],
@@ -147,12 +199,62 @@ class SchoolAttendanceController extends Controller
         return response()->json(['sessions' => $result]);
     }
 
+    public function sessionOptions(Request $request): JsonResponse
+    {
+        Gate::authorize(SchoolAttendancePermission::CREATE->value);
+        $year = $this->year($request);
+        $data = $request->validate([
+            'person_type' => ['required', Rule::enum(AttendancePersonType::class)],
+            'student_id' => ['nullable', 'integer', TenantRule::exists('students')],
+            'teacher_id' => ['nullable', 'integer', TenantRule::exists('users')->where('role', UserRole::TEACHER->value)],
+            'date' => ['required', 'date', 'after_or_equal:'.$year->start_date->toDateString(), 'before_or_equal:'.$year->end_date->toDateString()],
+        ]);
+
+        $type = AttendancePersonType::from($data['person_type']);
+        Gate::authorize($type === AttendancePersonType::STUDENT
+            ? SchoolAttendancePermission::MANAGE_STUDENTS->value
+            : SchoolAttendancePermission::MANAGE_TEACHERS->value);
+        $date = Carbon::parse($data['date']);
+
+        if ($type === AttendancePersonType::STUDENT) {
+            if (empty($data['student_id'])) {
+                throw ValidationException::withMessages(['student_id' => 'Sélectionnez un élève.']);
+            }
+            $enrollment = StudentAcademicEnrollment::where('academic_year_id', $year->id)
+                ->where('student_id', $data['student_id'])->where('status', 'enrolled')->first();
+            $sessions = $enrollment ? $this->sessions($year, $date, $enrollment->school_group_id) : collect();
+        } else {
+            if (empty($data['teacher_id'])) {
+                throw ValidationException::withMessages(['teacher_id' => 'Sélectionnez un enseignant.']);
+            }
+            $sessions = $this->sessions($year, $date, null, (int) $data['teacher_id'], forTeachers: true);
+        }
+
+        return response()->json(['sessions' => $sessions->map(fn (TimetableSession $session) => [
+            'id' => $session->id,
+            'start_time' => substr($session->start_time, 0, 5),
+            'end_time' => substr($session->end_time, 0, 5),
+            'subject' => $session->subject?->title,
+            'group' => $session->group?->name,
+            'room' => $session->room?->name,
+        ])->values()]);
+    }
+
     public function destroy(AttendanceException $attendanceException): RedirectResponse
     {
-        Gate::authorize(SchoolAttendancePermission::MANAGE->value);
+        Gate::authorize(SchoolAttendancePermission::DELETE->value);
         $attendanceException->delete();
 
-        return back()->with('success', 'Présence rétablie.');
+        return back()->with('success', 'Absence supprimée : la présence redevient implicite.');
+    }
+
+    public function downloadAttachment(Request $request, int $attendanceException)
+    {
+        Gate::authorize(SchoolAttendancePermission::VIEW->value);
+        $absence = AttendanceException::findOrFail($attendanceException);
+        abort_unless($absence->parent_justification_attachment_path, 404);
+
+        return Storage::disk('local')->download($absence->parent_justification_attachment_path, $absence->parent_justification_attachment_name ?: 'justificatif');
     }
 
     private function year(Request $request): AcademicYear
@@ -162,7 +264,7 @@ class SchoolAttendanceController extends Controller
             ?? AcademicYear::latest('start_date')->first() ?? throw ValidationException::withMessages(['academic_year_id' => 'Sélectionnez une année scolaire.']);
     }
 
-    private function sessions(AcademicYear $year, Carbon $date, ?int $groupId = null, ?int $teacherId = null, ?int $cycleId = null, ?int $levelId = null, bool $forTeachers = false): Collection
+    private function sessions(AcademicYear $year, Carbon $date, ?int $groupId = null, ?int $teacherId = null, ?int $cycleId = null, ?int $levelId = null, bool $forTeachers = false, ?int $siteId = null): Collection
     {
         $dateString = $date->toDateString();
         $audience = $forTeachers ? 'teachers' : 'students';
@@ -171,11 +273,12 @@ class SchoolAttendanceController extends Controller
         }
         $replaced = TimetableSession::where('academic_year_id', $year->id)->whereDate('effective_date', $dateString)->whereNotNull('parent_session_id')->pluck('parent_session_id');
 
-        return TimetableSession::with(['subject:id,title,title_ar', 'teacher:id,name,email', 'room:id,name', 'group.level.cycle'])
+        return TimetableSession::with(['subject:id,title,title_ar', 'teacher:id,name,email', 'room:id,name', 'group.level.cycle', 'group.classroom.site'])
             ->where('academic_year_id', $year->id)->where('status', '!=', 'cancelled')
             ->when($groupId, fn ($q) => $q->where('school_group_id', $groupId))->when($teacherId, fn ($q) => $q->where('teacher_id', $teacherId))
             ->when($levelId, fn ($q) => $q->whereHas('group', fn ($g) => $g->where('school_level_id', $levelId)))
             ->when($cycleId, fn ($q) => $q->whereHas('group.level', fn ($l) => $l->where('school_cycle_id', $cycleId)))
+            ->when($siteId, fn ($q) => $q->whereHas('group.classroom', fn ($room) => $room->where('school_site_id', $siteId)))
             ->where(fn ($q) => $q->where(fn ($weekly) => $weekly->where('recurrence', 'weekly')->where('day', $date->dayOfWeekIso)->whereNull('parent_session_id')->whereNotIn('id', $replaced))
                 ->orWhere(fn ($once) => $once->where('recurrence', 'once')->whereDate('effective_date', $dateString)))
             ->orderBy('start_time')->get();
@@ -204,11 +307,23 @@ class SchoolAttendanceController extends Controller
             throw ValidationException::withMessages(['end_date' => "Une absence d'élève ne peut pas être une plage."]);
         }
         $session = ! empty($data['timetable_session_id']) ? TimetableSession::findOrFail($data['timetable_session_id']) : null;
+        if ($session && ! empty($data['end_date'])) {
+            throw ValidationException::withMessages(['end_date' => 'Une absence liée à une séance ne peut pas couvrir une plage de dates.']);
+        }
         if ($session && $type === AttendancePersonType::TEACHER && (int) $session->teacher_id !== (int) $data['teacher_id']) {
             throw ValidationException::withMessages(['teacher_id' => "Cet enseignant n'est pas planifié pour cette séance."]);
         }
         if ($type === AttendancePersonType::STUDENT && ! StudentAcademicEnrollment::where('academic_year_id', $year->id)->where('student_id', $data['student_id'])->where('status', 'enrolled')->when($session, fn ($q) => $q->where('school_group_id', $session->school_group_id))->exists()) {
             throw ValidationException::withMessages(['student_id' => "Cet élève n'est pas inscrit dans ce groupe."]);
+        }
+        if ($session) {
+            $date = Carbon::parse($data['date']);
+            $scheduled = $type === AttendancePersonType::STUDENT
+                ? $this->sessions($year, $date, $session->school_group_id)->contains('id', $session->id)
+                : $this->sessions($year, $date, null, (int) $data['teacher_id'], forTeachers: true)->contains('id', $session->id);
+            if (! $scheduled) {
+                throw ValidationException::withMessages(['timetable_session_id' => "Cette séance ne fait pas partie de l'emploi du temps de la personne à cette date."]);
+            }
         }
         $identity = ['academic_year_id' => $year->id, 'date' => $data['date'], 'timetable_session_id' => $session?->id, 'person_type' => $type->value, 'student_id' => $data['student_id'] ?? null, 'teacher_id' => $data['teacher_id'] ?? null];
 

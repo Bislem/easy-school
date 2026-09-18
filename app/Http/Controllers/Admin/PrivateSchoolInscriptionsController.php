@@ -10,6 +10,7 @@ use App\Models\PrivateSchoolInscription;
 use App\Models\PrivateSchoolInscriptionCampaign;
 use App\Models\SchoolLevel;
 use App\Services\PrivateSchoolApplicantMatcher;
+use App\Services\StudentAcademicEnrollmentService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -49,10 +50,10 @@ class PrivateSchoolInscriptionsController extends Controller
         ]);
     }
 
-    public function updateStatus(Request $request, PrivateSchoolInscription $inscription, PrivateSchoolApplicantMatcher $matcher): RedirectResponse
+    public function updateStatus(Request $request, PrivateSchoolInscription $inscription, PrivateSchoolApplicantMatcher $matcher, StudentAcademicEnrollmentService $academicEnrollments): RedirectResponse
     {
         $data = $request->validate(['status' => ['required', Rule::enum(PrivateSchoolInscriptionStatus::class)], 'review_notes' => ['nullable', 'string', 'max:3000']]);
-        DB::transaction(function () use ($data, $request, $inscription, $matcher): void {
+        DB::transaction(function () use ($data, $request, $inscription, $matcher, $academicEnrollments): void {
             $locked = PrivateSchoolInscription::query()->lockForUpdate()->findOrFail($inscription->id);
             if ($data['status'] === PrivateSchoolInscriptionStatus::ACCEPTED->value && $locked->status !== PrivateSchoolInscriptionStatus::ACCEPTED) {
                 $level = PrivateSchoolCampaignLevel::query()->lockForUpdate()->findOrFail($locked->campaign_level_id);
@@ -69,6 +70,9 @@ class PrivateSchoolInscriptionsController extends Controller
                 }
             }
             $locked->update([...$data, 'reviewed_by' => $request->user()->id, 'reviewed_at' => now()]);
+            if ($data['status'] === PrivateSchoolInscriptionStatus::ACCEPTED->value) {
+                $academicEnrollments->ensureFromInscription($locked->fresh());
+            }
         });
 
         return back()->with('success', 'Statut de l’inscription mis à jour.');

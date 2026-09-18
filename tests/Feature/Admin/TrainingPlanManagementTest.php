@@ -3,10 +3,11 @@
 use App\Enums\UserRole;
 use App\Models\Classroom;
 use App\Models\Course;
+use App\Models\CourseEnrollment;
 use App\Models\CourseLevel;
 use App\Models\EnrollmentForm;
 use App\Models\SchoolSite;
-use App\Models\CourseEnrollment;
+use App\Models\SessionAttendance;
 use App\Models\Student;
 use App\Models\TeacherAttendance;
 use App\Models\TrainingPlan;
@@ -65,12 +66,12 @@ test('room conflicts and excessive planned duration are rejected', function () {
     expect($groupOne->sessions()->count())->toBe(1);
 });
 
-test('teachers cannot manage planifications', function () {
+test('teachers can access the planification module', function () {
     $teacher = User::factory()->create(['role' => UserRole::TEACHER]);
-    $this->actingAs($teacher)->get(route('admin.training-plans.index'))->assertForbidden();
+    $this->actingAs($teacher)->get(route('admin.training-plans.index'))->assertOk();
 });
 
-test('planning attendance is entered once and session validation marks the teacher present', function () {
+test('planning stores only absence exceptions and session validation marks the teacher present', function () {
     $admin = User::factory()->create(['role' => UserRole::ADMIN]);
     $teacher = User::factory()->create(['role' => UserRole::TEACHER]);
     $course = Course::create(['title' => 'Mathématiques', 'code' => 'MATH-ATT', 'duration_hours' => 4, 'price' => 5000, 'is_active' => true]);
@@ -84,8 +85,30 @@ test('planning attendance is entered once and session validation marks the teach
     $session = $group->sessions()->create(['classroom_id' => $room->id, 'teacher_id' => $teacher->id, 'title' => 'Séance présence', 'starts_at' => '2026-08-20 08:00:00', 'ends_at' => '2026-08-20 10:00:00']);
 
     $route = route('admin.training-plans.sessions.attendance', [$plan, $group, $session]);
-    $this->actingAs($admin)->put($route, ['attendances' => [$student->id => 'present']])->assertSessionHasNoErrors();
-    $this->actingAs($admin)->put($route, ['attendances' => [$student->id => 'absent']])->assertSessionHasErrors('attendance');
+    $this->actingAs($admin)->put($route, ['student_ids' => [$student->id]])->assertSessionHasNoErrors();
+    expect(SessionAttendance::where('training_session_id', $session->id)->where('student_id', $student->id)->firstOrFail()->status)->toBe('absent');
+
+    $this->actingAs($admin)->put($route, ['student_ids' => []])->assertSessionHasNoErrors();
+    expect(SessionAttendance::where('training_session_id', $session->id)->where('student_id', $student->id)->exists())->toBeFalse();
+
+    $this->actingAs($admin)->put($route, ['student_ids' => [$student->id]])->assertSessionHasNoErrors();
+
+    $this->actingAs($admin)->put(route('admin.attendance.student-day-absences'), [
+        'group_id' => $group->id,
+        'student_id' => $student->id,
+        'date' => '2026-08-20',
+        'session_ids' => [],
+    ])->assertSessionHasNoErrors();
+    expect(SessionAttendance::where('training_session_id', $session->id)->where('student_id', $student->id)->exists())->toBeFalse();
+
+    $this->actingAs($admin)->put(route('admin.attendance.student-day-absences'), [
+        'group_id' => $group->id,
+        'student_id' => $student->id,
+        'date' => '2026-08-20',
+        'session_ids' => [$session->id],
+    ])->assertSessionHasNoErrors();
+    expect(SessionAttendance::where('training_session_id', $session->id)->where('student_id', $student->id)->firstOrFail()->status)->toBe('absent');
+
     $this->actingAs($admin)->patch(route('admin.training-plans.sessions.complete', [$plan, $group, $session]))->assertSessionHasNoErrors();
 
     expect($session->refresh()->status)->toBe('completed')
