@@ -30,12 +30,12 @@ use App\Models\User;
 use App\Observers\PortalNotificationObserver;
 use App\Policies\StaffPolicy;
 use App\Policies\TimetableSessionPolicy;
+use App\Services\AuthorizationService;
+use App\Services\TenantFilePondService;
+use App\Services\TenantStorageService;
 use App\Support\PermissionCatalog;
 use App\Tenancy\TenantContext;
 use App\Tenancy\TenantScope;
-use App\Services\TenantFilePondService;
-use App\Services\TenantStorageService;
-use App\Services\AuthorizationService;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 
@@ -58,14 +58,16 @@ class AppServiceProvider extends ServiceProvider
         foreach (TenantScope::MODELS as $model) {
             TenantScope::boot($model);
         }
-        foreach ([\App\Models\Student::class, \App\Models\SchoolParent::class, \App\Models\SchoolGroup::class,
+        foreach ([\App\Models\Student::class, \App\Models\SchoolParent::class, \App\Models\SchoolGroup::class, \App\Models\SchoolSite::class,
             \App\Models\Staff::class, \App\Models\StudentAcademicEnrollment::class, \App\Models\CourseEnrollment::class,
             \App\Models\StudentPayment::class, \App\Models\StudentObservation::class, \App\Models\SessionAttendance::class,
             \App\Models\TimetableSession::class, \App\Models\Expense::class, \App\Models\SalaryStatement::class,
-            \App\Models\SalaryPayment::class] as $scopedModel) {
+            \App\Models\SalaryPayment::class, \App\Models\FinancialAccount::class, \App\Models\FinancialTransaction::class] as $scopedModel) {
             $scopedModel::addGlobalScope(AuthorizationService::DATA_SCOPE, function ($query): void {
                 $permission = request()?->attributes->get('effective_permission');
-                if ($permission && request()->user()) app(AuthorizationService::class)->apply($query, request()->user(), $permission);
+                if ($permission && request()->user()) {
+                    app(AuthorizationService::class)->apply($query, request()->user(), $permission);
+                }
             });
         }
         \MohamedGaldi\ViltFilepond\Models\File::deleted(function ($file): void {
@@ -101,10 +103,15 @@ class AppServiceProvider extends ServiceProvider
         foreach (SchoolAttendancePermission::cases() as $permission) {
             Gate::define($permission->value, fn (User $user) => $user->tenant?->organization_type === 'private_school' && $user->hasPermission($permission->value));
         }
-        $created = [StudentPayment::class => 'student_payment.recorded', SalaryPayment::class => 'salary_payment.recorded', SalaryAdjustment::class => 'salary_adjustment.recorded', EnrollmentFinancialAdjustment::class => 'student_finance.adjusted', StudentHistory::class => 'student_history.recorded', Certificate::class => 'certificate.issued'];
+        $created = [StudentPayment::class => 'student_payment.recorded', \App\Models\FinancialTransaction::class => 'financial_transaction.recorded', SalaryPayment::class => 'salary_payment.recorded', SalaryAdjustment::class => 'salary_adjustment.recorded', EnrollmentFinancialAdjustment::class => 'student_finance.adjusted', StudentHistory::class => 'student_history.recorded', Certificate::class => 'certificate.issued'];
         foreach ($created as $model => $event) {
             $model::created(fn ($item) => self::audit($event, $item, null, $item->getAttributes()));
         }
+        CourseEnrollment::saved(function (CourseEnrollment $enrollment): void {
+            if ($enrollment->student_id && $enrollment->status === \App\Enums\ApplicationStatus::REGISTERED) {
+                app(\App\Services\FormationBillingService::class)->generateForEnrollment($enrollment);
+            }
+        });
         TrainingSession::updated(fn ($item) => self::audit('session.changed', $item, $item->getOriginal(), $item->getChanges()));
         Badge::updated(fn ($item) => self::audit('badge.changed', $item, $item->getOriginal(), $item->getChanges()));
         foreach ([TrainingPlan::class, TrainingPlanTeacherAccess::class, TrainingSession::class, SessionAttendance::class, TeacherAttendance::class, StudentPayment::class, SalaryStatement::class, SalaryPayment::class, CourseEnrollment::class] as $model) {

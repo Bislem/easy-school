@@ -11,8 +11,17 @@ class EnsureMobileAccess
     public function handle(Request $request, Closure $next): Response
     {
         $user = $request->user();
-        if (! $user || $request->attributes->get('mobile_role') !== 'parent') return response()->json(['message' => 'Seuls les comptes parents peuvent utiliser l’application mobile.', 'error' => 'role_not_allowed'], 403);
-        if (! $user->is_active || ! $user->can_login) return response()->json(['message' => 'Votre accès est désactivé. Contactez votre établissement.', 'error' => 'account_inactive'], 403);
+        if (! $user || $request->attributes->get('mobile_role') !== 'parent') {
+            return response()->json(['message' => 'Seuls les comptes parents peuvent utiliser l’application mobile.', 'error' => 'role_not_allowed'], 403);
+        }
+        if (! $user->is_active || ! $user->can_login) {
+            return response()->json(['message' => 'Votre accès est désactivé. Contactez votre établissement.', 'error' => 'account_inactive'], 403);
+        }
+        $tenant = $request->attributes->get('tenant');
+        if ($tenant && ! $tenant->hasAccess()) {
+            return response()->json(['message' => 'La période d’essai de cet établissement est terminée. Les données sont conservées.', 'error' => 'trial_expired'], 402);
+        }
+
         return $next($request);
     }
 }

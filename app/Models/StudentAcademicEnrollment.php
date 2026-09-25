@@ -6,6 +6,7 @@ use App\Enums\StudentAcademicEnrollmentStatus;
 use App\Enums\StudentAcademicResult;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\MorphOne;
 
 class StudentAcademicEnrollment extends Model
 {
@@ -85,6 +86,11 @@ class StudentAcademicEnrollment extends Model
     public function promotedToLevel(): BelongsTo
     {
         return $this->belongsTo(SchoolLevel::class, 'promoted_to_school_level_id');
+    }
+
+    public function financialAccount(): MorphOne
+    {
+        return $this->morphOne(FinancialAccount::class, 'accountable');
     }
 
     public function isAcademicallyActive(): bool

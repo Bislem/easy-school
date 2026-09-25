@@ -249,6 +249,31 @@ const bytes = (value: number | null) => {
                                 {{ date(client.plan_expires_at) }}
                             </p>
                         </div>
+                        <div
+                            v-if="client.account_type === 'demo'"
+                            class="mt-3 grid grid-cols-2 gap-2 rounded-xl border p-3 text-xs"
+                        >
+                            <span
+                                >Début essai<br /><b>{{
+                                    date(client.trial_started_at)
+                                }}</b></span
+                            >
+                            <span
+                                >Fin essai<br /><b>{{
+                                    date(client.demo_expires_at)
+                                }}</b></span
+                            >
+                            <span v-if="client.account_status === 'demo'"
+                                >Restant<br /><b
+                                    >{{ client.remaining_days }} jours</b
+                                ></span
+                            >
+                            <span
+                                v-else-if="client.account_status === 'expired'"
+                                class="font-bold text-red-600"
+                                >Essai expiré</span
+                            >
+                        </div>
                         <div class="mt-3 rounded-xl border p-3">
                             <div class="flex justify-between text-xs">
                                 <span>Stockage</span

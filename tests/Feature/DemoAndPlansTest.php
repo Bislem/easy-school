@@ -5,6 +5,7 @@ use App\Mail\DemoAccountApprovedMail;
 use App\Mail\DemoAccountRejectedMail;
 use App\Mail\SchoolCredentialsRegeneratedMail;
 use App\Models\DemoRequest;
+use App\Models\SubscriptionPayment;
 use App\Models\SubscriptionPlan;
 use App\Models\Tenant;
 use App\Models\User;
@@ -88,17 +89,16 @@ test('super admin must provide a rejection reason and the responsible receives i
 
     expect($demo->fresh()->status)->toBe('rejected')
         ->and($demo->fresh()->rejection_reason)->toBe($reason);
-    Mail::assertSent(DemoAccountRejectedMail::class, fn ($mail) =>
-        $mail->hasTo('sarah@atlas.test') && $mail->demoRequest->rejection_reason === $reason
+    Mail::assertSent(DemoAccountRejectedMail::class, fn ($mail) => $mail->hasTo('sarah@atlas.test') && $mail->demoRequest->rejection_reason === $reason
     );
 });
 
-test('demo accounts cannot update passwords or school information', function () {
+test('trial accounts have normal access to passwords and school information', function () {
     $tenant = Tenant::factory()->create(['account_type' => 'demo', 'demo_expires_at' => now()->addDays(7)]);
     $admin = User::factory()->create(['tenant_id' => $tenant->id, 'role' => UserRole::ADMIN, 'password' => 'password']);
 
-    $this->actingAs($admin)->put(route('password.update'), ['current_password' => 'password', 'password' => 'NewPassword123!', 'password_confirmation' => 'NewPassword123!'])->assertForbidden();
-    $this->actingAs($admin)->put(route('admin.settings.update'), [])->assertForbidden();
+    $this->actingAs($admin)->put(route('password.update'), ['current_password' => 'password', 'password' => 'NewPassword123!', 'password_confirmation' => 'NewPassword123!'])->assertSessionHasNoErrors();
+    $this->actingAs($admin)->put(route('admin.settings.update'), [])->assertSessionHasErrors();
 });
 
 test('super admin regenerates client credentials and chooses the delivery email', function () {
@@ -199,4 +199,31 @@ test('super admin manages plans and assigns one to a school', function () {
     expect($school->refresh()->subscription_plan_id)->toBe($plan->id)
         ->and($plan->features)->toBe(['Finance', 'Présences', 'Rapports'])
         ->and($plan->storage_mb)->toBe(10240);
+});
+
+test('super admin creates a private custom plan for one client and records its payment', function () {
+    $superAdmin = User::factory()->create(['role' => UserRole::SUPER_ADMIN, 'tenant_id' => null, 'is_active' => true, 'can_login' => true]);
+    $client = Tenant::factory()->create(['account_type' => 'demo']);
+    $otherClient = Tenant::factory()->create(['account_type' => 'demo']);
+
+    $this->actingAs($superAdmin, 'super_admin')->post(route('super-admin.tenants.subscription', $client), [
+        'action' => 'change', 'plan_mode' => 'custom', 'months' => 9,
+        'custom_name' => 'Contrat Atlas', 'custom_description' => 'Offre négociée',
+        'custom_price' => 175000, 'custom_currency' => 'DZD', 'custom_billing_period' => 'custom',
+        'custom_max_students' => 850, 'custom_max_sites' => 4, 'custom_storage_go' => 25,
+        'custom_features' => "Finance\nApplication mobile\nSupport prioritaire",
+        'amount' => 87500, 'payment_method' => 'bank_transfer', 'reference' => 'VIR-ATLAS-001',
+    ])->assertSessionHasNoErrors();
+
+    $plan = SubscriptionPlan::where('name', 'Contrat Atlas')->firstOrFail();
+    expect($plan->is_custom)->toBeTrue()
+        ->and($plan->owner_tenant_id)->toBe($client->id)
+        ->and($plan->storage_mb)->toBe(25600)
+        ->and($plan->features)->toBe(['Finance', 'Application mobile', 'Support prioritaire'])
+        ->and($client->refresh()->subscription_plan_id)->toBe($plan->id)
+        ->and(SubscriptionPayment::where('tenant_id', $client->id)->where('subscription_plan_id', $plan->id)->value('amount'))->toBe('87500.00');
+
+    $this->actingAs($superAdmin, 'super_admin')->post(route('super-admin.tenants.subscription', $otherClient), [
+        'action' => 'change', 'plan_mode' => 'existing', 'subscription_plan_id' => $plan->id, 'months' => 1,
+    ])->assertStatus(422);
 });

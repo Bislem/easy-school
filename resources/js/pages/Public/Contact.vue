@@ -310,9 +310,9 @@ const field =
                                 Vous préférez voir la plateforme ?
                             </p>
                             <Link
-                                href="/demo"
+                                href="/register-school"
                                 class="mt-3 flex items-center gap-2 text-sm font-black text-[#23d5bd]"
-                                >Demander une démo <ArrowRight class="size-4"
+                                >Créer votre école <ArrowRight class="size-4"
                             /></Link>
                         </div>
                     </aside>

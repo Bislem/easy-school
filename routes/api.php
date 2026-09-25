@@ -16,7 +16,7 @@ use Illuminate\Support\Facades\Route;
 // The timetable is a first-party admin SPA. Load the web session explicitly so
 // authentication does not depend on SANCTUM_STATEFUL_DOMAINS matching the
 // deployment hostname (a common source of production-only 401 responses).
-Route::middleware(['web', 'auth:sanctum,web', \App\Http\Middleware\SetTenantContext::class])->prefix('v1/timetable')->name('api.v1.timetable.')->group(function () {
+Route::middleware(['web', 'auth:sanctum,web', \App\Http\Middleware\SetTenantContext::class, 'active'])->prefix('v1/timetable')->name('api.v1.timetable.')->group(function () {
     Route::get('catalogue', TimetableCatalogueController::class)->name('catalogue');
     Route::get('settings', [TimetableSettingController::class, 'show'])->name('settings.show');
     Route::put('settings', [TimetableSettingController::class, 'update'])->name('settings.update');

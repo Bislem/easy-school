@@ -2,14 +2,14 @@
 
 namespace App\Http\Middleware;
 
+use App\Enums\UserRole;
 use App\Models\AcademicYear;
 use App\Models\CompanySetting;
 use App\Models\SchoolAnnouncement;
-use App\Enums\UserRole;
+use App\Services\AuthorizationService;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
-use App\Services\AuthorizationService;
 use Inertia\Middleware;
 
 class HandleInertiaRequests extends Middleware
@@ -80,7 +80,7 @@ class HandleInertiaRequests extends Middleware
             'quote' => ['message' => trim($message), 'author' => trim($author)],
             'auth' => [
                 'user' => $authenticatedUser,
-                'tenant' => $authenticatedTenant?->only(['id', 'name', 'slug', 'logo_url', 'status', 'account_type', 'organization_type', 'demo_expires_at']),
+                'tenant' => $authenticatedTenant?->only(['id', 'name', 'slug', 'logo_url', 'status', 'account_type', 'organization_type', 'trial_started_at', 'demo_expires_at']),
                 'permissions' => $effectivePermissions,
             ],
             'academic_years' => $academicYears,
@@ -92,10 +92,13 @@ class HandleInertiaRequests extends Middleware
                 ->get(['id', 'type', 'title', 'message', 'data', 'read_at', 'occurred_at']) ?? []),
             'latest_parent_announcement' => function () use ($isPlatformAdmin, $request) {
                 $user = $request->user();
-                if ($isPlatformAdmin || ! $user || $user->role !== UserRole::PARENT) return null;
+                if ($isPlatformAdmin || ! $user || $user->role !== UserRole::PARENT) {
+                    return null;
+                }
                 $item = $user->portalNotifications()->where('type', 'announcement.new')->whereNull('read_at')
                     ->whereHasMorph('related', [SchoolAnnouncement::class], fn ($query) => $query->where('status', 'published'))
                     ->latest('occurred_at')->first();
+
                 return $item ? ['notification_id' => $item->id, 'title' => $item->title, 'message' => $item->message,
                     'poster_url' => $item->data['poster_url'] ?? null, 'published_at' => $item->occurred_at?->toIso8601String()] : null;
             },

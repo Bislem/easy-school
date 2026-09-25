@@ -58,6 +58,11 @@ class EnrollmentForm extends Model
         return $this->hasMany(TrainingPlan::class);
     }
 
+    public function pricingConfigs(): HasMany
+    {
+        return $this->hasMany(FormationPricingConfig::class);
+    }
+
     public function groupCapacity(): int
     {
         if ($this->classroom_id) {

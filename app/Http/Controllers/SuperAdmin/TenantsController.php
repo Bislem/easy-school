@@ -5,9 +5,9 @@ namespace App\Http\Controllers\SuperAdmin;
 use App\Enums\UserRole;
 use App\Http\Controllers\Controller;
 use App\Mail\SchoolCredentialsRegeneratedMail;
-use App\Models\Tenant;
 use App\Models\SubscriptionPayment;
 use App\Models\SubscriptionPlan;
+use App\Models\Tenant;
 use App\Models\User;
 use App\Services\TenantInitializer;
 use App\Services\TenantStorageService;
@@ -40,14 +40,14 @@ final class TenantsController extends Controller
         $schools->getCollection()->each(function (Tenant $tenant): void {
             $expiry = $tenant->isDemo() ? $tenant->demo_expires_at : $tenant->plan_expires_at;
             $tenant->setAttribute('storage_percentage', $tenant->storage_limit_bytes ? min(100, round($tenant->storage_used_bytes / $tenant->storage_limit_bytes * 100, 1)) : 0);
-            $tenant->setAttribute('account_status', $tenant->status !== 'active' ? 'suspended' : ($expiry?->isPast() ? 'expired' : ($tenant->isDemo() ? 'demo' : 'active')));
+            $tenant->setAttribute('account_status', $tenant->status !== 'active' ? 'suspended' : ($tenant->hasActiveSubscription() ? 'active' : ($tenant->demoExpired() ? 'expired' : ($tenant->isDemo() ? 'demo' : 'active'))));
             $tenant->setAttribute('remaining_days', $expiry ? max(0, now()->startOfDay()->diffInDays($expiry, false)) : null);
         });
 
         return Inertia::render('SuperAdmin/Tenants/Index', [
             'schools' => $schools,
             'filters' => $filters,
-            'plans' => SubscriptionPlan::where('is_active', true)->orderBy('sort_order')->get(),
+            'plans' => SubscriptionPlan::whereNull('owner_tenant_id')->where('is_active', true)->orderBy('sort_order')->get(),
             'summary' => [
                 'total' => Tenant::count(),
                 'active' => Tenant::where('status', 'active')->count(),
@@ -64,7 +64,7 @@ final class TenantsController extends Controller
             'admin_email' => ['required', 'email', 'max:255', 'unique:users,email'],
             'admin_phone' => ['nullable', 'string', 'max:50'],
             'password' => ['required', Password::defaults()],
-            'subscription_plan_id' => ['required', 'exists:subscription_plans,id'],
+            'subscription_plan_id' => ['required', Rule::exists('subscription_plans', 'id')->whereNull('owner_tenant_id')],
             'plan_expires_at' => ['nullable', 'date', 'after:today'],
             'payment_amount' => ['nullable', 'numeric', 'min:0'],
             'payment_method' => ['nullable', 'string', 'max:50'],
@@ -144,10 +144,16 @@ final class TenantsController extends Controller
 
         return Inertia::render('SuperAdmin/Tenants/Show', [
             'school' => $tenant, 'administrator' => $administrator, 'stats' => $stats,
-            'plans' => SubscriptionPlan::where('is_active', true)->orderBy('sort_order')->get(),
+            'plans' => SubscriptionPlan::where('is_active', true)->where(fn ($query) => $query->whereNull('owner_tenant_id')->orWhere('owner_tenant_id', $tenant->id))->orderBy('is_custom')->orderBy('sort_order')->get(),
             'payments' => SubscriptionPayment::with('plan:id,name')->where('tenant_id', $tenant->id)->latest('paid_at')->get(),
             'storage' => $tenantStorage->summary($tenant),
-            'accountSummary' => ['status' => $tenant->status !== 'active' ? 'suspended' : ($expiry?->isPast() ? 'expired' : ($tenant->isDemo() ? 'demo' : 'active')), 'expires_at' => $expiry, 'remaining_days' => $expiry ? max(0, now()->startOfDay()->diffInDays($expiry, false)) : null],
+            'accountSummary' => [
+                'status' => $tenant->status !== 'active' ? 'suspended' : ($tenant->hasActiveSubscription() ? 'active' : ($tenant->demoExpired() ? 'expired' : 'demo')),
+                'trial_started_at' => $tenant->trial_started_at,
+                'trial_expires_at' => $tenant->demo_expires_at,
+                'expires_at' => $expiry,
+                'remaining_days' => $tenant->isDemo() && $tenant->demo_expires_at ? max(0, now()->startOfDay()->diffInDays($tenant->demo_expires_at, false)) : null,
+            ],
         ]);
     }
 
@@ -155,21 +161,53 @@ final class TenantsController extends Controller
     {
         $data = $request->validate([
             'action' => ['required', Rule::in(['renew', 'extend', 'change'])],
-            'subscription_plan_id' => ['required', 'exists:subscription_plans,id'],
+            'plan_mode' => ['nullable', Rule::in(['existing', 'custom'])],
+            'subscription_plan_id' => [Rule::requiredIf($request->input('plan_mode', 'existing') === 'existing'), 'nullable', 'exists:subscription_plans,id'],
+            'custom_name' => [Rule::requiredIf($request->input('plan_mode') === 'custom'), 'nullable', 'string', 'max:100'],
+            'custom_description' => ['nullable', 'string', 'max:1000'],
+            'custom_price' => [Rule::requiredIf($request->input('plan_mode') === 'custom'), 'nullable', 'numeric', 'min:0'],
+            'custom_currency' => [Rule::requiredIf($request->input('plan_mode') === 'custom'), 'nullable', Rule::in(['DZD', 'EUR', 'USD'])],
+            'custom_billing_period' => [Rule::requiredIf($request->input('plan_mode') === 'custom'), 'nullable', Rule::in(['monthly', 'yearly', 'custom'])],
+            'custom_max_students' => ['nullable', 'integer', 'min:1'], 'custom_max_teachers' => ['nullable', 'integer', 'min:1'],
+            'custom_max_staff' => ['nullable', 'integer', 'min:1'], 'custom_max_sites' => ['nullable', 'integer', 'min:1'],
+            'custom_max_users' => ['nullable', 'integer', 'min:1'], 'custom_max_courses' => ['nullable', 'integer', 'min:1'],
+            'custom_storage_go' => ['nullable', 'numeric', 'min:0.01', 'max:1000000'],
+            'custom_features' => ['nullable', 'string', 'max:5000'],
             'months' => ['required', 'integer', 'min:1', 'max:60'],
             'amount' => ['nullable', 'numeric', 'min:0'], 'payment_method' => ['nullable', 'string', 'max:50'],
             'reference' => ['nullable', 'string', 'max:100'], 'notes' => ['nullable', 'string', 'max:1000'],
             'proof' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp', 'max:10240'],
         ]);
-        $base = $data['action'] === 'extend' && $tenant->plan_expires_at?->isFuture() ? $tenant->plan_expires_at->copy() : now();
-        $tenant->update([
-            'subscription_plan_id' => $data['subscription_plan_id'], 'plan_started_at' => $data['action'] === 'change' ? now() : ($tenant->plan_started_at ?? now()),
-            'plan_expires_at' => $base->addMonths($data['months'])->endOfDay(), 'demo_expires_at' => null,
-            'status' => 'active', 'account_type' => 'paid',
-            'storage_limit_bytes' => ($storageMb = SubscriptionPlan::findOrFail($data['subscription_plan_id'])->storage_mb) === null ? null : $storageMb * 1024 * 1024,
-        ]);
+        $data['plan_mode'] ??= 'existing';
+        $plan = DB::transaction(function () use ($data, $tenant): SubscriptionPlan {
+            if ($data['plan_mode'] === 'custom') {
+                $plan = SubscriptionPlan::create([
+                    'owner_tenant_id' => $tenant->id, 'is_custom' => true, 'is_active' => true,
+                    'name' => $data['custom_name'], 'slug' => $this->uniquePlanSlug($tenant->name.' '.$data['custom_name']),
+                    'description' => $data['custom_description'] ?? null, 'price' => $data['custom_price'],
+                    'currency' => $data['custom_currency'], 'billing_period' => $data['custom_billing_period'],
+                    'max_students' => $data['custom_max_students'] ?? null, 'max_teachers' => $data['custom_max_teachers'] ?? null,
+                    'max_staff' => $data['custom_max_staff'] ?? null, 'max_sites' => $data['custom_max_sites'] ?? null,
+                    'max_users' => $data['custom_max_users'] ?? null, 'max_courses' => $data['custom_max_courses'] ?? null,
+                    'storage_mb' => isset($data['custom_storage_go']) ? (int) round((float) $data['custom_storage_go'] * 1024) : null,
+                    'features' => collect(preg_split('/\r\n|\r|\n/', (string) ($data['custom_features'] ?? '')))->map(fn ($feature) => trim($feature))->filter()->unique()->values()->all(),
+                    'sort_order' => 0,
+                ]);
+            } else {
+                $plan = SubscriptionPlan::findOrFail($data['subscription_plan_id']);
+                abort_if($plan->owner_tenant_id !== null && (int) $plan->owner_tenant_id !== (int) $tenant->id, 422, 'Ce plan personnalisé appartient à un autre client.');
+            }
+            $base = $data['action'] === 'extend' && $tenant->plan_expires_at?->isFuture() ? $tenant->plan_expires_at->copy() : now();
+            $tenant->update([
+                'subscription_plan_id' => $plan->id, 'plan_started_at' => $data['action'] === 'change' || $data['plan_mode'] === 'custom' ? now() : ($tenant->plan_started_at ?? now()),
+                'plan_expires_at' => $base->addMonths($data['months'])->endOfDay(), 'demo_expires_at' => null,
+                'status' => 'active', 'account_type' => 'paid',
+                'storage_limit_bytes' => $plan->storage_mb === null ? null : $plan->storage_mb * 1024 * 1024,
+            ]);
+
+            return $plan;
+        });
         if (($data['amount'] ?? null) !== null) {
-            $plan = SubscriptionPlan::findOrFail($data['subscription_plan_id']);
             SubscriptionPayment::create([
                 'tenant_id' => $tenant->id, 'subscription_plan_id' => $plan->id, 'amount' => $data['amount'],
                 'currency' => $plan->currency, 'paid_at' => now()->toDateString(), 'payment_method' => $data['payment_method'] ?? null,
@@ -182,9 +220,22 @@ final class TenantsController extends Controller
         return back()->with('success', 'Abonnement client mis à jour.');
     }
 
+    private function uniquePlanSlug(string $name): string
+    {
+        $base = Str::slug($name) ?: 'plan-personnalise';
+        $slug = $base;
+        $index = 2;
+        while (SubscriptionPlan::where('slug', $slug)->exists()) {
+            $slug = $base.'-'.$index++;
+        }
+
+        return $slug;
+    }
+
     public function paymentProof(Tenant $tenant, SubscriptionPayment $payment): StreamedResponse
     {
         abort_unless($payment->tenant_id === $tenant->id && $payment->proof_path && Storage::disk('local')->exists($payment->proof_path), 404);
+
         return Storage::disk('local')->download($payment->proof_path);
     }
 

@@ -14,7 +14,7 @@ class AccountSubscriptionController extends Controller
     {
         $tenant = $request->user()->tenant()->with('subscriptionPlan')->firstOrFail();
         $expiry = $tenant->isDemo() ? $tenant->demo_expires_at : $tenant->plan_expires_at;
-        $status = $tenant->status !== 'active' ? 'suspended' : ($expiry?->isPast() ? 'expired' : ($tenant->isDemo() ? 'demo' : 'active'));
+        $status = $tenant->status !== 'active' ? 'suspended' : ($tenant->hasActiveSubscription() ? 'active' : ($tenant->demoExpired() ? 'expired' : ($tenant->isDemo() ? 'demo' : 'active')));
         $plan = $tenant->subscriptionPlan;
 
         return Inertia::render('Admin/Account/Index', [

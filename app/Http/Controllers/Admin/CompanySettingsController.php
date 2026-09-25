@@ -33,7 +33,6 @@ class CompanySettingsController extends Controller
 
     public function update(Request $request)
     {
-        abort_if($request->user()->tenant?->isDemo(), 403, "Les informations de l'école sont verrouillées pendant la démonstration.");
         $settings = CompanySetting::firstOrCreate([], CompanySetting::defaults());
 
         $validated = $request->validate([

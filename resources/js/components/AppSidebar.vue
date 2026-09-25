@@ -177,12 +177,12 @@ const rawMainNavItems: NavItem[] = [
                                     icon: FileText,
                                 },
                                 {
-                                    title: 'Exams & Grades',
+                                    title: 'Évaluations et notes',
                                     href: '/admin/assessments',
                                     icon: ClipboardCheck,
                                 },
                                 {
-                                    title: 'Gradebook',
+                                    title: 'Carnet de notes',
                                     href: '/admin/gradebook',
                                     icon: ClipboardList,
                                 },
@@ -217,7 +217,11 @@ const rawMainNavItems: NavItem[] = [
                   ],
               },
               { title: 'Parents', href: '/admin/parents', icon: Users },
-              { title: 'Annonces parents', href: '/admin/announcements', icon: Bell },
+              {
+                  title: 'Annonces parents',
+                  href: '/admin/announcements',
+                  icon: Bell,
+              },
               { title: 'Sites', href: '/admin/sites', icon: Building2 },
               { title: 'Salles', href: '/admin/classrooms', icon: Building2 },
               {
@@ -275,9 +279,29 @@ const rawMainNavItems: NavItem[] = [
                   icon: ClipboardList,
               },
               {
-                  title: 'Finance étudiants',
-                  href: '/admin/finance',
-                  icon: ReceiptText,
+                  title: 'Paiements',
+                  icon: WalletCards,
+                  children: [
+                      ...(isPrivateSchool
+                          ? [
+                                {
+                                    title: 'Paiements scolaires',
+                                    href: '/admin/school-payments',
+                                    icon: WalletCards,
+                                },
+                            ]
+                          : []),
+                      {
+                          title: 'Paiements formations',
+                          href: '/admin/formation-payments',
+                          icon: ReceiptText,
+                      },
+                      {
+                          title: 'Vue d’ensemble des paiements',
+                          href: '/admin/payments-overview',
+                          icon: ChartNoAxesColumn,
+                      },
+                  ],
               },
               { title: 'Dépenses', href: '/admin/expenses', icon: ReceiptText },
           ]
@@ -451,6 +475,9 @@ const routePermissions: Record<string, string> = {
     '/admin/reports': 'reports.view',
     '/admin/audit': 'audit.view',
     '/admin/finance': 'payments.view',
+    '/admin/formation-payments': 'payments.view',
+    '/admin/school-payments': 'school_fees.view',
+    '/admin/payments-overview': 'financial_reports.view',
     '/admin/expenses': 'expenses.view',
     '/admin/settings': 'users.view',
     '/admin/settings/access/users': 'roles.view',

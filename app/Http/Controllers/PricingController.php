@@ -10,6 +10,6 @@ class PricingController extends Controller
 {
     public function __invoke(): Response
     {
-        return Inertia::render('Public/Pricing', ['plans' => SubscriptionPlan::where('is_active', true)->orderBy('sort_order')->orderBy('price')->get()]);
+        return Inertia::render('Public/Pricing', ['plans' => SubscriptionPlan::whereNull('owner_tenant_id')->where('is_active', true)->orderBy('sort_order')->orderBy('price')->get()]);
     }
 }

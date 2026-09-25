@@ -239,6 +239,10 @@ const limits = [
                                             p.is_active ? 'Actif' : 'Masqué'
                                         }}</Badge
                                     >
+                                    <Badge v-if="p.is_custom" variant="outline"
+                                        >Personnalisé ·
+                                        {{ p.owner_tenant?.name }}</Badge
+                                    >
                                 </div>
                                 <p
                                     class="mt-2 min-h-10 text-sm leading-5 text-muted-foreground"

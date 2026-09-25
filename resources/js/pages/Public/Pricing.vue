@@ -211,14 +211,14 @@ const limit = (value: number | null, noun: 'students' | 'sites') => {
                             </li>
                         </ul>
                         <Link
-                            href="/demo"
+                            href="/register-school"
                             class="flex items-center justify-center gap-2 rounded-xl px-5 py-3.5 text-sm font-black transition"
                             :class="
                                 index === 1
                                     ? 'bg-[#0ebda8] text-white shadow-lg shadow-teal-200 hover:bg-[#0aa895]'
                                     : 'bg-[#071f3e] text-white hover:bg-[#0d315d]'
                             "
-                            >Essayer gratuitement <ArrowRight class="size-4"
+                            >Créer votre école <ArrowRight class="size-4"
                         /></Link>
                     </article>
                 </div>

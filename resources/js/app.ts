@@ -12,9 +12,12 @@ function registerPwa() {
     if (!('serviceWorker' in navigator)) return;
 
     window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' }).then((registration) => {
-            registration.update().catch(() => undefined);
-        }).catch(() => undefined);
+        navigator.serviceWorker
+            .register('/sw.js', { updateViaCache: 'none' })
+            .then((registration) => {
+                registration.update().catch(() => undefined);
+            })
+            .catch(() => undefined);
     });
 }
 
@@ -48,6 +51,9 @@ const pages = import.meta.glob<DefineComponent>([
     './pages/Admin/Staff/**/*.vue',
     './pages/Admin/Badges/**/*.vue',
     './pages/Admin/Finance/**/*.vue',
+    './pages/Admin/SchoolPayments/**/*.vue',
+    './pages/Admin/FormationPayments/**/*.vue',
+    './pages/Admin/PaymentsOverview/**/*.vue',
     './pages/Admin/Certificates/**/*.vue',
     './pages/Admin/Reports/**/*.vue',
     './pages/Admin/Audit/**/*.vue',

@@ -6,11 +6,14 @@ use App\Enums\DataScope;
 use App\Enums\UserRole;
 use App\Models\CourseEnrollment;
 use App\Models\Expense;
+use App\Models\FinancialAccount;
+use App\Models\FinancialTransaction;
 use App\Models\ReportCard;
 use App\Models\SalaryPayment;
 use App\Models\SalaryStatement;
 use App\Models\SchoolGroup;
 use App\Models\SchoolParent;
+use App\Models\SchoolSite;
 use App\Models\SessionAttendance;
 use App\Models\Staff;
 use App\Models\Student;
@@ -63,7 +66,7 @@ final class AuthorizationService
 
     public function scope(User $user, string $permission): ?DataScope
     {
-        if ($user->hasSystemRole(DefaultTenantRoles::TENANT_ADMINISTRATOR)) {
+        if ($user->role === UserRole::ADMIN || $user->hasSystemRole(DefaultTenantRoles::TENANT_ADMINISTRATOR)) {
             return DataScope::TENANT;
         }
         $permission = PermissionCatalog::normalize($permission);
@@ -128,6 +131,21 @@ final class AuthorizationService
             'admin.staff.' => $delete ? 'employees.delete' : ($create ? 'employees.create' : ($write ? 'employees.update' : 'employees.view')),
             'admin.users.' => $write ? 'users.manage' : 'users.view',
             'admin.salaries.' => $write ? 'salaries.manage' : 'salaries.view',
+            'admin.school-payments.fee-structures.' => 'school_fees.manage',
+            'admin.school-payments.generation.' => 'school_fees.manage',
+            'admin.school-payments.movements.' => str_contains($name, 'refund') ? 'payments.refund' : 'school_fees.manage',
+            'admin.school-payments.payments.' => 'payments.collect',
+            'admin.school-payments.receipts.' => 'payments.view',
+            'admin.school-payments.' => 'school_fees.view',
+            'admin.formation-payments.pricing.' => 'payments.collect',
+            'admin.formation-payments.generation.' => 'payments.collect',
+            'admin.formation-payments.payments.' => 'payments.collect',
+            'admin.formation-payments.movements.' => 'payments.collect',
+            'admin.formation-payments.export' => 'payments.export',
+            'admin.formation-payments.receipts.' => 'payments.view',
+            'admin.formation-payments.' => 'payments.view',
+            'admin.payments-overview.export' => 'financial_reports.export',
+            'admin.payments-overview.' => 'financial_reports.view',
             'admin.finance.' => $write ? 'payments.collect' : 'payments.view',
             'admin.expenses.' => $delete ? 'expenses.delete' : ($create ? 'expenses.create' : ($write ? 'expenses.update' : 'expenses.view')),
             'admin.enrollment-forms.' => $write ? 'enrollments.manage' : 'enrollments.view',
@@ -155,6 +173,8 @@ final class AuthorizationService
             'admin.access.' => 'roles.view',
         ];
         $exact = [
+            'admin.school-payments.generate' => 'school_fees.manage',
+            'admin.formation-payments.generate' => 'payments.collect',
             'admin.finance.payments.reverse' => 'payments.cancel',
             'admin.finance.payments.refund' => 'payments.refund',
             'admin.finance.payments.receipt' => 'payments.view',
@@ -217,6 +237,8 @@ final class AuthorizationService
             $model instanceof StudentObservation => $query->where('author_id', $user->id),
             $model instanceof StudentAcademicEnrollment, $model instanceof CourseEnrollment,
             $model instanceof StudentPayment, $model instanceof SessionAttendance => $query->whereHas('student', fn ($q) => $q->where('user_id', $user->id)),
+            $model instanceof FinancialAccount => $query->whereHas('student', fn ($q) => $q->where('user_id', $user->id)),
+            $model instanceof FinancialTransaction => $query->whereHas('account.student', fn ($q) => $q->where('user_id', $user->id)),
             $model instanceof ReportCard => $query->whereHas('student', fn ($q) => $q->where('user_id', $user->id)),
             $model instanceof SalaryStatement, $model instanceof SalaryPayment => $query->whereHas('staff', fn ($q) => $q->where('user_id', $user->id)),
             $model instanceof Expense => $query->where(fn ($q) => $q->where('created_by', $user->id)->orWhereHas('staff', fn ($s) => $s->where('user_id', $user->id))),
@@ -229,6 +251,7 @@ final class AuthorizationService
     {
         $groupIds = $user->schoolGroups()->withoutGlobalScope(self::DATA_SCOPE)->pluck('school_groups.id')
             ->merge($user->principalGroups()->withoutGlobalScope(self::DATA_SCOPE)->pluck('id'))->unique();
+        $trainingGroupIds = $user->taughtGroups()->withoutGlobalScope(self::DATA_SCOPE)->pluck('training_plan_groups.id');
 
         return match (true) {
             $model instanceof SchoolGroup => $query->whereKey($groupIds),
@@ -237,8 +260,14 @@ final class AuthorizationService
             $model instanceof SchoolParent => $query->whereHas('students', fn ($q) => $this->assigned($q->withoutGlobalScope(self::DATA_SCOPE), $q->getModel(), $user)),
             $model instanceof StudentAcademicEnrollment => $query->whereIn('school_group_id', $groupIds),
             $model instanceof ReportCard => $query->whereIn('school_group_id', $groupIds),
-            $model instanceof CourseEnrollment => $query->whereHas('student', fn ($q) => $this->assigned($q->withoutGlobalScope(self::DATA_SCOPE), $q->getModel(), $user)),
+            $model instanceof CourseEnrollment => $query->where(fn ($enrollments) => $enrollments
+                ->whereIn('training_plan_group_id', $trainingGroupIds)
+                ->orWhereHas('student', fn ($q) => $this->assigned($q->withoutGlobalScope(self::DATA_SCOPE), $q->getModel(), $user))),
             $model instanceof StudentPayment, $model instanceof SessionAttendance, $model instanceof StudentObservation => $query->whereHas('student', fn ($q) => $this->assigned($q->withoutGlobalScope(self::DATA_SCOPE), $q->getModel(), $user)),
+            $model instanceof FinancialAccount => $query->where(fn ($accounts) => $accounts
+                ->whereHasMorph('accountable', [StudentAcademicEnrollment::class], fn ($q) => $q->whereIn('school_group_id', $groupIds))
+                ->orWhereHasMorph('accountable', [CourseEnrollment::class], fn ($q) => $q->whereIn('training_plan_group_id', $trainingGroupIds))),
+            $model instanceof FinancialTransaction => $query->whereHas('account', fn ($q) => $this->assigned($q->withoutGlobalScope(self::DATA_SCOPE), $q->getModel(), $user)),
             $model instanceof TimetableSession => $query->where(fn ($q) => $q->whereIn('school_group_id', $groupIds)->orWhere('teacher_id', $user->id)),
             $model instanceof Staff => $this->own($query, $model, $user),
             default => $query->whereRaw('1 = 0'),
@@ -250,6 +279,7 @@ final class AuthorizationService
         $siteIds = $user->schoolSites()->pluck('school_sites.id');
 
         return match (true) {
+            $model instanceof SchoolSite => $query->whereKey($siteIds),
             $model instanceof SchoolGroup => $query->whereHas('classroom', fn ($q) => $q->withoutGlobalScope(self::DATA_SCOPE)->whereIn('school_site_id', $siteIds)),
             $model instanceof Student => $query->whereHas('group.classroom', fn ($q) => $q->withoutGlobalScope(self::DATA_SCOPE)->whereIn('school_site_id', $siteIds)),
             $model instanceof SchoolParent => $query->whereHas('students.group.classroom', fn ($q) => $q->withoutGlobalScope(self::DATA_SCOPE)->whereIn('school_site_id', $siteIds)),
@@ -257,6 +287,8 @@ final class AuthorizationService
             $model instanceof ReportCard => $query->whereHas('group.classroom', fn ($q) => $q->withoutGlobalScope(self::DATA_SCOPE)->whereIn('school_site_id', $siteIds)),
             $model instanceof CourseEnrollment => $query->whereHas('student.group.classroom', fn ($q) => $q->withoutGlobalScope(self::DATA_SCOPE)->whereIn('school_site_id', $siteIds)),
             $model instanceof StudentPayment, $model instanceof SessionAttendance, $model instanceof StudentObservation => $query->whereHas('student.group.classroom', fn ($q) => $q->withoutGlobalScope(self::DATA_SCOPE)->whereIn('school_site_id', $siteIds)),
+            $model instanceof FinancialAccount => $query->where(fn ($account) => $account->whereHasMorph('accountable', [StudentAcademicEnrollment::class], fn ($q) => $q->whereHas('group.classroom', fn ($c) => $c->whereIn('school_site_id', $siteIds)))->orWhereHasMorph('accountable', [CourseEnrollment::class], fn ($q) => $q->where(fn ($enrollment) => $enrollment->whereHas('trainingPlanGroup.classroom', fn ($c) => $c->whereIn('school_site_id', $siteIds))->orWhereHas('form.classroom', fn ($c) => $c->whereIn('school_site_id', $siteIds))))),
+            $model instanceof FinancialTransaction => $query->whereHas('account', fn ($q) => $this->site($q->withoutGlobalScope(self::DATA_SCOPE), $q->getModel(), $user)),
             $model instanceof TimetableSession => $query->whereHas('room', fn ($q) => $q->whereIn('school_site_id', $siteIds)),
             default => $query->whereRaw('1 = 0'),
         };

@@ -334,9 +334,9 @@ const showPassword = ref(false);
                     </div>
                 </div>
                 <Link
-                    href="/demo"
+                    href="/register-school"
                     class="flex shrink-0 items-center gap-3 rounded-xl border border-[#15cfb8] px-7 py-3 text-sm font-bold text-[#15cfb8] hover:bg-[#15cfb8] hover:text-[#05203e]"
-                    >Demander une démo <CalendarDays class="size-4"
+                    >Créer votre école <CalendarDays class="size-4"
                 /></Link>
             </section>
         </div>

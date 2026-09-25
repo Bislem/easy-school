@@ -23,14 +23,20 @@ class CheckUserActive
             return redirect()->route('account.pending');
         }
 
-        if (Auth::check() && (! $user->is_active || $user->can_login === false || $tenant?->status !== 'active' || $tenant?->demoExpired())) {
+        if (Auth::check() && $tenant?->demoExpired() && ! $tenant->hasActiveSubscription()) {
+            return $request->expectsJson()
+                ? response()->json(['message' => 'Votre période d’essai de 30 jours est terminée. Vos données sont conservées.', 'error' => 'trial_expired'], 402)
+                : redirect()->route('trial.expired');
+        }
+
+        if (Auth::check() && (! $user->is_active || $user->can_login === false || ! $tenant?->hasAccess())) {
             Auth::logout();
-            
+
             $request->session()->invalidate();
             $request->session()->regenerateToken();
-            
+
             return redirect()->route($user?->role === UserRole::PARENT ? 'parent.login' : 'login')
-                ->with('error', $tenant?->demoExpired() ? 'Votre démonstration est terminée.' : "Votre accès au portail a été désactivé. Veuillez contacter l'administrateur.");
+                ->with('error', "Votre accès au portail a été désactivé. Veuillez contacter l'administrateur.");
         }
 
         return $next($request);

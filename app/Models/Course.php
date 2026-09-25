@@ -67,4 +67,9 @@ class Course extends Model
     {
         return $this->hasMany(TimetableSession::class, 'course_id');
     }
+
+    public function pricingConfigs(): HasMany
+    {
+        return $this->hasMany(FormationPricingConfig::class, 'course_id');
+    }
 }

@@ -107,7 +107,21 @@ const regenerateCredentials = () =>
 const showSubscription = ref(false);
 const subscriptionForm = useForm({
     action: 'renew',
+    plan_mode: 'existing',
     subscription_plan_id: props.school.subscription_plan_id || '',
+    custom_name: '',
+    custom_description: '',
+    custom_price: '',
+    custom_currency: 'DZD',
+    custom_billing_period: 'monthly',
+    custom_max_students: '',
+    custom_max_teachers: '',
+    custom_max_staff: '',
+    custom_max_sites: '',
+    custom_max_users: '',
+    custom_max_courses: '',
+    custom_storage_go: '',
+    custom_features: '',
     months: 1,
     amount: '',
     payment_method: 'bank_transfer',
@@ -117,6 +131,7 @@ const subscriptionForm = useForm({
 });
 const manageSubscription = (action: 'renew' | 'extend' | 'change') => {
     subscriptionForm.action = action;
+    subscriptionForm.plan_mode = 'existing';
     subscriptionForm.subscription_plan_id =
         props.school.subscription_plan_id || '';
     showSubscription.value = true;
@@ -314,6 +329,30 @@ const statCards = [
                             <CreditCard class="size-8 text-[#089c8d]" />
                         </div>
                         <div class="mt-4 grid grid-cols-2 gap-3 text-sm">
+                            <div v-if="school.trial_started_at">
+                                <p class="text-muted-foreground">
+                                    Début de l’essai
+                                </p>
+                                <b>{{ date(school.trial_started_at) }}</b>
+                            </div>
+                            <div v-if="school.demo_expires_at">
+                                <p class="text-muted-foreground">
+                                    Fin de l’essai
+                                </p>
+                                <b>{{ date(school.demo_expires_at) }}</b>
+                            </div>
+                            <div v-if="accountSummary.status === 'demo'">
+                                <p class="text-muted-foreground">
+                                    Jours restants
+                                </p>
+                                <b>{{ accountSummary.remaining_days }}</b>
+                            </div>
+                            <div v-if="accountSummary.status === 'expired'">
+                                <p class="text-muted-foreground">
+                                    État de l’essai
+                                </p>
+                                <b class="text-red-600">Expiré</b>
+                            </div>
                             <div>
                                 <p class="text-muted-foreground">Début</p>
                                 <b>{{ date(school.plan_started_at) }}</b>
@@ -629,7 +668,28 @@ const statCards = [
                             {{ option[1] }}
                         </button>
                     </div>
-                    <div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <button
+                            v-for="option in [
+                                ['existing', 'Plan existant'],
+                                ['custom', 'Plan personnalisé'],
+                            ]"
+                            :key="option[0]"
+                            type="button"
+                            class="rounded-xl border p-3 text-sm font-bold"
+                            :class="
+                                subscriptionForm.plan_mode === option[0]
+                                    ? 'border-[#12cbb2] bg-teal-50 text-teal-800'
+                                    : ''
+                            "
+                            @click="
+                                subscriptionForm.plan_mode = option[0] as any
+                            "
+                        >
+                            {{ option[1] }}
+                        </button>
+                    </div>
+                    <div v-if="subscriptionForm.plan_mode === 'existing'">
                         <Label>Plan *</Label
                         ><select
                             v-model="subscriptionForm.subscription_plan_id"
@@ -650,6 +710,110 @@ const statCards = [
                                 subscriptionForm.errors.subscription_plan_id
                             "
                         />
+                    </div>
+                    <div
+                        v-else
+                        class="space-y-4 rounded-xl border bg-slate-50 p-4"
+                    >
+                        <div class="grid gap-4 sm:grid-cols-2">
+                            <div>
+                                <Label>Nom du plan *</Label
+                                ><Input
+                                    v-model="subscriptionForm.custom_name"
+                                    required
+                                />
+                                <InputError
+                                    :message="
+                                        subscriptionForm.errors.custom_name
+                                    "
+                                />
+                            </div>
+                            <div>
+                                <Label>Prix *</Label
+                                ><Input
+                                    v-model="subscriptionForm.custom_price"
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    required
+                                />
+                                <InputError
+                                    :message="
+                                        subscriptionForm.errors.custom_price
+                                    "
+                                />
+                            </div>
+                            <div>
+                                <Label>Devise *</Label
+                                ><select
+                                    v-model="subscriptionForm.custom_currency"
+                                    class="mt-1 h-9 w-full rounded-md border bg-background px-3"
+                                >
+                                    <option>DZD</option>
+                                    <option>EUR</option>
+                                    <option>USD</option>
+                                </select>
+                            </div>
+                            <div>
+                                <Label>Période de facturation *</Label
+                                ><select
+                                    v-model="
+                                        subscriptionForm.custom_billing_period
+                                    "
+                                    class="mt-1 h-9 w-full rounded-md border bg-background px-3"
+                                >
+                                    <option value="monthly">Mensuelle</option>
+                                    <option value="yearly">Annuelle</option>
+                                    <option value="custom">
+                                        Personnalisée
+                                    </option>
+                                </select>
+                            </div>
+                        </div>
+                        <div>
+                            <Label>Description</Label
+                            ><textarea
+                                v-model="subscriptionForm.custom_description"
+                                rows="2"
+                                class="mt-1 w-full rounded-md border bg-background p-3"
+                            />
+                        </div>
+                        <div class="grid gap-3 sm:grid-cols-3">
+                            <div
+                                v-for="field in [
+                                    ['custom_max_students', 'Étudiants max.'],
+                                    ['custom_max_teachers', 'Enseignants max.'],
+                                    ['custom_max_staff', 'Employés max.'],
+                                    ['custom_max_sites', 'Sites max.'],
+                                    ['custom_max_users', 'Utilisateurs max.'],
+                                    ['custom_max_courses', 'Formations max.'],
+                                    ['custom_storage_go', 'Stockage (Go)'],
+                                ]"
+                                :key="field[0]"
+                            >
+                                <Label>{{ field[1] }}</Label
+                                ><Input
+                                    v-model="
+                                        (subscriptionForm as any)[field[0]]
+                                    "
+                                    type="number"
+                                    min="1"
+                                />
+                            </div>
+                        </div>
+                        <div>
+                            <Label>Fonctionnalités</Label
+                            ><textarea
+                                v-model="subscriptionForm.custom_features"
+                                rows="3"
+                                class="mt-1 w-full rounded-md border bg-background p-3"
+                                placeholder="Une fonctionnalité par ligne"
+                            />
+                        </div>
+                        <p class="text-xs text-muted-foreground">
+                            Ce plan sera privé et utilisable uniquement pour
+                            {{ school.name }}.
+                        </p>
                     </div>
                     <div class="grid gap-4 sm:grid-cols-2">
                         <div>

@@ -52,6 +52,11 @@ class Student extends Model
         return $this->hasMany(StudentPayment::class)->latest('payment_date');
     }
 
+    public function financialAccounts(): HasMany
+    {
+        return $this->hasMany(FinancialAccount::class);
+    }
+
     public function histories(): HasMany
     {
         return $this->hasMany(StudentHistory::class)->latest();

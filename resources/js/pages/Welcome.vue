@@ -25,7 +25,6 @@ import {
     Smartphone,
     Sparkles,
     UserRoundCheck,
-    Users,
     UsersRound,
 } from 'lucide-vue-next';
 
@@ -185,20 +184,13 @@ const portalFeatures = [
                         </p>
                         <div class="mt-8 flex flex-col gap-3 sm:flex-row">
                             <Link
-                                href="/demo"
+                                href="/register-school"
                                 class="group inline-flex items-center justify-center gap-3 rounded-xl bg-[#16cdb3] px-6 py-3.5 text-sm font-extrabold text-[#052d38] shadow-xl shadow-black/20 transition hover:-translate-y-0.5 hover:bg-[#2adde0]"
                             >
-                                Découvrir Easy School
+                                Créer votre école
                                 <ArrowRight
                                     class="size-4 transition group-hover:translate-x-1"
                                 />
-                            </Link>
-                            <Link
-                                href="/parent/login"
-                                class="inline-flex items-center justify-center gap-3 rounded-xl border border-white/20 bg-white/5 px-6 py-3.5 text-sm font-bold text-white backdrop-blur transition hover:border-white/35 hover:bg-white/10"
-                            >
-                                <Users class="size-4 text-[#50e0cd]" /> Espace
-                                parents
                             </Link>
                         </div>
                         <div
@@ -941,7 +933,7 @@ const portalFeatures = [
                             </p>
                             <div class="mt-8 flex flex-col gap-3 sm:flex-row">
                                 <Link
-                                    href="/demo"
+                                    href="/register-school"
                                     class="group inline-flex items-center justify-center gap-3 rounded-xl bg-[#12cbb2] px-6 py-3.5 text-sm font-extrabold text-[#061d3b] transition hover:bg-[#2bdcc4]"
                                     >Demander ma démonstration
                                     <ArrowRight

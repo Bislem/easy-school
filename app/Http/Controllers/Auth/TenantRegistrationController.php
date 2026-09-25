@@ -5,16 +5,13 @@ namespace App\Http\Controllers\Auth;
 use App\Enums\UserRole;
 use App\Http\Controllers\Controller;
 use App\Models\Tenant;
-use App\Models\SubscriptionPlan;
 use App\Models\User;
 use App\Services\TenantInitializer;
-use App\Services\TenantStorageService;
 use App\Tenancy\TenantContext;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Password;
 use Inertia\Inertia;
@@ -25,54 +22,34 @@ final class TenantRegistrationController extends Controller
 {
     public function create(): Response
     {
-        return Inertia::render('auth/RegisterSchool', [
-            'plans' => SubscriptionPlan::query()
-                ->where('is_active', true)
-                ->orderBy('sort_order')
-                ->get(['id', 'name', 'description', 'price', 'currency', 'billing_period', 'features', 'max_students', 'max_sites']),
-        ]);
+        return Inertia::render('auth/RegisterSchool');
     }
 
-    public function store(Request $request, TenantInitializer $initializer, TenantStorageService $tenantStorage): RedirectResponse
+    public function store(Request $request, TenantInitializer $initializer): RedirectResponse
     {
         $data = $request->validate([
             'name' => ['required', 'string', 'max:150'],
             'admin_name' => ['required', 'string', 'max:150'],
             'email' => ['required', 'email', 'max:255', 'unique:users,email'],
             'phone' => ['nullable', 'string', 'max:50'],
-            'address' => ['nullable', 'string', 'max:500'],
-            'wilaya' => ['nullable', 'string', 'max:100'],
-            'commune' => ['nullable', 'string', 'max:100'],
-            'logo' => ['nullable', 'image', 'max:5120'],
-            'subscription_plan_id' => ['required', 'exists:subscription_plans,id'],
-            'payment_proof' => ['required', 'file', 'mimes:pdf,jpg,jpeg,png,webp', 'max:10240'],
+            'organization_type' => ['required', 'in:private_school,training_center,language_school'],
             'password' => ['required', 'confirmed', Password::defaults()],
         ]);
 
-        abort_unless(SubscriptionPlan::whereKey($data['subscription_plan_id'])->where('is_active', true)->exists(), 422, 'Le plan sélectionné n’est plus disponible.');
-
-        $logoPath = null;
-        $paymentProofPath = null;
         try {
-            [$tenant, $admin] = DB::transaction(function () use ($request, $data, $initializer, $tenantStorage, &$logoPath, &$paymentProofPath) {
-                $plan = SubscriptionPlan::findOrFail($data['subscription_plan_id']);
+            [$tenant, $admin] = DB::transaction(function () use ($data, $initializer) {
+                $trialStartedAt = now();
                 $tenant = Tenant::create([
                     'name' => $data['name'], 'slug' => $this->uniqueSlug($data['name']),
                     'phone' => $data['phone'] ?? null, 'email' => Str::lower($data['email']),
-                    'address' => $data['address'] ?? null, 'wilaya' => $data['wilaya'] ?? null,
-                    'commune' => $data['commune'] ?? null, 'status' => 'pending',
-                    'subscription_plan_id' => $data['subscription_plan_id'],
-                    'storage_limit_bytes' => $plan->storage_mb === null ? null : $plan->storage_mb * 1024 * 1024,
+                    'status' => 'active', 'account_type' => 'demo',
+                    'organization_type' => $data['organization_type'],
+                    'trial_started_at' => $trialStartedAt,
+                    'demo_expires_at' => $trialStartedAt->copy()->addDays(30),
+                    'subscription_plan_id' => null,
                     'registration_submitted_at' => now(),
                 ]);
                 app(TenantContext::class)->set($tenant);
-
-                if ($request->hasFile('logo')) {
-                    $logoPath = $tenantStorage->store($request->file('logo'), 'branding', 'public', TenantStorageService::PROFILE_IMAGES, 'school_branding', $tenant, $tenant);
-                    $tenant->update(['logo' => $logoPath]);
-                }
-                $paymentProofPath = $tenantStorage->store($request->file('payment_proof'), 'registration', 'local', TenantStorageService::ATTACHMENTS, 'registration', $tenant, $tenant);
-                $tenant->update(['payment_proof_path' => $paymentProofPath]);
 
                 $admin = User::create([
                     'name' => $data['admin_name'], 'email' => Str::lower($data['email']),
@@ -85,12 +62,6 @@ final class TenantRegistrationController extends Controller
                 return [$tenant, $admin];
             });
         } catch (Throwable $exception) {
-            if ($logoPath) {
-                Storage::disk('public')->delete($logoPath);
-            }
-            if ($paymentProofPath) {
-                Storage::disk('local')->delete($paymentProofPath);
-            }
             app(TenantContext::class)->clear();
             throw $exception;
         }
@@ -99,7 +70,7 @@ final class TenantRegistrationController extends Controller
         $request->session()->regenerate();
         app(TenantContext::class)->set($tenant);
 
-        return redirect()->route('account.pending')->with('success', 'Votre demande a été envoyée avec succès.');
+        return redirect()->route('dashboard')->with('success', 'Votre école a été créée. Votre essai gratuit de 30 jours est actif.');
     }
 
     private function uniqueSlug(string $name): string

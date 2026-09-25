@@ -1,0 +1,1 @@
+import{a_ as i,r as n,y as r,aF as o}from"./app-CjuH97gs.js";function u(e){const t=i({dir:n("ltr")});return r(()=>e?.value||t.dir?.value||"ltr")}function a(){const e=n(),t=r(()=>["#text","#comment"].includes(e.value?.$el.nodeName)?e.value?.$el.nextElementSibling:o(e));return{primitiveElement:e,currentElement:t}}export{a,u};

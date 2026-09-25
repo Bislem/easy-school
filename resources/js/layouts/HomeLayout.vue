@@ -225,9 +225,9 @@ const nav = [
                             </Transition>
                         </div>
                         <Link
-                            href="/demo"
+                            href="/register-school"
                             class="flex items-center gap-3 rounded-xl bg-gradient-to-r from-[#10bea9] to-[#11d4b5] px-6 py-3 text-sm font-bold shadow-lg"
-                            >Demander une démo <ArrowRight class="size-4"
+                            >Créer votre école <ArrowRight class="size-4"
                         /></Link>
                     </template>
                 </div>
@@ -306,9 +306,9 @@ const nav = [
                         </Link>
                     </div>
                     <Link
-                        href="/demo"
+                        href="/register-school"
                         class="rounded-lg bg-[#12cbb2] px-3 py-3 text-center text-sm font-semibold"
-                        >Demander une démo</Link
+                        >Créer votre école</Link
                     >
                 </div>
                 <div class="mt-2 grid grid-cols-3 gap-2" data-no-translate>
@@ -358,7 +358,7 @@ const nav = [
                         <a href="/#modules">Fonctionnalités</a>
                         <a href="/#parents">Portail parents</a>
                         <Link href="/pricing">Tarifs</Link>
-                        <Link href="/demo">Demander une démo</Link>
+                        <Link href="/register-school">Créer votre école</Link>
                     </div>
                 </div>
                 <div>

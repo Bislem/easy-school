@@ -16,7 +16,7 @@ class SubscriptionPlansController extends Controller
 {
     public function index(): Response
     {
-        $plans = SubscriptionPlan::withCount('tenants')
+        $plans = SubscriptionPlan::with(['ownerTenant:id,name'])->withCount('tenants')
             ->orderBy('sort_order')
             ->get()
             ->each(fn (SubscriptionPlan $plan) => $plan->setAttribute(
@@ -34,7 +34,7 @@ class SubscriptionPlansController extends Controller
         unset($data['storage_go']);
         $data['slug'] = $this->uniqueSlug($data['name']);
         $data['features'] = $this->features($data['features'] ?? null);
-        SubscriptionPlan::create($data);
+        SubscriptionPlan::create($data + ['owner_tenant_id' => null, 'is_custom' => false]);
 
         return back()->with('success', 'Plan créé.');
     }
@@ -65,7 +65,15 @@ class SubscriptionPlansController extends Controller
         $data = $request->validate(['tenant_id' => ['required', 'exists:tenants,id'], 'subscription_plan_id' => ['nullable', 'exists:subscription_plans,id'], 'plan_expires_at' => ['nullable', 'date', 'after:today']]);
         $tenant = Tenant::findOrFail($data['tenant_id']);
         $plan = $data['subscription_plan_id'] ? SubscriptionPlan::findOrFail($data['subscription_plan_id']) : null;
-        $tenant->update(['subscription_plan_id' => $plan?->id, 'plan_started_at' => $plan ? now() : null, 'plan_expires_at' => $plan ? ($data['plan_expires_at'] ?? null) : null, 'storage_limit_bytes' => $plan?->storage_mb === null ? null : $plan->storage_mb * 1024 * 1024]);
+        abort_if($plan?->owner_tenant_id !== null && (int) $plan->owner_tenant_id !== (int) $tenant->id, 422, 'Ce plan personnalisé appartient à un autre client.');
+        $tenant->update([
+            'subscription_plan_id' => $plan?->id,
+            'plan_started_at' => $plan ? now() : null,
+            'plan_expires_at' => $plan ? ($data['plan_expires_at'] ?? null) : null,
+            'account_type' => $plan ? 'paid' : $tenant->account_type,
+            'status' => $plan ? 'active' : $tenant->status,
+            'storage_limit_bytes' => $plan?->storage_mb === null ? null : $plan->storage_mb * 1024 * 1024,
+        ]);
 
         return back()->with('success', 'Abonnement mis à jour.');
     }

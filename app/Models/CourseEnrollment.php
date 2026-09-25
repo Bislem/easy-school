@@ -7,6 +7,7 @@ use App\Enums\EnrollmentPaymentStatus;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphOne;
 
 class CourseEnrollment extends Model
 {
@@ -22,8 +23,8 @@ class CourseEnrollment extends Model
         return ['birth_date' => 'date:Y-m-d', 'confirmed_at' => 'datetime', 'group_number' => 'integer',
             'status' => ApplicationStatus::class, 'contacted_at' => 'datetime', 'approved_at' => 'datetime',
             'registered_at' => 'datetime', 'rejected_at' => 'datetime', 'cancelled_at' => 'datetime',
-            'formation_price'=>'decimal:2', 'discount_amount'=>'decimal:2', 'adjustment_total'=>'decimal:2', 'final_price'=>'decimal:2',
-            'total_paid'=>'decimal:2', 'remaining_balance'=>'decimal:2', 'payment_status'=>EnrollmentPaymentStatus::class];
+            'formation_price' => 'decimal:2', 'discount_amount' => 'decimal:2', 'adjustment_total' => 'decimal:2', 'final_price' => 'decimal:2',
+            'total_paid' => 'decimal:2', 'remaining_balance' => 'decimal:2', 'payment_status' => EnrollmentPaymentStatus::class];
     }
 
     protected static function booted(): void
@@ -38,12 +39,48 @@ class CourseEnrollment extends Model
         });
     }
 
-    public function form(): BelongsTo { return $this->belongsTo(EnrollmentForm::class, 'enrollment_form_id'); }
-    public function trainingPlanGroup(): BelongsTo { return $this->belongsTo(TrainingPlanGroup::class); }
-    public function student(): BelongsTo { return $this->belongsTo(Student::class); }
-    public function histories(): HasMany { return $this->hasMany(EnrollmentHistory::class)->latest(); }
-    public function installments(): HasMany { return $this->hasMany(StudentInstallment::class)->orderBy('due_date'); }
-    public function payments(): HasMany { return $this->hasMany(StudentPayment::class)->latest('payment_date'); }
-    public function financialAdjustments(): HasMany { return $this->hasMany(EnrollmentFinancialAdjustment::class)->latest(); }
-    public function certificates(): HasMany { return $this->hasMany(Certificate::class)->latest('issue_date'); }
+    public function form(): BelongsTo
+    {
+        return $this->belongsTo(EnrollmentForm::class, 'enrollment_form_id');
+    }
+
+    public function trainingPlanGroup(): BelongsTo
+    {
+        return $this->belongsTo(TrainingPlanGroup::class);
+    }
+
+    public function student(): BelongsTo
+    {
+        return $this->belongsTo(Student::class);
+    }
+
+    public function histories(): HasMany
+    {
+        return $this->hasMany(EnrollmentHistory::class)->latest();
+    }
+
+    public function installments(): HasMany
+    {
+        return $this->hasMany(StudentInstallment::class)->orderBy('due_date');
+    }
+
+    public function payments(): HasMany
+    {
+        return $this->hasMany(StudentPayment::class)->latest('payment_date');
+    }
+
+    public function financialAdjustments(): HasMany
+    {
+        return $this->hasMany(EnrollmentFinancialAdjustment::class)->latest();
+    }
+
+    public function certificates(): HasMany
+    {
+        return $this->hasMany(Certificate::class)->latest('issue_date');
+    }
+
+    public function financialAccount(): MorphOne
+    {
+        return $this->morphOne(FinancialAccount::class, 'accountable');
+    }
 }

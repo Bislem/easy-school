@@ -13,7 +13,7 @@ class Tenant extends Model
 {
     use HasFactory, SoftDeletes;
 
-    protected $fillable = ['name', 'slug', 'logo', 'phone', 'email', 'address', 'wilaya', 'commune', 'status', 'account_type', 'organization_type', 'demo_expires_at', 'subscription_plan_id', 'payment_proof_path', 'registration_submitted_at', 'registration_reviewed_at', 'registration_rejection_reason', 'plan_started_at', 'plan_expires_at', 'settings', 'storage_used_bytes', 'storage_limit_bytes'];
+    protected $fillable = ['name', 'slug', 'logo', 'phone', 'email', 'address', 'wilaya', 'commune', 'status', 'account_type', 'organization_type', 'trial_started_at', 'demo_expires_at', 'subscription_plan_id', 'payment_proof_path', 'registration_submitted_at', 'registration_reviewed_at', 'registration_rejection_reason', 'plan_started_at', 'plan_expires_at', 'settings', 'storage_used_bytes', 'storage_limit_bytes'];
 
     protected $appends = ['logo_url'];
 
@@ -21,7 +21,7 @@ class Tenant extends Model
 
     protected function casts(): array
     {
-        return ['settings' => 'array', 'demo_expires_at' => 'datetime', 'registration_submitted_at' => 'datetime', 'registration_reviewed_at' => 'datetime', 'plan_started_at' => 'datetime', 'plan_expires_at' => 'datetime', 'storage_used_bytes' => 'integer', 'storage_limit_bytes' => 'integer'];
+        return ['settings' => 'array', 'trial_started_at' => 'datetime', 'demo_expires_at' => 'datetime', 'registration_submitted_at' => 'datetime', 'registration_reviewed_at' => 'datetime', 'plan_started_at' => 'datetime', 'plan_expires_at' => 'datetime', 'storage_used_bytes' => 'integer', 'storage_limit_bytes' => 'integer'];
     }
 
     public function subscriptionPlan(): BelongsTo
@@ -37,6 +37,25 @@ class Tenant extends Model
     public function demoExpired(): bool
     {
         return $this->isDemo() && (! $this->demo_expires_at || $this->demo_expires_at->isPast());
+    }
+
+    public function hasActiveSubscription(): bool
+    {
+        return $this->subscription_plan_id !== null
+            && ($this->plan_expires_at === null || $this->plan_expires_at->isFuture());
+    }
+
+    public function hasAccess(): bool
+    {
+        if ($this->status !== 'active') {
+            return false;
+        }
+
+        if ($this->isDemo()) {
+            return $this->hasActiveSubscription() || ! $this->demoExpired();
+        }
+
+        return $this->account_type !== 'paid' || $this->hasActiveSubscription();
     }
 
     public function users(): HasMany

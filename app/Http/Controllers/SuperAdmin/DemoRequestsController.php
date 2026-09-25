@@ -31,7 +31,7 @@ class DemoRequestsController extends Controller
         return Inertia::render('SuperAdmin/DemoRequests/Index', [
             'requests' => DemoRequest::with(['tenant:id,name,status,account_type,demo_expires_at', 'reviewer:id,name'])->when($filters['status'] ?? null, fn ($q, $status) => $q->where('status', $status))->latest()->paginate(15)->withQueryString(),
             'filters' => $filters, 'counts' => DemoRequest::selectRaw('status, count(*) total')->groupBy('status')->pluck('total', 'status'),
-            'plans' => SubscriptionPlan::where('is_active', true)->orderBy('sort_order')->get(['id', 'name', 'price', 'currency', 'billing_period']),
+            'plans' => SubscriptionPlan::whereNull('owner_tenant_id')->where('is_active', true)->orderBy('sort_order')->get(['id', 'name', 'price', 'currency', 'billing_period']),
         ]);
     }
 
