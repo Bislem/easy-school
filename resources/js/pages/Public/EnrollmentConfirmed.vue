@@ -18,15 +18,9 @@ defineProps<{ enrollment: any }>();
             </h1>
             <p class="mt-3 leading-7 text-slate-600">
                 Votre adresse e-mail a été vérifiée. Votre demande pour
-                <strong>{{ enrollment.form.course.title }}</strong> est est
+                <strong>{{ enrollment.form.course.title }}</strong> est
                 maintenant en attente d’étude par l’administration.
             </p>
-            <div class="mt-6 rounded-xl bg-slate-50 p-4">
-                <p class="text-sm text-slate-500">Votre groupe</p>
-                <p class="mt-1 text-2xl font-bold">
-                    Groupe {{ enrollment.group_number }}
-                </p>
-            </div>
             <p class="mt-6 text-sm text-slate-500">
                 L'établissement vous contactera avec les prochaines
                 informations.

@@ -8,6 +8,7 @@ use App\Models\Student;
 use App\Models\StudentObservation;
 use App\Services\Mobile\StudentMobileData;
 use App\Services\NotificationDispatcher;
+use App\Services\StudentFinanceSummary;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -114,10 +115,10 @@ class ParentController extends Controller
         return response()->json(['data' => $student->files()->get()->map(fn ($f) => ['id' => $f->id, 'name' => $f->original_name, 'mime_type' => $f->mime_type, 'size' => $f->size, 'url' => $f->url])]);
     }
 
-    public function payments(Request $request, Student $student): JsonResponse
+    public function payments(Request $request, Student $student, StudentFinanceSummary $finance): JsonResponse
     {
         $student = $this->child($request, $student);
 
-        return response()->json(['data' => $student->enrollments()->with(['form.course', 'trainingPlanGroup.plan.course', 'installments', 'payments'])->get()->map(fn ($e) => ['enrollment_id' => $e->id, 'formation' => $e->form?->course?->title ?? $e->trainingPlanGroup?->plan?->course?->title, 'price' => $e->final_price, 'paid' => $e->total_paid, 'remaining' => $e->remaining_balance, 'status' => $e->payment_status?->value ?? $e->payment_status, 'installments' => $e->installments->map->only(['id', 'amount', 'due_date', 'status']), 'payments' => $e->payments->map->only(['id', 'reference', 'amount', 'payment_date', 'payment_method', 'status'])])]);
+        return response()->json(['data' => $finance->forStudent($student)['accounts']]);
     }
 }

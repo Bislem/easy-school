@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import BadgeCard from '@/components/BadgeCard.vue';
+import StudentFinancePanel from '@/components/finance/StudentFinancePanel.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -32,6 +33,7 @@ const props = withDefaults(
         academicJourney?: any[];
         selectedAcademicEnrollment?: any;
         academicallyActive?: boolean;
+        finance?: { accounts: any[]; totals: Record<string, number> } | null;
     }>(),
     {
         readOnly: false,
@@ -159,14 +161,12 @@ const labels: Record<string, string> = {
     completed: 'Terminé',
     cancelled: 'Annulé',
 };
-const paymentLabels: Record<string, string> = {
-    unpaid: 'Non payé',
-    partially_paid: 'Partiellement payé',
-    paid: 'Payé',
-    overdue: 'En retard',
-};
-const money = (value: string | number) =>
-    `${Number(value ?? 0).toLocaleString('fr-DZ', { minimumFractionDigits: 2 })} DA`;
+const receiptUrl = (paymentId: number, account: any) =>
+    props.parentView
+        ? `/parent/payments/${paymentId}/receipt`
+        : `/admin/${account.domain}-payments/transactions/${paymentId}/receipt`;
+const accountUrl = (account: any) =>
+    `/admin/${account.domain}-payments/accounts/${account.id}`;
 function observationAuthor(author: any): string {
     const role =
         author?.role === 'parent'
@@ -202,7 +202,9 @@ const tabs = computed(() =>
         { id: 'history', label: 'Historique', icon: History },
     ].filter(
         (tab) =>
-            !props.teacherView || !['payments', 'documents'].includes(tab.id),
+            (!props.teacherView ||
+                !['payments', 'documents'].includes(tab.id)) &&
+            (tab.id !== 'payments' || props.finance != null),
     ),
 );
 function selectTab(tab: string) {
@@ -661,7 +663,10 @@ function saveMedical() {
                                 </div>
                                 <span class="text-sm"
                                     >{{ item.level || 'Niveau non défini' }} ·
-                                    Groupe {{ item.group_number || '—' }}</span
+                                    {{
+                                        item.training_plan_group?.name ||
+                                        'Sans groupe'
+                                    }}</span
                                 >
                             </div>
                             <p class="mt-2 text-xs text-muted-foreground">
@@ -776,98 +781,12 @@ function saveMedical() {
                             </table>
                         </div>
                     </div>
-                    <div v-else-if="activeTab === 'payments'" class="space-y-5">
-                        <article
-                            v-for="item in student.enrollments"
-                            :key="item.id"
-                            class="rounded-lg border p-4"
-                        >
-                            <div class="flex flex-wrap justify-between gap-3">
-                                <div>
-                                    <p class="font-medium">
-                                        {{
-                                            item.form?.course?.title ||
-                                            item.training_plan_group?.plan
-                                                ?.course?.title ||
-                                            'Formation'
-                                        }}
-                                    </p>
-                                    <p class="text-sm text-muted-foreground">
-                                        {{
-                                            paymentLabels[
-                                                item.payment_status
-                                            ] || item.payment_status
-                                        }}
-                                    </p>
-                                </div>
-                                <div class="text-right text-sm">
-                                    <p>
-                                        Prix final :
-                                        {{ money(item.final_price) }}
-                                    </p>
-                                    <p>Payé : {{ money(item.total_paid) }}</p>
-                                    <strong
-                                        >Reste :
-                                        {{
-                                            money(item.remaining_balance)
-                                        }}</strong
-                                    >
-                                </div>
-                            </div>
-                            <div
-                                v-if="item.payments.length"
-                                class="mt-4 divide-y border-t"
-                            >
-                                <div
-                                    v-for="payment in item.payments"
-                                    :key="payment.id"
-                                    class="flex items-center justify-between gap-3 py-3 text-sm"
-                                >
-                                    <div>
-                                        <p>{{ payment.reference }}</p>
-                                        <p
-                                            class="text-xs text-muted-foreground"
-                                        >
-                                            {{ payment.payment_date }} ·
-                                            {{
-                                                payment.recorder?.name ||
-                                                'Système'
-                                            }}
-                                        </p>
-                                    </div>
-                                    <div class="text-right">
-                                        <strong>{{
-                                            money(payment.amount)
-                                        }}</strong>
-                                        <p>
-                                            <a
-                                                class="text-primary underline"
-                                                :href="
-                                                    parentView
-                                                        ? `/portal/payments/${payment.id}/receipt`
-                                                        : `/admin/finance/payments/${payment.id}/receipt`
-                                                "
-                                                >Imprimer le reçu</a
-                                            >
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-                            <p
-                                v-else
-                                class="mt-3 text-sm text-muted-foreground"
-                            >
-                                Aucun paiement pour cette inscription.
-                            </p>
-                        </article>
-                        <Button
-                            v-if="!readOnly && !parentView"
-                            as-child
-                            variant="outline"
-                            ><Link href="/admin/finance"
-                                >Ouvrir la gestion financière</Link
-                            ></Button
-                        >
+                    <div v-else-if="activeTab === 'payments'">
+                        <StudentFinancePanel
+                            :finance="finance ?? null"
+                            :receipt-url="receiptUrl"
+                            :account-url="parentView ? undefined : accountUrl"
+                        />
                     </div>
                     <div v-else-if="activeTab === 'badge'" class="space-y-5">
                         <BadgeCard

@@ -32,9 +32,8 @@ interface CourseLevel {
 interface FormOption {
     id: number;
     title: string;
-    teacher_id: number;
+    teacher_id?: number | null;
     classroom_id?: number | null;
-    groups_count: number;
     start_date: string;
     end_date: string;
     course: Course;
@@ -97,8 +96,15 @@ const selectedLevel = computed(() =>
 watch(
     () => form.enrollment_form_id,
     () => {
-        if (selectedForm.value)
+        if (selectedForm.value) {
             form.title = `Planification — ${selectedForm.value.title}`;
+            form.teacher_id = selectedForm.value.teacher_id
+                ? String(selectedForm.value.teacher_id)
+                : '';
+            form.classroom_id = selectedForm.value.classroom_id
+                ? String(selectedForm.value.classroom_id)
+                : '';
+        }
     },
 );
 watch(
@@ -367,10 +373,7 @@ const statusTone: Record<string, string> = {
                                 :key="item.id"
                                 :value="String(item.id)"
                             >
-                                {{ item.title }} — {{ item.course.title }} ({{
-                                    item.groups_count
-                                }}
-                                groupes)
+                                {{ item.title }} — {{ item.course.title }}
                             </option></select
                         ><InputError
                             :message="form.errors.enrollment_form_id"
@@ -430,57 +433,58 @@ const statusTone: Record<string, string> = {
                             ><InputError
                                 :message="form.errors.course_level_id"
                                 class="mt-1"
-                            />
-                        </div>
-                        <div class="grid gap-4 sm:grid-cols-2">
-                            <div>
-                                <Label>Formateur principal</Label
-                                ><select
-                                    v-model="form.teacher_id"
-                                    class="mt-1 h-9 w-full rounded-md border bg-background px-3 text-sm"
-                                    required
-                                >
-                                    <option value="" disabled>
-                                        Sélectionner
-                                    </option>
-                                    <option
-                                        v-for="teacher in teachers"
-                                        :key="teacher.id"
-                                        :value="String(teacher.id)"
-                                    >
-                                        {{ teacher.name }}
-                                    </option>
-                                </select>
-                            </div>
-                            <div>
-                                <Label>Nombre de groupes</Label
-                                ><Input
-                                    v-model="form.groups_count"
-                                    class="mt-1"
-                                    type="number"
-                                    min="1"
-                                    max="100"
-                                    required
-                                />
-                            </div>
-                        </div>
+                            /></div
+                    ></template>
+                    <div class="grid gap-4 sm:grid-cols-2">
                         <div>
-                            <Label>Salle initiale (facultative)</Label
+                            <Label>Formateur principal</Label
                             ><select
-                                v-model="form.classroom_id"
+                                v-model="form.teacher_id"
                                 class="mt-1 h-9 w-full rounded-md border bg-background px-3 text-sm"
+                                required
                             >
-                                <option value="">Aucune</option>
+                                <option value="" disabled>Sélectionner</option>
                                 <option
-                                    v-for="room in classrooms"
-                                    :key="room.id"
-                                    :value="String(room.id)"
+                                    v-for="teacher in teachers"
+                                    :key="teacher.id"
+                                    :value="String(teacher.id)"
                                 >
-                                    {{ room.name }} — {{ room.capacity }} places
+                                    {{ teacher.name }}
                                 </option>
                             </select>
-                        </div></template
-                    >
+                            <InputError
+                                :message="form.errors.teacher_id"
+                                class="mt-1"
+                            />
+                        </div>
+                        <div>
+                            <Label>Nombre de groupes</Label
+                            ><Input
+                                v-model="form.groups_count"
+                                class="mt-1"
+                                type="number"
+                                min="1"
+                                max="100"
+                                required
+                            />
+                        </div>
+                    </div>
+                    <div>
+                        <Label>Salle initiale (facultative)</Label
+                        ><select
+                            v-model="form.classroom_id"
+                            class="mt-1 h-9 w-full rounded-md border bg-background px-3 text-sm"
+                        >
+                            <option value="">Aucune</option>
+                            <option
+                                v-for="room in classrooms"
+                                :key="room.id"
+                                :value="String(room.id)"
+                            >
+                                {{ room.name }} — {{ room.capacity }} places
+                            </option>
+                        </select>
+                    </div>
                     <div>
                         <Label>Titre</Label
                         ><Input

@@ -39,8 +39,8 @@ function paymentsOverviewFixture(): array
     $formation = Formation::create(['title' => 'English B2', 'code' => 'EN-B2', 'duration_hours' => 40, 'price' => 30000, 'is_active' => true]);
     $session = EnrollmentForm::create(['course_id' => $formation->id, 'teacher_id' => $teacher->id, 'title' => 'Oct-Jan', 'start_date' => '2026-10-01', 'end_date' => '2027-01-31', 'min_students' => 1, 'max_students' => 20, 'groups_count' => 1, 'students_per_group' => 20, 'is_active' => true]);
     $formationEnrollment = CourseEnrollment::create(['enrollment_form_id' => $session->id, 'student_id' => $student->id, 'status' => ApplicationStatus::REGISTERED, 'first_name' => 'Nadia', 'last_name' => 'Test', 'email' => 'nadia-overview@example.test', 'phone' => '0550000000', 'confirmation_token' => str()->uuid(), 'registered_at' => now()]);
-    $formationAccount = FinancialAccount::create(['accountable_type' => $formationEnrollment->getMorphClass(), 'accountable_id' => $formationEnrollment->id, 'domain' => 'formation', 'student_id' => $student->id]);
-    $formationAccount->installments()->create(['source_key' => 'formation-one', 'label' => 'Formation price', 'amount' => 30000, 'due_date' => '2026-10-01', 'sort_order' => 0]);
+    // Registration bills the catalogue price (30 000) due at the session start.
+    $formationAccount = $formationEnrollment->financialAccount()->firstOrFail();
 
     $ledger = app(FinancialAccountService::class);
     $ledger->refresh($schoolAccount);

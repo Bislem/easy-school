@@ -6,9 +6,13 @@ use App\Models\Course;
 use App\Models\CourseEnrollment;
 use App\Models\EnrollmentForm;
 use App\Models\Student;
+use App\Models\Tenant;
 use App\Models\User;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\URL;
+use App\Tenancy\TenantContext;
+
+beforeEach(fn () => app(TenantContext::class)->set(Tenant::factory()->create()));
 
 test('a public enrollment confirmation keeps an applicant waiting without creating a student', function () {
     Mail::fake();
@@ -30,10 +34,10 @@ test('a public enrollment confirmation keeps an applicant waiting without creati
     $this->assertDatabaseMissing('students', ['email' => 'amel@example.com']);
     expect($enrollment->refresh()->status->value)->toBe('waiting')
         ->and($enrollment->student_id)->toBeNull()
-        ->and($enrollment->group_number)->toBeNull();
+        ->and($enrollment->training_plan_group_id)->toBeNull();
 });
 
-test('an approved applicant is converted and reuses an existing student dossier', function () {
+test('an approved applicant is linked to the student dossier chosen by the administrator', function () {
     Mail::fake();
     $student = Student::create(['first_name' => 'Amel', 'last_name' => 'Rahmani', 'email' => 'amel@example.com', 'phone' => '0550000000', 'is_active' => true]);
     $teacher = User::factory()->create(['role' => UserRole::TEACHER]);
@@ -42,7 +46,7 @@ test('an approved applicant is converted and reuses an existing student dossier'
     $enrollment = CourseEnrollment::create(['enrollment_form_id' => $form->id, 'first_name' => 'Amel', 'last_name' => 'Rahmani', 'email' => 'amel@example.com', 'phone' => '0550000000', 'confirmation_token' => fake()->uuid()]);
     $enrollment->update(['status' => 'approved', 'confirmed_at' => now(), 'approved_at' => now()]);
     $admin = User::factory()->create(['role' => UserRole::ADMIN]);
-    $this->actingAs($admin)->post(route('admin.enrollment-forms.enrollments.register', [$form, $enrollment]))->assertRedirect();
+    $this->actingAs($admin)->post(route('admin.enrollment-forms.enrollments.register', [$form, $enrollment]), ['student_id' => $student->id])->assertRedirect();
 
     expect(Student::where('email', 'amel@example.com')->count())->toBe(1)
         ->and($enrollment->refresh()->student_id)->toBe($student->id)

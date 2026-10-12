@@ -15,7 +15,7 @@ class Student extends Model
 
     protected $fillable = [
         'user_id', 'first_name',
-        'training_plan_group_id', 'school_group_id',
+        'school_group_id',
         'last_name',
         'photo_path',
         'email',
@@ -45,11 +45,6 @@ class Student extends Model
     public function enrollments(): HasMany
     {
         return $this->hasMany(CourseEnrollment::class);
-    }
-
-    public function payments(): HasMany
-    {
-        return $this->hasMany(StudentPayment::class)->latest('payment_date');
     }
 
     public function financialAccounts(): HasMany

@@ -9,9 +9,9 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 class FinancialAccount extends Model
 {
-    protected $fillable = ['accountable_type', 'accountable_id', 'domain', 'student_id', 'academic_year_id', 'school_fee_structure_id', 'expected_total', 'paid_total', 'adjustment_total', 'balance', 'status'];
+    protected $fillable = ['accountable_type', 'accountable_id', 'domain', 'student_id', 'academic_year_id', 'school_fee_structure_id', 'expected_total', 'paid_total', 'adjustment_total', 'balance', 'status', 'closed_at', 'closed_reason'];
 
-    protected $casts = ['expected_total' => 'decimal:2', 'paid_total' => 'decimal:2', 'adjustment_total' => 'decimal:2', 'balance' => 'decimal:2'];
+    protected $casts = ['expected_total' => 'decimal:2', 'paid_total' => 'decimal:2', 'adjustment_total' => 'decimal:2', 'balance' => 'decimal:2', 'closed_at' => 'datetime'];
 
     public function accountable(): MorphTo
     {

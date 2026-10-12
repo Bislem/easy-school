@@ -138,7 +138,7 @@ final class TenantsController extends Controller
             'courses' => DB::table('courses')->where('tenant_id', $tenant->id)->count(),
             'plans' => DB::table('training_plans')->where('tenant_id', $tenant->id)->count(),
             'sessions' => DB::table('training_sessions')->where('tenant_id', $tenant->id)->count(),
-            'revenue' => DB::table('student_payments')->where('tenant_id', $tenant->id)->where('status', 'completed')->sum('amount'),
+            'revenue' => DB::table('financial_transactions')->where('tenant_id', $tenant->id)->whereNotNull('payment_method')->sum('amount'),
             'subscription_paid' => SubscriptionPayment::where('tenant_id', $tenant->id)->sum('amount'),
         ];
 

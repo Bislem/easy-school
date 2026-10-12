@@ -6,6 +6,7 @@ use App\Enums\PaymentMethod;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use LogicException;
 
 class FinancialTransaction extends Model
@@ -28,6 +29,16 @@ class FinancialTransaction extends Model
     public function allocations(): HasMany
     {
         return $this->hasMany(FinancialAllocation::class);
+    }
+
+    public function reverses(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'reverses_transaction_id');
+    }
+
+    public function reversal(): HasOne
+    {
+        return $this->hasOne(self::class, 'reverses_transaction_id');
     }
 
     public function recorder(): BelongsTo

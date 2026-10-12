@@ -38,7 +38,6 @@ use App\Http\Controllers\Admin\SchoolPaymentsController;
 use App\Http\Controllers\Admin\SchoolSitesController;
 use App\Http\Controllers\Admin\SickLeavesController;
 use App\Http\Controllers\Admin\StaffController;
-use App\Http\Controllers\Admin\StudentFinanceController;
 use App\Http\Controllers\Admin\StudentsController;
 use App\Http\Controllers\Admin\SubjectsController;
 use App\Http\Controllers\Admin\TimetableController;
@@ -157,7 +156,7 @@ Route::middleware(['auth', 'verified', 'active'])->group(function () {
     Route::put('/portal/sessions/{session}/attendance', [PortalController::class, 'attendance'])->name('portal.attendance');
     Route::patch('/portal/notifications/{notification}/read', [PortalController::class, 'read'])->name('portal.notifications.read');
     Route::patch('/portal/notifications/read-all', [PortalController::class, 'readAll'])->name('portal.notifications.read-all');
-    Route::get('/portal/payments/{payment}/receipt', [PortalController::class, 'receipt'])->name('portal.payments.receipt');
+    Route::get('/portal/payments/{transaction}/receipt', [PortalController::class, 'receipt'])->name('portal.payments.receipt');
 });
 
 Route::middleware(['auth', 'verified', 'active', 'parent'])
@@ -177,8 +176,10 @@ Route::middleware(['auth', 'verified', 'active', 'parent'])
         Route::get('/grades', [ParentPortalController::class, 'grades'])->name('grades');
         Route::get('/exams', [ParentPortalController::class, 'exams'])->name('exams');
         Route::get('/announcements', [ParentPortalController::class, 'announcements'])->name('announcements');
+        Route::get('/payments', [ParentPortalController::class, 'payments'])->name('payments');
+        Route::get('/payments/{transaction}/receipt', [ParentPortalController::class, 'paymentReceipt'])->whereNumber('transaction')->name('payments.receipt');
         Route::get('/{module}', [ParentPortalController::class, 'module'])
-            ->where('module', 'timetable|attendance|grades|report-cards|homework|events|announcements|payments|messages|profile')
+            ->where('module', 'timetable|attendance|grades|report-cards|homework|events|announcements|messages|profile')
             ->name('module');
     });
 
@@ -373,19 +374,12 @@ Route::middleware(['auth', 'verified', 'active', 'admin', 'permission'])
         Route::get('reports', [ReportsController::class, 'index'])->name('reports.index');
         Route::get('reports/export/{format}', [ReportsController::class, 'export'])->whereIn('format', ['csv', 'pdf'])->name('reports.export');
         Route::get('audit', AuditController::class)->name('audit.index');
-        Route::get('finance', [StudentFinanceController::class, 'index'])->name('finance.index');
-        Route::get('finance/settings', [StudentFinanceController::class, 'settings'])->name('finance.settings');
         Route::get('badges', [BadgesController::class, 'index'])->name('badges.index');
         Route::post('badges', [BadgesController::class, 'store'])->name('badges.store');
         Route::patch('badges/{badge}/status', [BadgesController::class, 'status'])->name('badges.status');
         Route::post('badges/{badge}/reissue', [BadgesController::class, 'reissue'])->name('badges.reissue');
         Route::get('badges/{badge}/print', [BadgesController::class, 'print'])->name('badges.print');
         Route::post('badges/print-batch', [BadgesController::class, 'batch'])->name('badges.print-batch');
-        Route::put('finance/enrollments/{enrollment}', [StudentFinanceController::class, 'configure'])->name('finance.enrollments.configure');
-        Route::post('finance/enrollments/{enrollment}/adjustments', [StudentFinanceController::class, 'adjustment'])->name('finance.adjustments.store');
-        Route::post('finance/enrollments/{enrollment}/payments', [StudentFinanceController::class, 'pay'])->name('finance.payments.store');
-        Route::post('finance/payments/{payment}/reverse', [StudentFinanceController::class, 'reverse'])->name('finance.payments.reverse');
-        Route::get('finance/payments/{payment}/receipt', [StudentFinanceController::class, 'receipt'])->name('finance.payments.receipt');
         Route::get('formation-payments', [FormationPaymentsController::class, 'index'])->name('formation-payments.index');
         Route::post('formation-payments/pricing', [FormationPaymentsController::class, 'storePricing'])->name('formation-payments.pricing.store');
         Route::post('formation-payments/generation/preview', [FormationPaymentsController::class, 'preview'])->name('formation-payments.generation.preview');
@@ -395,16 +389,20 @@ Route::middleware(['auth', 'verified', 'active', 'admin', 'permission'])
         Route::post('formation-payments/accounts/{account}/payments', [FormationPaymentsController::class, 'pay'])->name('formation-payments.payments.store');
         Route::post('formation-payments/accounts/{account}/movements', [FormationPaymentsController::class, 'movement'])->name('formation-payments.movements.store');
         Route::get('formation-payments/transactions/{transaction}/receipt', [FormationPaymentsController::class, 'receipt'])->name('formation-payments.receipts.show');
+        Route::post('formation-payments/transactions/{transaction}/cancel', [FormationPaymentsController::class, 'cancel'])->name('formation-payments.transactions.cancel');
         Route::get('payments-overview', [PaymentsOverviewController::class, 'index'])->name('payments-overview.index');
         Route::get('payments-overview/export', [PaymentsOverviewController::class, 'export'])->name('payments-overview.export');
-        Route::get('school-payments', [SchoolPaymentsController::class, 'index'])->name('school-payments.index');
-        Route::post('school-payments/fee-structures', [SchoolPaymentsController::class, 'storeStructure'])->name('school-payments.fee-structures.store');
-        Route::post('school-payments/generation/preview', [SchoolPaymentsController::class, 'previewGeneration'])->name('school-payments.generation.preview');
-        Route::post('school-payments/generate', [SchoolPaymentsController::class, 'generate'])->name('school-payments.generate');
-        Route::get('school-payments/accounts/{account}', [SchoolPaymentsController::class, 'show'])->name('school-payments.accounts.show');
-        Route::post('school-payments/accounts/{account}/payments', [SchoolPaymentsController::class, 'pay'])->name('school-payments.payments.store');
-        Route::post('school-payments/accounts/{account}/movements', [SchoolPaymentsController::class, 'movement'])->name('school-payments.movements.store');
-        Route::get('school-payments/transactions/{transaction}/receipt', [SchoolPaymentsController::class, 'receipt'])->name('school-payments.receipts.show');
+        Route::middleware('private-school')->group(function () {
+            Route::get('school-payments', [SchoolPaymentsController::class, 'index'])->name('school-payments.index');
+            Route::post('school-payments/fee-structures', [SchoolPaymentsController::class, 'storeStructure'])->name('school-payments.fee-structures.store');
+            Route::post('school-payments/generation/preview', [SchoolPaymentsController::class, 'previewGeneration'])->name('school-payments.generation.preview');
+            Route::post('school-payments/generate', [SchoolPaymentsController::class, 'generate'])->name('school-payments.generate');
+            Route::get('school-payments/accounts/{account}', [SchoolPaymentsController::class, 'show'])->name('school-payments.accounts.show');
+            Route::post('school-payments/accounts/{account}/payments', [SchoolPaymentsController::class, 'pay'])->name('school-payments.payments.store');
+            Route::post('school-payments/accounts/{account}/movements', [SchoolPaymentsController::class, 'movement'])->name('school-payments.movements.store');
+            Route::get('school-payments/transactions/{transaction}/receipt', [SchoolPaymentsController::class, 'receipt'])->name('school-payments.receipts.show');
+            Route::post('school-payments/transactions/{transaction}/cancel', [SchoolPaymentsController::class, 'cancel'])->name('school-payments.transactions.cancel');
+        });
         Route::get('enrollment-forms', [EnrollmentFormsController::class, 'index'])->name('enrollment-forms.index');
         Route::get('enrollment-forms/{enrollmentForm}', [EnrollmentFormsController::class, 'show'])->name('enrollment-forms.show');
         Route::post('enrollment-forms', [EnrollmentFormsController::class, 'store'])->name('enrollment-forms.store');

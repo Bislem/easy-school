@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import StudentFinancePanel from '@/components/finance/StudentFinancePanel.vue';
 import { Button } from '@/components/ui/button';
 import AdminLayout from '@/layouts/AdminLayout.vue';
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
@@ -26,6 +27,8 @@ const props = defineProps({
     data: { type: [Object, Array], required: true },
     children: Array,
 });
+const portalReceipt = (paymentId: number) =>
+    `/portal/payments/${paymentId}/receipt`;
 const labels: any = {
     formation: 'Ma formation',
     planning: 'Mon planning',
@@ -89,7 +92,6 @@ function read(n: any) {
         );
     else visit();
 }
-const money = (v: any) => `${Number(v || 0).toLocaleString('fr-DZ')} DA`;
 const planningDate = (value: string) =>
     new Date(value).toLocaleDateString('fr-FR', {
         weekday: 'long',
@@ -154,16 +156,10 @@ const salaryLabels: any = {
                             {{ child.first_name }} {{ child.last_name }}
                         </h2>
                         <div v-if="section === 'payments'" class="mt-3">
-                            <p v-for="e in child.enrollments" :key="e.id">
-                                {{
-                                    e.form?.course?.title ||
-                                    e.training_plan_group?.plan?.course
-                                        ?.title ||
-                                    'Formation'
-                                }}
-                                — reste
-                                {{ money(e.remaining_balance) }}
-                            </p>
+                            <StudentFinancePanel
+                                :finance="child.finance"
+                                :receipt-url="portalReceipt"
+                            />
                         </div>
                         <div v-else-if="section === 'attendance'" class="mt-3">
                             <p v-for="a in child.attendances" :key="a.id">
@@ -207,7 +203,7 @@ const salaryLabels: any = {
                             </h2>
                             <p>
                                 Niveau {{ e.level || '—' }} · Groupe
-                                {{ e.group_number || '—' }}
+                                {{ e.training_plan_group?.name || '—' }}
                             </p>
                         </article>
                     </section>
@@ -240,42 +236,11 @@ const salaryLabels: any = {
                             {{ a.recorded_at }}
                         </p>
                     </section>
-                    <section
-                        v-else-if="section === 'payments'"
-                        class="space-y-4"
-                    >
-                        <article
-                            v-for="e in data.enrollments"
-                            :key="e.id"
-                            class="rounded-xl border bg-card p-5"
-                        >
-                            <h2 class="font-semibold">
-                                {{
-                                    e.form?.course?.title ||
-                                    e.training_plan_group?.plan?.course
-                                        ?.title ||
-                                    'Formation'
-                                }}
-                            </h2>
-                            <p>
-                                Payé {{ money(e.total_paid) }} · Reste
-                                {{ money(e.remaining_balance) }}
-                            </p>
-                            <div class="mt-3">
-                                <p
-                                    v-for="p in e.payments"
-                                    :key="p.id"
-                                    class="border-t py-2 text-sm"
-                                >
-                                    {{ p.reference }} · {{ money(p.amount) }} ·
-                                    <a
-                                        class="text-primary underline"
-                                        :href="`/portal/payments/${p.id}/receipt`"
-                                        >Reçu</a
-                                    >
-                                </p>
-                            </div>
-                        </article>
+                    <section v-else-if="section === 'payments'">
+                        <StudentFinancePanel
+                            :finance="data.finance"
+                            :receipt-url="portalReceipt"
+                        />
                     </section>
                     <section
                         v-else-if="section === 'documents'"
@@ -420,9 +385,7 @@ const salaryLabels: any = {
                                         <p class="text-muted-foreground">
                                             Groupe
                                             {{
-                                                e.group_number ||
-                                                e.training_plan_group
-                                                    ?.group_number ||
+                                                e.training_plan_group?.name ||
                                                 '—'
                                             }}
                                         </p>

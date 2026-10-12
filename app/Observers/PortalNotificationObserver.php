@@ -3,10 +3,10 @@
 namespace App\Observers;
 
 use App\Models\CourseEnrollment;
+use App\Models\FinancialTransaction;
 use App\Models\SalaryPayment;
 use App\Models\SalaryStatement;
 use App\Models\SessionAttendance;
-use App\Models\StudentPayment;
 use App\Models\TeacherAttendance;
 use App\Models\TrainingPlan;
 use App\Models\TrainingPlanTeacherAccess;
@@ -30,7 +30,7 @@ class PortalNotificationObserver
             $this->studentAttendance($model);
         } elseif ($model instanceof TeacherAttendance) {
             $this->teacherAttendance($model);
-        } elseif ($model instanceof StudentPayment) {
+        } elseif ($model instanceof FinancialTransaction) {
             $this->studentPayment($model);
         } elseif ($model instanceof SalaryStatement) {
             $this->salaryGenerated($model);
@@ -154,24 +154,24 @@ class PortalNotificationObserver
         }
     }
 
-    private function studentPayment(StudentPayment $payment): void
+    private function studentPayment(FinancialTransaction $payment): void
     {
-        if ($payment->status !== 'completed' || (float) $payment->amount <= 0) {
+        if ($payment->type !== 'payment') {
             return;
         }
 
-        $payment->loadMissing(['student.parents.user', 'enrollment.trainingPlanGroup.plan.course', 'enrollment.form.course']);
-        $student = $payment->student;
-        $course = $payment->enrollment?->trainingPlanGroup?->plan?->course?->title ?? $payment->enrollment?->form?->course?->title;
+        $payment->loadMissing(['account.student.parents.user']);
+        $account = $payment->account;
+        $student = $account?->student;
         $body = collect([
             $this->money($payment->amount).' encaissés',
-            $course,
-            $payment->reference ? 'Réf. '.$payment->reference : null,
-            $payment->remaining_balance !== null ? 'Reste '.$this->money($payment->remaining_balance) : null,
+            $account?->domain === 'school' ? 'Scolarité' : 'Formation',
+            'Réf. '.$payment->reference,
+            'Reste '.$this->money($account?->balance ?? 0),
         ])->filter()->implode(' • ');
         foreach ($student?->parents?->pluck('user')->filter()->unique('id') ?? [] as $parent) {
             $this->send($parent->id, 'payment.student_validated', 'Paiement validé : '.$student->full_name,
-                $body, $payment, ['url' => '/portal/children/'.$payment->student_id, 'amount' => $payment->amount]);
+                $body, $payment, ['url' => '/parent/payments', 'amount' => $payment->amount]);
         }
     }
 

@@ -11,7 +11,7 @@ const props = defineProps<{
     students: any;
     courses: any[];
     levels: string[];
-    groups: number[];
+    groups: { id: number; name: string; plan?: { title: string } }[];
     studentStatuses: string[];
     filters: any;
     isPrivateSchool?: boolean;
@@ -149,8 +149,13 @@ function pageLabel(v: string) {
                         class="h-9 rounded-md border bg-background px-3"
                     >
                         <option value="">Tous les groupes</option>
-                        <option v-for="g in groups" :key="g" :value="String(g)">
-                            Groupe {{ g }}
+                        <option
+                            v-for="g in groups"
+                            :key="g.id"
+                            :value="String(g.id)"
+                        >
+                            {{ g.plan?.title ? `${g.plan.title} — ` : ''
+                            }}{{ g.name }}
                         </option></select
                     ><Input
                         v-model="filters.registered_from"
@@ -223,9 +228,9 @@ function pageLabel(v: string) {
                                         }}
                                         /
                                         {{
-                                            student.enrollments[0]?.group_number
-                                                ? `Groupe ${student.enrollments[0].group_number}`
-                                                : '—'
+                                            student.enrollments[0]
+                                                ?.training_plan_group?.name ||
+                                            '—'
                                         }}
                                     </td>
                                     <td class="p-4">

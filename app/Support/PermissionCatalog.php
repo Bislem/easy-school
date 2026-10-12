@@ -14,6 +14,7 @@ final class PermissionCatalog
             'hr_records.view' => 'Consulter les dossiers RH', 'hr_records.manage' => 'Gérer les dossiers RH',
             'payments.view' => 'Consulter les paiements', 'payments.collect' => 'Encaisser des paiements', 'payments.cancel' => 'Annuler des paiements', 'payments.refund' => 'Rembourser des paiements', 'payments.export' => 'Exporter les paiements',
             'school_fees.view' => 'Consulter les frais scolaires', 'school_fees.manage' => 'Gérer les frais scolaires',
+            'formation_fees.manage' => 'Gérer les tarifs de formation',
             'expenses.view' => 'Consulter les dépenses', 'expenses.create' => 'Créer des dépenses', 'expenses.update' => 'Modifier les dépenses', 'expenses.delete' => 'Supprimer des dépenses', 'expenses.approve' => 'Approuver les dépenses',
             'financial_reports.view' => 'Consulter les rapports financiers', 'financial_reports.export' => 'Exporter les rapports financiers',
             'students.view' => 'Consulter les élèves', 'students.create' => 'Créer des élèves', 'students.update' => 'Modifier les élèves', 'students.delete' => 'Supprimer des élèves', 'students.export' => 'Exporter les élèves',

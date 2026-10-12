@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\ApplicationStatus;
 use App\Mail\EnrollmentConfirmationMail;
 use App\Models\CourseEnrollment;
 use App\Models\EnrollmentForm;
@@ -20,20 +21,18 @@ class PublicEnrollmentController extends Controller
     {
         app(TenantContext::class)->set($enrollmentForm->tenant_id);
         $enrollmentForm->load(['course', 'teacher:id,name', 'classroom:id,name,code', 'files']);
-        $confirmed = $enrollmentForm->enrollments()->where('status', 'registered')->count();
 
         return Inertia::render('Public/EnrollmentForm', [
             'enrollmentForm' => $enrollmentForm,
-            'confirmedCount' => $confirmed,
-            'isAvailable' => $enrollmentForm->is_active && $confirmed < $enrollmentForm->max_students,
+            'confirmedCount' => $enrollmentForm->registeredCount(),
+            'isAvailable' => $this->open($enrollmentForm),
         ]);
     }
 
     public function store(Request $request, EnrollmentForm $enrollmentForm): RedirectResponse
     {
         app(TenantContext::class)->set($enrollmentForm->tenant_id);
-        $confirmed = $enrollmentForm->enrollments()->where('status', 'registered')->count();
-        abort_unless($enrollmentForm->is_active && $confirmed < $enrollmentForm->max_students, 422, 'Les inscriptions sont fermées.');
+        abort_unless($this->open($enrollmentForm), 422, 'Les inscriptions sont fermées.');
 
         $validated = $request->validate([
             'first_name' => ['required', 'string', 'max:100'],
@@ -46,15 +45,17 @@ class PublicEnrollmentController extends Controller
         ]);
         $validated['email'] = Str::lower($validated['email']);
 
-        $existing = $enrollmentForm->enrollments()->where('email', $validated['email'])->first();
-        if ($existing?->confirmed_at) {
-            return back()->withErrors(['email' => 'Une demande confirmée existe déjà pour cette adresse e-mail.']);
+        // One open application per applicant (same e-mail and name): siblings may share an e-mail.
+        $existing = $enrollmentForm->enrollments()->where('email', $validated['email'])
+            ->whereRaw('LOWER(first_name) = ? AND LOWER(last_name) = ?', [Str::lower($validated['first_name']), Str::lower($validated['last_name'])])
+            ->latest('id')->first();
+        $closed = [ApplicationStatus::REJECTED, ApplicationStatus::CANCELLED];
+        if ($existing?->confirmed_at && ! in_array($existing->status, $closed, true)) {
+            return back()->withErrors(['email' => 'Une demande confirmée existe déjà pour cet étudiant.']);
         }
 
-        $enrollment = $enrollmentForm->enrollments()->updateOrCreate(
-            ['email' => $validated['email']],
-            [...$validated, 'status' => 'new', 'confirmation_token' => (string) Str::uuid()],
-        );
+        $attributes = [...$validated, 'status' => ApplicationStatus::NEW, 'confirmation_token' => (string) Str::uuid(), 'confirmed_at' => null];
+        $enrollment = $existing && ! $existing->student_id ? tap($existing)->update($attributes) : $enrollmentForm->enrollments()->create($attributes);
         $enrollment->load('form.course');
 
         $confirmationUrl = URL::temporarySignedRoute(
@@ -85,5 +86,10 @@ class PublicEnrollmentController extends Controller
         $enrollment->load('form.course');
 
         return Inertia::render('Public/EnrollmentConfirmed', ['enrollment' => $enrollment]);
+    }
+
+    private function open(EnrollmentForm $enrollmentForm): bool
+    {
+        return (bool) $enrollmentForm->tenant?->hasAccess() && $enrollmentForm->acceptsApplications();
     }
 }

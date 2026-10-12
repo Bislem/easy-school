@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class TrainingPlanGroup extends Model
 {
-    protected $fillable = ['training_plan_id', 'school_level_id', 'academic_period_id', 'classroom_id', 'principal_teacher_id', 'group_number', 'name', 'code', 'capacity', 'is_active'];
+    protected $fillable = ['training_plan_id', 'classroom_id', 'principal_teacher_id', 'group_number', 'name', 'code', 'capacity', 'is_active'];
 
     protected function casts(): array
     {
@@ -31,24 +31,9 @@ class TrainingPlanGroup extends Model
         return $this->classroom();
     }
 
-    public function level(): BelongsTo
-    {
-        return $this->belongsTo(SchoolLevel::class, 'school_level_id');
-    }
-
-    public function academicPeriod(): BelongsTo
-    {
-        return $this->belongsTo(AcademicPeriod::class);
-    }
-
     public function principalTeacher(): BelongsTo
     {
         return $this->belongsTo(User::class, 'principal_teacher_id');
-    }
-
-    public function students(): HasMany
-    {
-        return $this->hasMany(Student::class);
     }
 
     public function teachers(): BelongsToMany
@@ -59,11 +44,6 @@ class TrainingPlanGroup extends Model
         return $tenantId ? $relation->withPivotValue('tenant_id', $tenantId) : $relation;
     }
 
-    public function timetableSessions(): HasMany
-    {
-        return $this->hasMany(TimetableSession::class);
-    }
-
     public function sessions(): HasMany
     {
         return $this->hasMany(TrainingSession::class);
@@ -72,5 +52,10 @@ class TrainingPlanGroup extends Model
     public function enrollments(): HasMany
     {
         return $this->hasMany(CourseEnrollment::class)->where('status', 'registered');
+    }
+
+    public function hasRoomFor(int $students = 1): bool
+    {
+        return ! $this->capacity || $this->enrollments()->count() + $students <= $this->capacity;
     }
 }

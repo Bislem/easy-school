@@ -116,7 +116,6 @@ const structure = useForm({
             code: 'registration',
             label: 'Inscription',
             amount: '',
-            is_mandatory: true,
         },
     ],
     schedule: [
@@ -134,7 +133,6 @@ const generation = useForm({
     group_id: '',
     school_fee_structure_id: '',
     update_existing: false,
-    optional_component_ids: [] as number[],
 });
 const structureGroups = computed(() =>
     props.groups.filter(
@@ -183,12 +181,17 @@ const selectGenerationStructure = () => {
     preview.value = null;
 };
 const preview = ref<any>(null);
+const previewError = ref('');
+const sum = (items: any[]) =>
+    Math.round(items.reduce((s, i) => s + Number(i.amount || 0), 0) * 100) /
+    100;
+const componentsTotal = computed(() => sum(structure.components));
+const scheduleTotal = computed(() => sum(structure.schedule));
 const addComponent = () =>
     structure.components.push({
         code: 'custom',
         label: 'Autre frais',
         amount: '',
-        is_mandatory: true,
     });
 const addSchedule = () =>
     structure.schedule.push({
@@ -219,7 +222,13 @@ async function previewGeneration() {
         },
         body: JSON.stringify(generation.data()),
     });
-    preview.value = await response.json();
+    const body = await response.json();
+    previewError.value = response.ok
+        ? ''
+        : Object.values(body.errors || {})
+              .flat()
+              .join(' ') || body.message;
+    preview.value = response.ok ? body : null;
 }
 const generate = () =>
     generation.post('/admin/school-payments/generate', {
@@ -821,7 +830,7 @@ const generateFromStructure = (item: any) => {
                             <div
                                 v-for="(c, i) in structure.components"
                                 :key="i"
-                                class="mb-2 grid gap-2 sm:grid-cols-4"
+                                class="mb-2 grid gap-2 sm:grid-cols-3"
                             >
                                 <Input
                                     v-model="c.code"
@@ -837,12 +846,7 @@ const generateFromStructure = (item: any) => {
                                     type="number"
                                     min="0"
                                     placeholder="Montant"
-                                /><label class="flex items-center gap-2 text-sm"
-                                    ><input
-                                        v-model="c.is_mandatory"
-                                        type="checkbox"
-                                    />Obligatoire</label
-                                >
+                                />
                             </div>
                         </div>
                         <div>
@@ -889,7 +893,34 @@ const generateFromStructure = (item: any) => {
                                 </select>
                             </div>
                         </div>
-                        <Button :disabled="structure.processing" class="w-full"
+                        <p
+                            class="rounded-lg p-3 text-sm"
+                            :class="
+                                componentsTotal === scheduleTotal
+                                    ? 'bg-muted'
+                                    : 'bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-300'
+                            "
+                        >
+                            Total des composants :
+                            <b>{{ money(componentsTotal) }}</b> · Total de
+                            l’échéancier : <b>{{ money(scheduleTotal) }}</b>
+                            <template v-if="componentsTotal !== scheduleTotal">
+                                — les deux totaux doivent être égaux.</template
+                            >
+                        </p>
+                        <p
+                            v-for="(error, key) in structure.errors"
+                            :key="key"
+                            class="text-sm text-red-600"
+                        >
+                            {{ error }}
+                        </p>
+                        <Button
+                            :disabled="
+                                structure.processing ||
+                                componentsTotal !== scheduleTotal
+                            "
+                            class="w-full"
                             >Créer la structure</Button
                         >
                     </form>
@@ -974,39 +1005,17 @@ const generateFromStructure = (item: any) => {
                             />Mettre à jour uniquement les comptes existants
                             sans transaction</label
                         >
-                        <div
-                            v-if="
-                                selectedGenerationStructure?.components?.some(
-                                    (component: any) => !component.is_mandatory,
-                                )
-                            "
-                            class="rounded-xl border p-3"
-                        >
-                            <b class="text-sm"
-                                >Composants optionnels à inclure</b
-                            >
-                            <label
-                                v-for="component in selectedGenerationStructure.components.filter(
-                                    (item: any) => !item.is_mandatory,
-                                )"
-                                :key="component.id"
-                                class="mt-2 flex items-center gap-2 text-sm"
-                            >
-                                <input
-                                    v-model="generation.optional_component_ids"
-                                    type="checkbox"
-                                    :value="component.id"
-                                />{{ component.label }} —
-                                {{ money(component.amount) }}
-                            </label>
-                        </div>
                         <Button
                             type="button"
                             variant="outline"
                             class="w-full"
+                            :disabled="!generation.school_fee_structure_id"
                             @click="previewGeneration"
                             >Calculer les élèves concernés</Button
                         >
+                        <p v-if="previewError" class="text-sm text-red-600">
+                            {{ previewError }}
+                        </p>
                         <div
                             v-if="preview"
                             class="rounded-xl bg-muted p-4 text-sm"
@@ -1015,10 +1024,19 @@ const generateFromStructure = (item: any) => {
                             {{ preview.new }} nouveau(x) ·
                             {{ preview.existing }} déjà généré(s).
                             <p class="mt-2">
-                                Les comptes avec des transactions seront
-                                toujours ignorés afin de préserver l’historique.
+                                Les comptes avec des opérations, les comptes
+                                clôturés et ceux couverts par une structure plus
+                                spécifique (élève &gt; groupe &gt; niveau) sont
+                                toujours ignorés.
                             </p>
                         </div>
+                        <p
+                            v-for="(error, key) in generation.errors"
+                            :key="key"
+                            class="text-sm text-red-600"
+                        >
+                            {{ error }}
+                        </p>
                         <Button
                             :disabled="!preview || generation.processing"
                             class="w-full"

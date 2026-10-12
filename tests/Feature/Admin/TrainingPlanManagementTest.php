@@ -26,7 +26,7 @@ test('an administrator can create a plan from an enrollment form with all its gr
 
     $this->actingAs($admin)->post(route('admin.training-plans.store'), [
         'source_type' => 'form', 'enrollment_form_id' => $form->id, 'course_level_id' => $level->id,
-        'title' => 'Planification français', 'notes' => null,
+        'title' => 'Planification français', 'groups_count' => 3, 'notes' => null,
     ])->assertSessionHasNoErrors();
 
     $plan = TrainingPlan::where('title', 'Planification français')->firstOrFail();

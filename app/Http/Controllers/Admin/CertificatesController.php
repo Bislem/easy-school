@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Tenancy\TenantRule;
 use App\Enums\CertificateType;
 use App\Enums\ManagementPermission;
 use App\Http\Controllers\Controller;
@@ -45,7 +46,7 @@ class CertificatesController extends Controller
                     ->orWhere('formation_name', 'like', "%{$search}%"));
             })->latest('issue_date')->paginate(20)->withQueryString();
 
-        $students = Student::with(['enrollments' => fn ($query) => $query->where('status', 'registered')->with('form.course')])
+        $students = Student::with(['enrollments' => fn ($query) => $query->whereIn('status', ['registered', 'completed'])->with(['form.course', 'trainingPlanGroup:id,name'])])
             ->orderBy('last_name')->get(['id', 'first_name', 'last_name', 'status', 'is_active']);
 
         return Inertia::render('Admin/Certificates/Index', [
@@ -63,9 +64,9 @@ class CertificatesController extends Controller
     {
         Gate::authorize(ManagementPermission::CERTIFICATES_ISSUE->value);
         $data = $request->validate([
-            'student_id' => ['required', 'exists:students,id'],
-            'course_enrollment_id' => ['nullable', 'exists:course_enrollments,id'],
-            'course_id' => ['nullable', Rule::exists('courses', 'id')->where('entity_type', 'formation')], 'course_level_id' => ['nullable', 'exists:course_levels,id'],
+            'student_id' => ['required', TenantRule::exists('students')],
+            'course_enrollment_id' => ['nullable', TenantRule::exists('course_enrollments')],
+            'course_id' => ['nullable', TenantRule::exists('courses')->where('entity_type', 'formation')], 'course_level_id' => ['nullable', TenantRule::exists('course_levels')],
             'type' => ['required', Rule::enum(CertificateType::class)],
             'issue_date' => ['required', 'date'],
             'formation_start' => ['nullable', 'date'],
@@ -93,7 +94,7 @@ class CertificatesController extends Controller
     {
         Gate::authorize(ManagementPermission::CERTIFICATES_ISSUE->value);
         $data = $request->validate([
-            'training_plan_id' => ['required', 'exists:training_plans,id'],
+            'training_plan_id' => ['required', TenantRule::exists('training_plans')],
             'group_ids' => ['required', 'array', 'min:1'], 'group_ids.*' => ['integer', 'distinct'],
             'enrollment_ids' => ['required', 'array', 'min:1'], 'enrollment_ids.*' => ['integer', 'distinct'],
             'type' => ['required', Rule::enum(CertificateType::class)], 'issue_date' => ['required', 'date'],
@@ -102,12 +103,12 @@ class CertificatesController extends Controller
         $plan = TrainingPlan::with(['course', 'level', 'groups.sessions'])->where('status', 'completed')->findOrFail($data['training_plan_id']);
         $groupIds = $plan->groups->whereIn('id', $data['group_ids'])->pluck('id');
         abort_unless($groupIds->count() === count($data['group_ids']), 422);
-        $enrollments = CourseEnrollment::with(['student', 'form.course'])->whereIn('id', $data['enrollment_ids'])
-            ->whereIn('training_plan_group_id', $groupIds)->where('status', 'registered')->whereNotNull('student_id')->get();
+        $enrollments = CourseEnrollment::with(['student', 'form.course', 'trainingPlanGroup'])->whereIn('id', $data['enrollment_ids'])
+            ->whereIn('training_plan_group_id', $groupIds)->whereIn('status', ['registered', 'completed'])->whereNotNull('student_id')->get();
         abort_unless($enrollments->count() === count($data['enrollment_ids']), 422);
         $type = CertificateType::from($data['type']);
         abort_if($type === CertificateType::DIPLOMA && ! $plan->course->is_certified, 422, 'Cette formation ne délivre pas de diplôme.');
-        $sessions = $plan->groups->whereIn('id', $groupIds)->flatMap->sessions;
+        $sessions = $plan->groups->whereIn('id', $groupIds)->flatMap->sessions->where('status', '!=', 'cancelled');
         $base = [...$data, 'course' => $plan->course, 'level_record' => $plan->level,
             'duration_hours' => $plan->level->duration_hours, 'formation_start' => $sessions->min('starts_at')?->toDateString(),
             'formation_end' => $sessions->max('ends_at')?->toDateString()];
@@ -155,7 +156,7 @@ class CertificatesController extends Controller
             'certificate_number' => 'CERT-'.now()->format('Y').'-'.str_pad((string) (Certificate::max('id') + 1), 6, '0', STR_PAD_LEFT).'-'.str()->upper(str()->random(4)),
             'verification_token' => hash('sha256', str()->uuid().str()->random(32)), 'issue_date' => $data['issue_date'],
             'student_name' => $student->full_name, 'formation_name' => $course?->title,
-            'level' => $enrollment?->level ?? $levelRecord?->name, 'group_label' => $enrollment?->group_number ? 'Groupe '.$enrollment->group_number : null,
+            'level' => $enrollment?->level ?? $levelRecord?->name, 'group_label' => $enrollment?->trainingPlanGroup?->name,
             'duration_hours' => $levelRecord?->duration_hours ?? $course?->duration_hours,
             'formation_start' => $enrollment?->form?->start_date ?? ($data['formation_start'] ?? null),
             'formation_end' => $enrollment?->form?->end_date ?? ($data['formation_end'] ?? null),

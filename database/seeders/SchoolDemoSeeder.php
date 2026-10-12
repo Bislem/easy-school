@@ -69,8 +69,7 @@ class SchoolDemoSeeder extends Seeder
                     [
                         'course_id' => $course->id, 'teacher_id' => $teacher->id,
                         'classroom_id' => null, 'start_date' => $definition['start'], 'end_date' => $definition['end'],
-                        'min_students' => 6, 'max_students' => 16, 'groups_count' => 2,
-                        'students_per_group' => 8, 'is_active' => true,
+                        'min_students' => 6, 'max_students' => 16, 'is_active' => true,
                     ],
                 );
 
@@ -82,7 +81,6 @@ class SchoolDemoSeeder extends Seeder
                         'phone' => $student->phone, 'birth_date' => $student->birth_date,
                         'status' => 'registered', 'registered_at' => now()->subDays(35 - ($courseIndex * 6 + $index)),
                         'confirmed_at' => now()->subDays(35 - ($courseIndex * 6 + $index)),
-                        'group_number' => ($index % 2) + 1,
                     ]);
                     $enrollment->confirmation_token ??= (string) Str::uuid();
                     $enrollment->save();
@@ -235,9 +233,10 @@ class SchoolDemoSeeder extends Seeder
             $group = $plan->groups()->updateOrCreate(['group_number' => $groupNumber], [
                 'name' => "Groupe {$groupNumber}", 'classroom_id' => $room->id, 'capacity' => min(8, $room->capacity),
             ]);
-            CourseEnrollment::where('enrollment_form_id', $form->id)
-                ->where('group_number', $groupNumber)
-                ->update(['training_plan_group_id' => $group->id, 'status' => 'registered']);
+            // Students alternate between the two groups in registration order.
+            $ids = CourseEnrollment::where('enrollment_form_id', $form->id)->orderBy('id')->pluck('id')
+                ->filter(fn ($id, $index) => $index % 2 === $groupNumber - 1);
+            CourseEnrollment::whereIn('id', $ids)->update(['training_plan_group_id' => $group->id, 'status' => 'registered']);
             foreach ($definition['dates'] as $sessionIndex => $date) {
                 [$start, $end] = $definition['times'][$groupNumber - 1];
                 $group->sessions()->updateOrCreate(['title' => $course->title.' — Séance '.($sessionIndex + 1)], [

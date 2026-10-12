@@ -33,7 +33,13 @@ source used by provisioning, validation, backend guards, and the frontend.
   `salaries.export`, `payslips.view`, `payslips.manage`, `hr_records.view`,
   `hr_records.manage`
 - Payments: `payments.view`, `payments.collect`, `payments.cancel`,
-  `payments.refund`, `payments.export`, `school_fees.view`, `school_fees.manage`
+  `payments.refund` (reserved, refunds are not offered yet), `payments.export`,
+  `school_fees.view`, `school_fees.manage`, `formation_fees.manage`
+
+  Recording a payment needs `payments.collect`; cancelling a payment or credit
+  needs `payments.cancel`. Fee structures, discounts, scholarships and debit
+  adjustments need `school_fees.manage` (school) or `formation_fees.manage`
+  (formation pricing).
 - Expenses and finance: `expenses.view`, `expenses.create`, `expenses.update`,
   `expenses.delete`, `expenses.approve`, `financial_reports.view`,
   `financial_reports.export`

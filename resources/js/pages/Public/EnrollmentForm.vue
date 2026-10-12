@@ -53,7 +53,10 @@ const pending = computed(() =>
                     {{ enrollmentForm.start_date }} au
                     {{ enrollmentForm.end_date }}
                 </p>
-                <p class="flex items-center gap-2 text-sm">
+                <p
+                    v-if="enrollmentForm.teacher"
+                    class="flex items-center gap-2 text-sm"
+                >
                     <Users class="size-4 text-primary" />{{
                         enrollmentForm.teacher.name
                     }}
@@ -72,11 +75,11 @@ const pending = computed(() =>
                         enrollmentForm.classroom.name
                     }}
                 </p>
-                <p v-else class="flex items-center gap-2 text-sm">
+                <p class="flex items-center gap-2 text-sm">
                     <Users class="size-4 text-primary" />{{
-                        enrollmentForm.students_per_group
+                        enrollmentForm.max_students
                     }}
-                    étudiants maximum par groupe
+                    places au total
                 </p>
             </div>
 

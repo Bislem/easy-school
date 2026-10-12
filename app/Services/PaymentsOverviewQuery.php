@@ -28,7 +28,7 @@ final class PaymentsOverviewQuery
                     ? $query->whereHasMorph('accountable', [StudentAcademicEnrollment::class], fn (Builder $enrollment) => $enrollment->where('school_group_id', $id))
                     : $query->whereHasMorph('accountable', [CourseEnrollment::class], fn (Builder $enrollment) => $enrollment->where('training_plan_group_id', $id));
             })
-            ->when($filters['formation_id'] ?? null, fn (Builder $query, $id) => $query->whereHasMorph('accountable', [CourseEnrollment::class], fn (Builder $enrollment) => $enrollment->whereHas('form', fn (Builder $form) => $form->where('course_id', $id))))
+            ->when($filters['formation_id'] ?? null, fn (Builder $query, $id) => $query->whereHasMorph('accountable', [CourseEnrollment::class], fn (Builder $enrollment) => $enrollment->where(fn (Builder $enrollment) => $enrollment->whereHas('form', fn (Builder $form) => $form->where('course_id', $id))->orWhereHas('trainingPlanGroup.plan.level', fn (Builder $level) => $level->where('course_id', $id)))))
             ->when($filters['session_id'] ?? null, fn (Builder $query, $id) => $query->whereHasMorph('accountable', [CourseEnrollment::class], fn (Builder $enrollment) => $enrollment->where('enrollment_form_id', $id)))
             ->when($filters['site_id'] ?? null, function (Builder $query, $id): void {
                 $query->where(function (Builder $accounts) use ($id): void {

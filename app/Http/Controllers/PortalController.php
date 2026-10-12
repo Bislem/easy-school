@@ -4,20 +4,20 @@ namespace App\Http\Controllers;
 
 use App\Enums\StudentStatus;
 use App\Enums\UserRole;
-use App\Models\CompanySetting;
 use App\Models\CourseEnrollment;
+use App\Models\FinancialInstallment;
+use App\Models\FinancialTransaction;
 use App\Models\PortalNotification;
 use App\Models\SessionAttendance;
 use App\Models\Student;
-use App\Models\StudentInstallment;
 use App\Models\StudentObservation;
-use App\Models\StudentPayment;
 use App\Models\TrainingPlanGroup;
 use App\Models\TrainingSession;
 use App\Services\AttendanceService;
 use App\Services\NotificationDispatcher;
+use App\Services\FinancialReceiptService;
+use App\Services\StudentFinanceSummary;
 use App\Tenancy\TenantRule;
-use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -33,7 +33,8 @@ class PortalController extends Controller
         $this->ensureReminders($user);
         $notifications = $user->portalNotifications()->limit(8)->get();
         if ($user->schoolParent) {
-            $profile = $user->schoolParent->load(['students.enrollments' => fn ($query) => $query->with(['form.course', 'trainingPlanGroup.plan.course', 'payments', 'installments'])]);
+            $profile = $user->schoolParent->load(['students.enrollments' => fn ($query) => $query->with(['form.course', 'trainingPlanGroup.plan.course'])]);
+            $finance = app(StudentFinanceSummary::class);
             $allUpcoming = collect();
             $paid = 0;
             $due = 0;
@@ -44,8 +45,9 @@ class PortalController extends Controller
                 $sessions = $this->sessionsForEnrollments($enrollments);
                 $upcoming = $sessions->where('starts_at', '>', now())->take(3)->values();
                 $attendance = $child->attendances()->get();
-                $childPaid = (float) $enrollments->sum('total_paid');
-                $childBalance = (float) $enrollments->sum('remaining_balance');
+                $totals = $finance->forStudent($child)['totals'];
+                $childPaid = $totals['paid'];
+                $childBalance = $totals['balance'];
                 $childPresent = $attendance->whereIn('status', ['present', 'late'])->count();
                 $child->setAttribute('portal_summary', ['formations' => $enrollments->where('status', 'registered')->count(), 'paid' => $childPaid, 'balance' => max(0, $childBalance), 'attendance_rate' => $attendance->count() ? round($childPresent / $attendance->count() * 100, 1) : null, 'upcoming' => $upcoming]);
                 $paid += $childPaid;
@@ -72,9 +74,10 @@ class PortalController extends Controller
         abort_unless(in_array($section, ['formation', 'planning', 'attendance', 'payments', 'documents', 'notifications', 'students'], true), 404);
         $user = $request->user();
         if ($user->schoolParent) {
-            $children = $user->schoolParent->students()->with(['enrollments' => fn ($q) => $q->where('status', 'registered')->with(['form.course', 'trainingPlanGroup.plan.course']), 'attendances.session', 'payments.enrollment.form.course', 'payments.enrollment.trainingPlanGroup.plan.course'])->get();
+            $children = $user->schoolParent->students()->with(['enrollments' => fn ($q) => $q->where('status', 'registered')->with(['form.course', 'trainingPlanGroup.plan.course']), 'attendances.session'])->get();
             foreach ($children as $child) {
                 $child->setAttribute('portal_sessions', $this->sessionsForEnrollments($child->enrollments));
+                $child->setAttribute('finance', app(StudentFinanceSummary::class)->forStudent($child));
             }
 
 return Inertia::render('Portal/Section', ['kind' => 'parent', 'section' => $section, 'children' => $children, 'data' => ['notifications' => $user->portalNotifications()->get()]]);
@@ -103,6 +106,7 @@ return Inertia::render('Portal/Section', ['kind' => 'parent', 'section' => $sect
     public function attendance(Request $request, TrainingSession $session, NotificationDispatcher $notifications): RedirectResponse
     {
         abort_unless($session->teacher_id === $request->user()->id, 403);
+        abort_if($session->status === 'cancelled' || in_array($session->group?->plan?->status, ['completed', 'cancelled'], true), 422, 'Cette séance ne peut plus recevoir de présences.');
         $data = $request->validate(['records' => ['required', 'array'], 'records.*.student_id' => ['required', TenantRule::exists('students')], 'records.*.status' => ['required', Rule::in(['present', 'absent', 'late', 'excused', 'left_early'])], 'records.*.justification' => ['nullable', 'string', 'max:2000'], 'records.*.notes' => ['nullable', 'string', 'max:1000']]);
         app(AttendanceService::class)->recordStudents($session, $data['records'], $request->user()->id);
         foreach ($data['records'] as $record) {
@@ -132,14 +136,14 @@ return Inertia::render('Portal/Section', ['kind' => 'parent', 'section' => $sect
         return back();
     }
 
-    public function receipt(Request $request, StudentPayment $payment): HttpResponse
+    public function receipt(Request $request, FinancialTransaction $transaction, FinancialReceiptService $receipts): HttpResponse
     {
         $user = $request->user();
-        $allowed = $user->student?->id === $payment->student_id || ($user->schoolParent?->students()->whereKey($payment->student_id)->exists() ?? false);
+        $studentId = $transaction->account?->student_id;
+        $allowed = $studentId && ($user->student?->id === $studentId || ($user->schoolParent?->students()->whereKey($studentId)->exists() ?? false));
         abort_unless($allowed, 403);
-        $payment->load(['student', 'enrollment.form.course', 'enrollment.trainingPlanGroup.plan.course', 'recorder']);
 
-        return Pdf::loadView('admin.finance.receipt', ['payment' => $payment, 'school' => CompanySetting::current(), 'currency' => config('app.currency_symbol')])->download($payment->reference.'.pdf');
+        return $receipts->download($transaction);
     }
 
     public function studentFolder(Request $request, Student $student): Response
@@ -168,7 +172,7 @@ return Inertia::render('Portal/Section', ['kind' => 'parent', 'section' => $sect
     {
         $parent = $request->user()->schoolParent;
         abort_unless($request->user()->role === UserRole::PARENT && $parent && $parent->students()->whereKey($student->id)->exists(), 403, 'Cet enfant n’est pas associé à votre compte.');
-        $student->load(['enrollments.form.course', 'enrollments.trainingPlanGroup.plan.level.course', 'enrollments.installments', 'enrollments.payments.recorder:id,name', 'badges.template', 'certificates.enrollment.form.course', 'histories.user:id,name', 'files', 'user:id,email,is_active', 'observations' => fn ($query) => $query->whereNull('parent_id')->with(['author:id,name,role', 'replies.author:id,name,role']), 'attendances.session.group.plan.level.course', 'attendances.session.teacher:id,name']);
+        $student->load(['enrollments.form.course', 'enrollments.trainingPlanGroup.plan.level.course', 'badges.template', 'certificates.enrollment.form.course', 'histories.user:id,name', 'files', 'user:id,email,is_active', 'observations' => fn ($query) => $query->whereNull('parent_id')->with(['author:id,name,role', 'replies.author:id,name,role']), 'attendances.session.group.plan.level.course', 'attendances.session.teacher:id,name']);
         $expected = TrainingSession::whereHas('group.enrollments', fn ($query) => $query->where('student_id', $student->id)->where('status', 'registered'))->count();
         $records = $student->attendances;
         $present = $records->whereIn('status', ['present', 'late'])->count();
@@ -181,7 +185,7 @@ return Inertia::render('Portal/Section', ['kind' => 'parent', 'section' => $sect
         $rate = $expected ? round($present / $expected * 100, 1) : null;
         $student->setAttribute('attendance_stats', ['expected' => $expected, 'recorded' => $records->count(), 'present' => $present, 'absent' => $records->where('status', 'absent')->count(), 'late' => $records->where('status', 'late')->count(), 'excused' => $records->where('status', 'excused')->count(), 'rate' => $rate, 'consecutive_absences' => $consecutive, 'warning' => $consecutive >= config('attendance.consecutive_absence_warning', 2) || ($rate !== null && $rate < config('attendance.warning_threshold', 75))]);
 
-        return Inertia::render('Admin/Students/Show', ['student' => $student, 'statuses' => collect(StudentStatus::cases())->map(fn ($status) => $status->value), 'readOnly' => true, 'parentView' => true]);
+        return Inertia::render('Admin/Students/Show', ['student' => $student, 'statuses' => collect(StudentStatus::cases())->map(fn ($status) => $status->value), 'readOnly' => true, 'parentView' => true, 'finance' => app(StudentFinanceSummary::class)->forStudent($student)]);
     }
 
     public function storeObservation(Request $request, Student $student, NotificationDispatcher $notifications): RedirectResponse
@@ -264,10 +268,10 @@ return CourseEnrollment::with(['student', 'form.course', 'trainingPlanGroup.plan
 
     private function studentPage(Student $student, string $section, $notifications, string $view = 'Portal/Dashboard'): Response
     {
-        $enrollments = $student->enrollments()->where('status', 'registered')->with(['form.course', 'trainingPlanGroup.plan.course', 'payments.recorder:id,name', 'installments'])->get();
+        $enrollments = $student->enrollments()->where('status', 'registered')->with(['form.course', 'trainingPlanGroup.plan.course'])->get();
         $sessions = $this->sessionsForEnrollments($enrollments);
 
-        return Inertia::render($view, ['kind' => 'student', 'section' => $section, 'profile' => $student->load(['badges.template', 'files', 'attendances.session']), 'data' => ['enrollments' => $enrollments, 'sessions' => $sessions, 'notifications' => $notifications], 'today' => $sessions->whereBetween('starts_at', [today()->startOfDay(), today()->endOfDay()])->values(), 'upcoming' => $sessions->where('starts_at', '>', now())->take(12)->values(), 'groups' => [], 'students' => [], 'notifications' => $notifications, 'summary' => []]);
+        return Inertia::render($view, ['kind' => 'student', 'section' => $section, 'profile' => $student->load(['badges.template', 'files', 'attendances.session']), 'data' => ['enrollments' => $enrollments, 'finance' => app(StudentFinanceSummary::class)->forStudent($student), 'sessions' => $sessions, 'notifications' => $notifications], 'today' => $sessions->whereBetween('starts_at', [today()->startOfDay(), today()->endOfDay()])->values(), 'upcoming' => $sessions->where('starts_at', '>', now())->take(12)->values(), 'groups' => [], 'students' => [], 'notifications' => $notifications, 'summary' => []]);
     }
 
     private function sessionsForEnrollments($enrollments)
@@ -283,10 +287,10 @@ return TrainingSession::with(['group.plan.course', 'classroom'])->whereIn('train
     {
         $students = $user->student ? collect([$user->student]) : ($user->schoolParent ? $user->schoolParent->students : collect());
         foreach ($students as $student) {
-            $installments = StudentInstallment::with(['enrollment.form.course', 'enrollment.trainingPlanGroup.plan.course'])->whereHas('enrollment', fn ($q) => $q->where('student_id', $student->id))->whereIn('status', ['pending', 'partial', 'overdue'])->whereDate('due_date', '<=', today()->addDays(7))->get();
+            $installments = FinancialInstallment::whereHas('account', fn ($q) => $q->where('student_id', $student->id)->whereNull('closed_at'))->whereIn('status', ['pending', 'partial', 'overdue'])->whereDate('due_date', '<=', today()->addDays(7))->get();
             foreach ($installments as $item) {
-                $title = $item->enrollment->form?->course?->title ?? $item->enrollment->trainingPlanGroup?->plan?->course?->title ?? 'Formation';
-                $this->notifyOnce($user, $item->due_date->isPast() ? 'payment.overdue' : 'payment.due', $item, $item->due_date->isPast() ? 'Paiement en retard' : 'Paiement bientôt dû', 'Échéance '.$title.' du '.$item->due_date->format('d/m/Y').'.');
+                $late = $item->due_date->lt(today());
+                $this->notifyOnce($user, $late ? 'payment.overdue' : 'payment.due', $item, $late ? 'Paiement en retard' : 'Paiement bientôt dû', 'Échéance « '.$item->label.' » du '.$item->due_date->format('d/m/Y').'.');
             }foreach ($student->enrollments()->where('status', 'registered')->with('form')->get() as $enrollment) {
                 if ($enrollment->form?->start_date?->between(today(), today()->addDays(7))) {
                     $this->notifyOnce($user, 'formation.starting', $enrollment, 'Formation prochainement', 'La formation commence le '.$enrollment->form->start_date->format('d/m/Y').'.');

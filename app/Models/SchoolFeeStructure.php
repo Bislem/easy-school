@@ -12,6 +12,17 @@ class SchoolFeeStructure extends Model
 
     protected $casts = ['is_active' => 'boolean'];
 
+    /** Higher wins when several structures apply to one enrollment. */
+    public function specificity(): int
+    {
+        return match (true) {
+            $this->student_id !== null => 3,
+            $this->school_group_id !== null => 2,
+            $this->school_level_id !== null => 1,
+            default => 0,
+        };
+    }
+
     public function academicYear(): BelongsTo
     {
         return $this->belongsTo(AcademicYear::class);

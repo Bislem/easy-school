@@ -84,3 +84,153 @@ test('a level specific structure automatically targets its specialization', func
     expect($f['enrollment']->financialAccount()->exists())->toBeTrue()
         ->and($otherEnrollment->financialAccount()->exists())->toBeFalse();
 });
+
+function schoolLedgerAccount(array $f, array $installments): FinancialAccount
+{
+    $account = FinancialAccount::create(['accountable_type' => $f['enrollment']->getMorphClass(), 'accountable_id' => $f['enrollment']->id, 'domain' => 'school', 'student_id' => $f['student']->id, 'academic_year_id' => $f['year']->id]);
+    foreach ($installments as $i => [$label, $amount, $due]) {
+        $account->installments()->create(['source_key' => "item-{$i}", 'label' => $label, 'amount' => $amount, 'due_date' => $due, 'sort_order' => $i]);
+    }
+
+    return app(\App\Services\FinancialAccountService::class)->refresh($account);
+}
+
+function schoolStructure(array $f, array $attributes, float $amount = 50000): SchoolFeeStructure
+{
+    $structure = SchoolFeeStructure::create(['academic_year_id' => $f['year']->id, 'name' => 'Tarif', 'is_active' => true, ...$attributes]);
+    $component = $structure->components()->create(['code' => 'tuition', 'label' => 'Scolarité', 'amount' => $amount, 'is_mandatory' => true, 'sort_order' => 0]);
+    $structure->scheduleItems()->create(['school_fee_component_id' => $component->id, 'label' => 'Scolarité', 'amount' => $amount, 'due_date' => today()->addMonth(), 'sort_order' => 0]);
+
+    return $structure;
+}
+
+test('a discount settles the latest installments so a full payment closes every installment', function () {
+    $f = schoolBillingFixture();
+    $account = schoolLedgerAccount($f, [['T1', 30000, today()->addDay()], ['T2', 30000, today()->addMonth()], ['T3', 30000, today()->addMonths(2)]]);
+    $this->actingAs($f['admin'])->post(route('admin.school-payments.movements.store', $account), ['type' => 'discount', 'amount' => 10000, 'reason' => 'Fratrie'])->assertSessionHasNoErrors();
+    $this->post(route('admin.school-payments.payments.store', $account), ['amount' => 80000, 'transaction_date' => today()->toDateString(), 'payment_method' => 'cash'])->assertSessionHasNoErrors();
+
+    $account->refresh();
+    expect((float) $account->balance)->toBe(0.0)
+        ->and($account->status)->toBe('paid')
+        ->and((float) $account->paid_total)->toBe(80000.0)
+        ->and((float) $account->adjustment_total)->toBe(-10000.0)
+        ->and($account->installments()->pluck('status')->unique()->all())->toBe(['paid']);
+});
+
+test('a discount cannot exceed the remaining balance', function () {
+    $f = schoolBillingFixture();
+    $account = schoolLedgerAccount($f, [['T1', 30000, today()->addDay()]]);
+    $this->actingAs($f['admin'])->post(route('admin.school-payments.movements.store', $account), ['type' => 'scholarship', 'amount' => 30000.01, 'reason' => 'Trop'])->assertSessionHasErrors('amount');
+});
+
+test('cancelling a payment restores the balance and keeps both entries', function () {
+    $f = schoolBillingFixture();
+    $account = schoolLedgerAccount($f, [['T1', 40000, today()->subDay()], ['T2', 35000, today()->addMonth()]]);
+    $this->actingAs($f['admin'])->post(route('admin.school-payments.payments.store', $account), ['amount' => 50000, 'transaction_date' => today()->toDateString(), 'payment_method' => 'cash'])->assertSessionHasNoErrors();
+    $payment = $account->transactions()->where('type', 'payment')->firstOrFail();
+
+    $this->post(route('admin.school-payments.transactions.cancel', $payment), ['reason' => 'Erreur de saisie'])->assertSessionHasNoErrors();
+    $this->post(route('admin.school-payments.transactions.cancel', $payment), ['reason' => 'Encore'])->assertSessionHasErrors('transaction');
+
+    $account->refresh();
+    expect((float) $account->balance)->toBe(75000.0)
+        ->and((float) $account->paid_total)->toBe(0.0)
+        ->and($account->status)->toBe('overdue')
+        ->and($account->transactions()->count())->toBe(2)
+        ->and($account->transactions()->where('type', 'reversal')->value('reverses_transaction_id'))->toBe($payment->id);
+});
+
+test('a debit adjustment adds an installment that payments can settle', function () {
+    $f = schoolBillingFixture();
+    $account = schoolLedgerAccount($f, [['T1', 10000, today()->addDay()]]);
+    $this->actingAs($f['admin'])->post(route('admin.school-payments.movements.store', $account), ['type' => 'adjustment', 'amount' => 2500, 'reason' => 'Tenue', 'due_date' => today()->addWeek()->toDateString()])->assertSessionHasNoErrors();
+    $this->post(route('admin.school-payments.payments.store', $account), ['amount' => 12500, 'transaction_date' => today()->toDateString(), 'payment_method' => 'cash'])->assertSessionHasNoErrors();
+
+    $account->refresh();
+    $payment = $account->transactions()->where('type', 'payment')->firstOrFail();
+    expect($account->installments)->toHaveCount(2)
+        ->and((float) $account->expected_total)->toBe(12500.0)
+        ->and((float) $account->balance)->toBe(0.0)
+        ->and((float) $payment->allocations()->sum('amount'))->toBe(12500.0);
+});
+
+test('a student specific structure only targets that student and wins over the level structure', function () {
+    $f = schoolBillingFixture();
+    $sibling = Student::create(['first_name' => 'Yanis', 'last_name' => 'Kaci', 'phone' => '0550000002', 'status' => StudentStatus::ACTIVE, 'is_active' => true]);
+    $siblingEnrollment = StudentAcademicEnrollment::create(['academic_year_id' => $f['year']->id, 'student_id' => $sibling->id, 'school_level_id' => $f['level']->id, 'school_group_id' => $f['group']->id, 'status' => StudentAcademicEnrollmentStatus::ENROLLED, 'enrollment_date' => '2026-09-01']);
+    $personal = schoolStructure($f, ['student_id' => $f['student']->id, 'name' => 'Tarif Lina'], 30000);
+    $this->actingAs($f['admin'])->post(route('admin.school-payments.generate'), ['academic_year_id' => $f['year']->id, 'school_fee_structure_id' => $personal->id])->assertSessionHasNoErrors();
+    expect($siblingEnrollment->financialAccount()->exists())->toBeFalse();
+
+    app(TenantContext::class)->set($f['tenant']);
+    $levelStructure = schoolStructure($f, ['school_level_id' => $f['level']->id, 'name' => 'Tarif 3AP'], 50000);
+    $this->post(route('admin.school-payments.generate'), ['academic_year_id' => $f['year']->id, 'school_fee_structure_id' => $levelStructure->id, 'update_existing' => true])->assertSessionHasNoErrors();
+
+    expect((float) $f['enrollment']->financialAccount()->value('expected_total'))->toBe(30000.0)
+        ->and((float) $siblingEnrollment->financialAccount()->value('expected_total'))->toBe(50000.0);
+});
+
+test('a fee structure must schedule exactly its components total', function () {
+    $f = schoolBillingFixture();
+    $this->actingAs($f['admin'])->post(route('admin.school-payments.fee-structures.store'), [
+        'academic_year_id' => $f['year']->id, 'name' => 'Incomplet',
+        'components' => [['code' => 'tuition', 'label' => 'Scolarité', 'amount' => 100000]],
+        'schedule' => [['label' => 'T1', 'amount' => 60000, 'due_date' => '2026-10-01', 'component_index' => 0]],
+    ])->assertSessionHasErrors('schedule');
+    expect(SchoolFeeStructure::count())->toBe(0);
+});
+
+test('enrollment lifecycle creates, closes and reopens the school account', function () {
+    $f = schoolBillingFixture();
+    $f['enrollment']->delete();
+    $structure = schoolStructure($f, ['school_level_id' => $f['level']->id]);
+    $structure->scheduleItems()->first()->update(['amount' => 20000]);
+    $structure->scheduleItems()->create(['label' => 'T2', 'amount' => 30000, 'due_date' => today()->subDay(), 'sort_order' => 1]);
+    $enrollment = StudentAcademicEnrollment::create(['academic_year_id' => $f['year']->id, 'student_id' => $f['student']->id, 'school_level_id' => $f['level']->id, 'school_group_id' => $f['group']->id, 'status' => StudentAcademicEnrollmentStatus::ENROLLED, 'enrollment_date' => '2026-09-01']);
+    $account = $enrollment->financialAccount()->firstOrFail();
+    expect((float) $account->balance)->toBe(50000.0)->and($account->school_fee_structure_id)->toBe($structure->id);
+
+    $enrollment->update(['status' => StudentAcademicEnrollmentStatus::WITHDRAWN]);
+    $account->refresh();
+    expect($account->closed_at)->not->toBeNull()
+        ->and((float) $account->balance)->toBe(30000.0)
+        ->and($account->transactions()->where('type', 'waiver')->exists())->toBeTrue();
+
+    $enrollment->update(['status' => StudentAcademicEnrollmentStatus::ENROLLED]);
+    expect($account->fresh()->closed_at)->toBeNull()->and((float) $account->fresh()->balance)->toBe(50000.0);
+});
+
+test('the daily refresh marks installments past their due date as overdue', function () {
+    $f = schoolBillingFixture();
+    $account = schoolLedgerAccount($f, [['T1', 10000, today()->addDay()]]);
+    $account->installments()->update(['due_date' => today()->subDay()]);
+    app(TenantContext::class)->clear();
+
+    $this->artisan('finance:refresh-statuses')->assertSuccessful();
+    app(TenantContext::class)->set($f['tenant']);
+    expect($account->fresh()->status)->toBe('overdue')->and($account->installments()->value('status'))->toBe('overdue');
+});
+
+test('manual receipt numbers only need to be unique within a school', function () {
+    $first = schoolBillingFixture();
+    $firstAccount = schoolLedgerAccount($first, [['T1', 10000, today()->addDay()]]);
+    $this->actingAs($first['admin'])->post(route('admin.school-payments.payments.store', $firstAccount), ['amount' => 1000, 'transaction_date' => today()->toDateString(), 'payment_method' => 'cash', 'reference' => 'REC-001'])->assertSessionHasNoErrors();
+    $this->post(route('admin.school-payments.payments.store', $firstAccount), ['amount' => 1000, 'transaction_date' => today()->toDateString(), 'payment_method' => 'cash', 'reference' => 'REC-001'])->assertSessionHasErrors('reference');
+
+    $second = schoolBillingFixture();
+    $secondAccount = schoolLedgerAccount($second, [['T1', 10000, today()->addDay()]]);
+    $this->actingAs($second['admin'])->post(route('admin.school-payments.payments.store', $secondAccount), ['amount' => 1000, 'transaction_date' => today()->toDateString(), 'payment_method' => 'cash', 'reference' => 'REC-001'])->assertSessionHasNoErrors();
+});
+
+test('school billing is only available to private schools and stays in its domain', function () {
+    $f = schoolBillingFixture();
+    $account = schoolLedgerAccount($f, [['T1', 10000, today()->addDay()]]);
+    $account->update(['domain' => 'formation']);
+    $this->actingAs($f['admin'])->post(route('admin.school-payments.payments.store', $account), ['amount' => 100, 'transaction_date' => today()->toDateString(), 'payment_method' => 'cash'])->assertNotFound();
+
+    $centre = Tenant::factory()->create(['organization_type' => 'training_center']);
+    app(TenantContext::class)->set($centre);
+    $centreAdmin = User::factory()->create(['tenant_id' => $centre->id, 'role' => UserRole::ADMIN]);
+    $this->actingAs($centreAdmin)->get(route('admin.school-payments.index'))->assertNotFound();
+});

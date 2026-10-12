@@ -14,12 +14,12 @@ test('an administrator can add and remove a student from a form', function () {
 
     $this->actingAs($admin)->post(route('admin.enrollment-forms.enrollments.store', $form), [
         'first_name' => 'Lina', 'last_name' => 'Kaci', 'email' => 'lina@example.com',
-        'phone' => '0550000000', 'group_number' => 2,
+        'phone' => '0550000000',
     ])->assertSessionHasNoErrors();
 
     $enrollment = $form->enrollments()->firstOrFail();
     expect($enrollment->confirmed_at)->not->toBeNull()
-        ->and($enrollment->group_number)->toBe(2)
+        ->and($enrollment->training_plan_group_id)->toBeNull()
         ->and(Student::where('email', 'lina@example.com')->exists())->toBeTrue();
 
     $this->actingAs($admin)

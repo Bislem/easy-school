@@ -474,7 +474,6 @@ const routePermissions: Record<string, string> = {
     '/admin/certificates': 'certificates.view',
     '/admin/reports': 'reports.view',
     '/admin/audit': 'audit.view',
-    '/admin/finance': 'payments.view',
     '/admin/formation-payments': 'payments.view',
     '/admin/school-payments': 'school_fees.view',
     '/admin/payments-overview': 'financial_reports.view',

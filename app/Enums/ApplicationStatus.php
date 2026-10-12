@@ -11,4 +11,11 @@ enum ApplicationStatus: string
     case REGISTERED = 'registered';
     case REJECTED = 'rejected';
     case CANCELLED = 'cancelled';
+    case COMPLETED = 'completed';
+
+    /** Application statuses an applicant can still move between before registration. */
+    public static function applicationStages(): array
+    {
+        return [self::NEW, self::CONTACTED, self::WAITING, self::APPROVED, self::REJECTED, self::CANCELLED];
+    }
 }

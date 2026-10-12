@@ -131,6 +131,8 @@ const props = defineProps<{
     students: Student[];
     access: {
         is_admin: boolean;
+        is_open: boolean;
+        manage_students: boolean;
         manage_groups: boolean;
         add_sessions: boolean;
         record_attendance: boolean;
@@ -456,7 +458,8 @@ function toggleAttendanceStudent(studentId: number) {
 function toggleAllAttendance() {
     if (!rosterGroup.value) return;
     attendanceSelectedIds.value =
-        attendanceSelectedIds.value.length === rosterGroup.value.enrollments.length
+        attendanceSelectedIds.value.length ===
+        rosterGroup.value.enrollments.length
             ? []
             : rosterGroup.value.enrollments.map((item) => item.student_id);
     attendanceForm.student_ids = [...attendanceSelectedIds.value];
@@ -773,7 +776,7 @@ watch(
                                 /></Button>
                                 <Button
                                     v-if="
-                                        access.is_admin &&
+                                        access.add_sessions &&
                                         session.attendance_status !==
                                             'validated' &&
                                         session.status !== 'completed'
@@ -784,7 +787,7 @@ watch(
                                     ><Pencil class="size-4" /></Button
                                 ><Button
                                     v-if="
-                                        access.is_admin &&
+                                        access.add_sessions &&
                                         session.attendance_status !==
                                             'validated' &&
                                         session.status !== 'completed'
@@ -1120,7 +1123,7 @@ watch(
                 </DialogHeader>
                 <div v-if="rosterGroup" class="space-y-5">
                     <form
-                        v-if="access.is_admin"
+                        v-if="access.manage_students"
                         class="space-y-3 rounded-lg border bg-muted/20 p-3"
                         @submit.prevent="addStudent"
                     >
@@ -1294,7 +1297,7 @@ watch(
                                     </p>
                                 </div>
                             </div>
-                            <DropdownMenu v-if="access.is_admin">
+                            <DropdownMenu v-if="access.manage_students">
                                 <DropdownMenuTrigger as-child
                                     ><Button size="sm" variant="outline"
                                         >Actions<ChevronDown
@@ -1531,10 +1534,8 @@ watch(
                             }}</Button
                         >
                         <span class="mr-auto text-sm text-muted-foreground"
-                            >{{
-                                attendanceSelectedIds.length
-                            }}
-                            absence(s) sélectionnée(s)</span
+                            >{{ attendanceSelectedIds.length }} absence(s)
+                            sélectionnée(s)</span
                         >
                     </div>
                     <div class="overflow-hidden rounded-lg border">
@@ -1574,8 +1575,21 @@ watch(
                             >
                             <span
                                 class="rounded-full px-2.5 py-1 text-xs font-semibold"
-                                :class="attendanceSelectedIds.includes(enrollment.student_id) ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'"
-                            >{{ attendanceSelectedIds.includes(enrollment.student_id) ? 'Absent' : 'Présent' }}</span>
+                                :class="
+                                    attendanceSelectedIds.includes(
+                                        enrollment.student_id,
+                                    )
+                                        ? 'bg-red-100 text-red-700'
+                                        : 'bg-emerald-100 text-emerald-700'
+                                "
+                                >{{
+                                    attendanceSelectedIds.includes(
+                                        enrollment.student_id,
+                                    )
+                                        ? 'Absent'
+                                        : 'Présent'
+                                }}</span
+                            >
                         </div>
                         <p
                             v-if="!rosterGroup.enrollments.length"

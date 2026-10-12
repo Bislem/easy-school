@@ -13,20 +13,19 @@ use App\Models\AuditLog;
 use App\Models\Badge;
 use App\Models\Certificate;
 use App\Models\CourseEnrollment;
-use App\Models\EnrollmentFinancialAdjustment;
 use App\Models\SalaryAdjustment;
 use App\Models\SalaryPayment;
 use App\Models\SalaryStatement;
 use App\Models\SessionAttendance;
 use App\Models\Staff;
 use App\Models\StudentHistory;
-use App\Models\StudentPayment;
 use App\Models\TeacherAttendance;
 use App\Models\TimetableSession;
 use App\Models\TrainingPlan;
 use App\Models\TrainingPlanTeacherAccess;
 use App\Models\TrainingSession;
 use App\Models\User;
+use App\Observers\FinancialEnrollmentObserver;
 use App\Observers\PortalNotificationObserver;
 use App\Policies\StaffPolicy;
 use App\Policies\TimetableSessionPolicy;
@@ -60,7 +59,7 @@ class AppServiceProvider extends ServiceProvider
         }
         foreach ([\App\Models\Student::class, \App\Models\SchoolParent::class, \App\Models\SchoolGroup::class, \App\Models\SchoolSite::class,
             \App\Models\Staff::class, \App\Models\StudentAcademicEnrollment::class, \App\Models\CourseEnrollment::class,
-            \App\Models\StudentPayment::class, \App\Models\StudentObservation::class, \App\Models\SessionAttendance::class,
+            \App\Models\StudentObservation::class, \App\Models\SessionAttendance::class,
             \App\Models\TimetableSession::class, \App\Models\Expense::class, \App\Models\SalaryStatement::class,
             \App\Models\SalaryPayment::class, \App\Models\FinancialAccount::class, \App\Models\FinancialTransaction::class] as $scopedModel) {
             $scopedModel::addGlobalScope(AuthorizationService::DATA_SCOPE, function ($query): void {
@@ -103,18 +102,15 @@ class AppServiceProvider extends ServiceProvider
         foreach (SchoolAttendancePermission::cases() as $permission) {
             Gate::define($permission->value, fn (User $user) => $user->tenant?->organization_type === 'private_school' && $user->hasPermission($permission->value));
         }
-        $created = [StudentPayment::class => 'student_payment.recorded', \App\Models\FinancialTransaction::class => 'financial_transaction.recorded', SalaryPayment::class => 'salary_payment.recorded', SalaryAdjustment::class => 'salary_adjustment.recorded', EnrollmentFinancialAdjustment::class => 'student_finance.adjusted', StudentHistory::class => 'student_history.recorded', Certificate::class => 'certificate.issued'];
+        $created = [\App\Models\FinancialTransaction::class => 'financial_transaction.recorded', SalaryPayment::class => 'salary_payment.recorded', SalaryAdjustment::class => 'salary_adjustment.recorded', StudentHistory::class => 'student_history.recorded', Certificate::class => 'certificate.issued'];
         foreach ($created as $model => $event) {
             $model::created(fn ($item) => self::audit($event, $item, null, $item->getAttributes()));
         }
-        CourseEnrollment::saved(function (CourseEnrollment $enrollment): void {
-            if ($enrollment->student_id && $enrollment->status === \App\Enums\ApplicationStatus::REGISTERED) {
-                app(\App\Services\FormationBillingService::class)->generateForEnrollment($enrollment);
-            }
-        });
+        CourseEnrollment::observe(FinancialEnrollmentObserver::class);
+        \App\Models\StudentAcademicEnrollment::observe(FinancialEnrollmentObserver::class);
         TrainingSession::updated(fn ($item) => self::audit('session.changed', $item, $item->getOriginal(), $item->getChanges()));
         Badge::updated(fn ($item) => self::audit('badge.changed', $item, $item->getOriginal(), $item->getChanges()));
-        foreach ([TrainingPlan::class, TrainingPlanTeacherAccess::class, TrainingSession::class, SessionAttendance::class, TeacherAttendance::class, StudentPayment::class, SalaryStatement::class, SalaryPayment::class, CourseEnrollment::class] as $model) {
+        foreach ([TrainingPlan::class, TrainingPlanTeacherAccess::class, TrainingSession::class, SessionAttendance::class, TeacherAttendance::class, \App\Models\FinancialTransaction::class, SalaryStatement::class, SalaryPayment::class, CourseEnrollment::class] as $model) {
             $model::observe(PortalNotificationObserver::class);
         }
     }

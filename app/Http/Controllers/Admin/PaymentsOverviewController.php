@@ -36,11 +36,12 @@ final class PaymentsOverviewController extends Controller
             ->whereHas('account', fn (Builder $query) => $overview->apply($query, $filters));
         $overview->dates($transactions, 'transaction_date', $filters);
 
-        $monthly = (clone $transactions)->selectRaw("substr(transaction_date, 1, 7) as period, SUM(CASE WHEN type = 'payment' THEN amount WHEN type IN ('refund', 'reversal') THEN -ABS(amount) ELSE 0 END) as total")
+        $monthly = (clone $transactions)->selectRaw("substr(transaction_date, 1, 7) as period, SUM(CASE WHEN payment_method IS NOT NULL THEN amount ELSE 0 END) as total")
             ->groupBy('period')->orderBy('period')->limit(18)->get();
-        $daily = (clone $transactions)->selectRaw("transaction_date as period, SUM(CASE WHEN type = 'payment' THEN amount WHEN type IN ('refund', 'reversal') THEN -ABS(amount) ELSE 0 END) as total")
+        $daily = (clone $transactions)->selectRaw("transaction_date as period, SUM(CASE WHEN payment_method IS NOT NULL THEN amount ELSE 0 END) as total")
             ->groupBy('transaction_date')->orderByDesc('transaction_date')->limit(31)->get()->reverse()->values();
-        $methods = (clone $transactions)->where('type', 'payment')->whereNotNull('payment_method')
+        // Cash movements carry a payment method; cancelled payments net out.
+        $methods = (clone $transactions)->whereNotNull('payment_method')
             ->selectRaw('payment_method, SUM(amount) as total')->groupBy('payment_method')->orderByDesc('total')->get();
 
         $recent = (clone $transactions)->with(['account.student:id,first_name,last_name', 'recorder:id,name',

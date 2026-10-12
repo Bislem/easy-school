@@ -34,13 +34,13 @@ class DemoTeacherAccountConsolidationSeeder extends Seeder
                 ['attendance_histories', 'user_id'], ['audit_logs', 'user_id'],
                 ['badges', 'status_changed_by'], ['badges', 'issued_by'], ['certificates', 'issued_by'],
                 ['drivers', 'approved_by'], ['drivers', 'user_id'], ['employee_attendances', 'locked_by'],
-                ['employee_attendances', 'recorded_by'], ['enrollment_financial_adjustments', 'created_by'],
+                ['employee_attendances', 'recorded_by'], ['financial_transactions', 'recorded_by'],
                 ['enrollment_forms', 'teacher_id'], ['enrollment_histories', 'user_id'],
                 ['expenses', 'created_by'], ['expenses', 'employee_id'], ['fuel_tank_records', 'recorded_by'],
                 ['payments', 'user_id'], ['portal_notifications', 'recipient_id'], ['reservations', 'user_id'],
                 ['salary_payments', 'created_by'], ['salary_statements', 'generated_by'],
                 ['session_attendances', 'recorded_by'], ['student_histories', 'user_id'],
-                ['student_payments', 'recorded_by'], ['students', 'user_id'], ['parents', 'user_id'],
+                ['students', 'user_id'], ['parents', 'user_id'],
                 ['tickets', 'user_id'], ['training_plans', 'teacher_id'], ['training_sessions', 'attendance_locked_by'],
             ] as [$table, $column]) {
                 DB::table($table)->where($column, $duplicate->id)->update([$column => $canonical->id]);

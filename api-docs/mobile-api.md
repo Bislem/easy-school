@@ -203,7 +203,7 @@ All routes require a parent context token. `{student}` must be linked to the sel
 | POST | `/parent/children/{student}/observations/{observation}/replies` | Reply to a teacher/admin observation thread |
 | GET | `/parent/children/{student}/certificates` | Certificates and verification URLs |
 | GET | `/parent/children/{student}/documents` | Safe document metadata and URLs |
-| GET | `/parent/children/{student}/payments` | Balances, installments and payment records |
+| GET | `/parent/children/{student}/payments` | One entry per billing account (school year or formation): `domain`, `title`, `context`, `status`, `closed`, `expected`, `credits`, `paid`, `balance`, `overdue`, `next_due`, `installments[]` and `payments[]` (with `cancelled`) |
 
 Child switching is client-side: use the IDs returned by `GET /parent/children`, keep the selected child ID in application state, and request that child's endpoints. No separate child token is needed. If the school hides a child, it disappears from the list and every direct data endpoint for that ID is denied.
 

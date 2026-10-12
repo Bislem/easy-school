@@ -14,12 +14,14 @@ use App\Models\ReportCard;
 use App\Models\Student;
 use App\Models\StudentAcademicEnrollment;
 use App\Models\StudentObservation;
-use App\Models\StudentPayment;
+use App\Models\FinancialTransaction;
 use App\Models\TimetableSession;
 use App\Models\TimetableSetting;
 use App\Models\TrainingSession;
+use App\Services\FinancialReceiptService;
 use App\Services\ParentAcademicResultsService;
 use App\Services\StudentAcademicEnrollmentService;
+use App\Services\StudentFinanceSummary;
 use App\Services\TenantStorageService;
 use App\Tenancy\TenantContext;
 use Carbon\Carbon;
@@ -30,6 +32,7 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\Response as HttpResponse;
 use MohamedGaldi\ViltFilepond\Models\TempFile;
 use MohamedGaldi\ViltFilepond\Services\FilePondService;
 
@@ -63,7 +66,7 @@ class ParentPortalController extends Controller
         abort_unless($student, 403, 'Cet enfant n’est pas associé à votre compte.');
         $this->activateChildTenant($request, $student);
         [$children, , $year] = $this->context($request, $student);
-        $student->load(['enrollments.form.course', 'enrollments.trainingPlanGroup.plan.level.course', 'enrollments.installments', 'enrollments.payments.recorder:id,name', 'badges.template', 'certificates.enrollment.form.course', 'histories.user:id,name', 'files', 'user:id,email,is_active', 'observations' => fn ($query) => $query->whereNull('parent_id')->with(['author:id,name,role', 'replies.author:id,name,role']), 'attendances.session.group.plan.level.course', 'attendances.session.teacher:id,name']);
+        $student->load(['enrollments.form.course', 'enrollments.trainingPlanGroup.plan.level.course', 'badges.template', 'certificates.enrollment.form.course', 'histories.user:id,name', 'files', 'user:id,email,is_active', 'observations' => fn ($query) => $query->whereNull('parent_id')->with(['author:id,name,role', 'replies.author:id,name,role']), 'attendances.session.group.plan.level.course', 'attendances.session.teacher:id,name']);
         $expected = TrainingSession::whereHas('group.enrollments', fn ($query) => $query->where('student_id', $student->id)->where('status', 'registered'))->count();
         $records = $student->attendances;
         $present = $records->whereIn('status', ['present', 'late'])->count();
@@ -74,6 +77,7 @@ class ParentPortalController extends Controller
             'student' => $student, 'statuses' => collect(\App\Enums\StudentStatus::cases())->map(fn ($status) => $status->value),
             'readOnly' => false, 'parentView' => true, 'isPrivateSchool' => true, 'academicJourney' => $journey,
             'selectedAcademicEnrollment' => $journey->first(), 'academicallyActive' => $journey->first()?->isAcademicallyActive() ?? false,
+            'finance' => app(StudentFinanceSummary::class)->forStudent($student),
         ]);
     }
 
@@ -358,6 +362,25 @@ class ParentPortalController extends Controller
         ]);
     }
 
+    public function payments(Request $request, StudentFinanceSummary $finance): Response
+    {
+        [$children, $child, $year] = $this->context($request);
+
+        return Inertia::render('Parent/Payments', [
+            'portal' => $this->portalProps($request, $children, $child, $year),
+            'finance' => $child ? $finance->forStudent($child) : null,
+        ]);
+    }
+
+    public function paymentReceipt(Request $request, int $transaction, FinancialReceiptService $receipts): HttpResponse
+    {
+        [$children] = $this->context($request);
+        $transaction = FinancialTransaction::with('account')->findOrFail($transaction);
+        abort_unless($children->contains('id', $transaction->account?->student_id), 403, 'Ce reçu ne concerne pas un de vos enfants.');
+
+        return $receipts->download($transaction);
+    }
+
     public function announcements(Request $request): Response
     {
         [$children, $child, $year] = $this->context($request);
@@ -456,7 +479,7 @@ class ParentPortalController extends Controller
                 'report_cards' => Schema::hasTable('report_cards'),
                 'events' => Schema::hasTable('academic_year_calendar_events'),
                 'announcements' => Schema::hasTable('portal_notifications'),
-                'payments' => Schema::hasTable('student_payments'),
+                'payments' => true,
                 'messages' => Schema::hasTable('messages'),
                 'homework' => Schema::hasTable('homework') || Schema::hasTable('assignments'),
             ],
@@ -541,9 +564,9 @@ class ParentPortalController extends Controller
         $absences = $currentPeriod ? (clone $absenceQuery)->whereBetween('date', [$currentPeriod->starts_on, $currentPeriod->ends_on])->count() : 0;
         $unjustified = (clone $absenceQuery)->where('status', '!=', 'EXCUSED')->whereNull('justified_at')->whereNull('justification')->count();
         $report = ReportCard::where('student_id', $student->id)->where('academic_year_id', $year->id)->whereNotNull('published_at')->latest('published_at')->first();
-        $payment = StudentPayment::where('student_id', $student->id)->latest('payment_date')->first();
+        $payment = FinancialTransaction::where('type', 'payment')->whereDoesntHave('reversal')->whereHas('account', fn ($q) => $q->where('student_id', $student->id))->latest('transaction_date')->latest('id')->first();
 
-        return ['absences' => $absences, 'unjustified_absences' => $unjustified, 'report_card' => $report ? ['period' => $report->period_key] : null, 'payment' => $payment ? ['amount' => $payment->amount, 'date' => $payment->payment_date?->format('Y-m-d')] : null];
+        return ['absences' => $absences, 'unjustified_absences' => $unjustified, 'report_card' => $report ? ['period' => $report->period_key] : null, 'payment' => $payment ? ['amount' => $payment->amount, 'date' => $payment->transaction_date?->format('Y-m-d')] : null];
     }
 
     private function activity(Request $request, Student $student, ?AcademicYear $year): array

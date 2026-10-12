@@ -19,8 +19,10 @@ use App\Models\Staff;
 use App\Models\Student;
 use App\Models\StudentAcademicEnrollment;
 use App\Models\StudentObservation;
-use App\Models\StudentPayment;
 use App\Models\TimetableSession;
+use App\Models\TrainingPlan;
+use App\Models\TrainingPlanGroup;
+use App\Models\TrainingSession;
 use App\Models\User;
 use App\Support\PermissionCatalog;
 use Illuminate\Database\Eloquent\Builder;
@@ -133,22 +135,26 @@ final class AuthorizationService
             'admin.salaries.' => $write ? 'salaries.manage' : 'salaries.view',
             'admin.school-payments.fee-structures.' => 'school_fees.manage',
             'admin.school-payments.generation.' => 'school_fees.manage',
-            'admin.school-payments.movements.' => str_contains($name, 'refund') ? 'payments.refund' : 'school_fees.manage',
+            'admin.school-payments.movements.' => 'school_fees.manage',
+            'admin.school-payments.transactions.' => 'payments.cancel',
             'admin.school-payments.payments.' => 'payments.collect',
             'admin.school-payments.receipts.' => 'payments.view',
             'admin.school-payments.' => 'school_fees.view',
-            'admin.formation-payments.pricing.' => 'payments.collect',
-            'admin.formation-payments.generation.' => 'payments.collect',
+            'admin.formation-payments.pricing.' => 'formation_fees.manage',
+            'admin.formation-payments.generation.' => 'formation_fees.manage',
             'admin.formation-payments.payments.' => 'payments.collect',
-            'admin.formation-payments.movements.' => 'payments.collect',
+            'admin.formation-payments.movements.' => 'formation_fees.manage',
+            'admin.formation-payments.transactions.' => 'payments.cancel',
             'admin.formation-payments.export' => 'payments.export',
             'admin.formation-payments.receipts.' => 'payments.view',
             'admin.formation-payments.' => 'payments.view',
             'admin.payments-overview.export' => 'financial_reports.export',
             'admin.payments-overview.' => 'financial_reports.view',
-            'admin.finance.' => $write ? 'payments.collect' : 'payments.view',
             'admin.expenses.' => $delete ? 'expenses.delete' : ($create ? 'expenses.create' : ($write ? 'expenses.update' : 'expenses.view')),
             'admin.enrollment-forms.' => $write ? 'enrollments.manage' : 'enrollments.view',
+            // Group, session and attendance actions are refined per plan by TrainingPlansController.
+            'admin.training-plans.groups.' => 'timetables.view',
+            'admin.training-plans.sessions.' => 'timetables.view',
             'admin.training-plans.' => $write ? 'timetables.manage' : 'timetables.view',
             'admin.plans.' => $write ? 'timetables.manage' : 'timetables.view',
             'admin.registrations.' => $write ? 'enrollments.manage' : 'enrollments.view',
@@ -174,10 +180,7 @@ final class AuthorizationService
         ];
         $exact = [
             'admin.school-payments.generate' => 'school_fees.manage',
-            'admin.formation-payments.generate' => 'payments.collect',
-            'admin.finance.payments.reverse' => 'payments.cancel',
-            'admin.finance.payments.refund' => 'payments.refund',
-            'admin.finance.payments.receipt' => 'payments.view',
+            'admin.formation-payments.generate' => 'formation_fees.manage',
             'admin.salaries.generate' => 'salaries.approve',
             'admin.salaries.declarations.declared' => 'salaries.approve',
             'admin.salaries.print' => 'salaries.export',
@@ -236,14 +239,28 @@ final class AuthorizationService
             $model instanceof SchoolParent => $query->where('user_id', $user->id),
             $model instanceof StudentObservation => $query->where('author_id', $user->id),
             $model instanceof StudentAcademicEnrollment, $model instanceof CourseEnrollment,
-            $model instanceof StudentPayment, $model instanceof SessionAttendance => $query->whereHas('student', fn ($q) => $q->where('user_id', $user->id)),
+            $model instanceof SessionAttendance => $query->whereHas('student', fn ($q) => $q->where('user_id', $user->id)),
             $model instanceof FinancialAccount => $query->whereHas('student', fn ($q) => $q->where('user_id', $user->id)),
             $model instanceof FinancialTransaction => $query->whereHas('account.student', fn ($q) => $q->where('user_id', $user->id)),
             $model instanceof ReportCard => $query->whereHas('student', fn ($q) => $q->where('user_id', $user->id)),
             $model instanceof SalaryStatement, $model instanceof SalaryPayment => $query->whereHas('staff', fn ($q) => $q->where('user_id', $user->id)),
             $model instanceof Expense => $query->where(fn ($q) => $q->where('created_by', $user->id)->orWhereHas('staff', fn ($s) => $s->where('user_id', $user->id))),
             $model instanceof TimetableSession => $query->where('teacher_id', $user->id),
+            $model instanceof TrainingPlan, $model instanceof TrainingPlanGroup, $model instanceof TrainingSession => $this->taughtPlans($query, $model, $user),
             default => $query->whereRaw('1 = 0'),
+        };
+    }
+
+    /** Formation planning a teacher leads or was given access to. */
+    private function taughtPlans(Builder $query, Model $model, User $user): Builder
+    {
+        $plans = fn ($plan) => $plan->withoutGlobalScope(self::DATA_SCOPE)->where(fn ($q) => $q->where('teacher_id', $user->id)
+            ->orWhereHas('teacherAccesses', fn ($access) => $access->where('teacher_id', $user->id)));
+
+        return match (true) {
+            $model instanceof TrainingPlan => $plans($query),
+            $model instanceof TrainingPlanGroup => $query->whereHas('plan', $plans),
+            default => $query->where(fn ($q) => $q->where('teacher_id', $user->id)->orWhereHas('group.plan', $plans)),
         };
     }
 
@@ -263,13 +280,14 @@ final class AuthorizationService
             $model instanceof CourseEnrollment => $query->where(fn ($enrollments) => $enrollments
                 ->whereIn('training_plan_group_id', $trainingGroupIds)
                 ->orWhereHas('student', fn ($q) => $this->assigned($q->withoutGlobalScope(self::DATA_SCOPE), $q->getModel(), $user))),
-            $model instanceof StudentPayment, $model instanceof SessionAttendance, $model instanceof StudentObservation => $query->whereHas('student', fn ($q) => $this->assigned($q->withoutGlobalScope(self::DATA_SCOPE), $q->getModel(), $user)),
+            $model instanceof SessionAttendance, $model instanceof StudentObservation => $query->whereHas('student', fn ($q) => $this->assigned($q->withoutGlobalScope(self::DATA_SCOPE), $q->getModel(), $user)),
             $model instanceof FinancialAccount => $query->where(fn ($accounts) => $accounts
                 ->whereHasMorph('accountable', [StudentAcademicEnrollment::class], fn ($q) => $q->whereIn('school_group_id', $groupIds))
                 ->orWhereHasMorph('accountable', [CourseEnrollment::class], fn ($q) => $q->whereIn('training_plan_group_id', $trainingGroupIds))),
             $model instanceof FinancialTransaction => $query->whereHas('account', fn ($q) => $this->assigned($q->withoutGlobalScope(self::DATA_SCOPE), $q->getModel(), $user)),
             $model instanceof TimetableSession => $query->where(fn ($q) => $q->whereIn('school_group_id', $groupIds)->orWhere('teacher_id', $user->id)),
             $model instanceof Staff => $this->own($query, $model, $user),
+            $model instanceof TrainingPlan, $model instanceof TrainingPlanGroup, $model instanceof TrainingSession => $this->taughtPlans($query, $model, $user),
             default => $query->whereRaw('1 = 0'),
         };
     }
@@ -286,7 +304,7 @@ final class AuthorizationService
             $model instanceof StudentAcademicEnrollment => $query->whereHas('group.classroom', fn ($q) => $q->withoutGlobalScope(self::DATA_SCOPE)->whereIn('school_site_id', $siteIds)),
             $model instanceof ReportCard => $query->whereHas('group.classroom', fn ($q) => $q->withoutGlobalScope(self::DATA_SCOPE)->whereIn('school_site_id', $siteIds)),
             $model instanceof CourseEnrollment => $query->whereHas('student.group.classroom', fn ($q) => $q->withoutGlobalScope(self::DATA_SCOPE)->whereIn('school_site_id', $siteIds)),
-            $model instanceof StudentPayment, $model instanceof SessionAttendance, $model instanceof StudentObservation => $query->whereHas('student.group.classroom', fn ($q) => $q->withoutGlobalScope(self::DATA_SCOPE)->whereIn('school_site_id', $siteIds)),
+            $model instanceof SessionAttendance, $model instanceof StudentObservation => $query->whereHas('student.group.classroom', fn ($q) => $q->withoutGlobalScope(self::DATA_SCOPE)->whereIn('school_site_id', $siteIds)),
             $model instanceof FinancialAccount => $query->where(fn ($account) => $account->whereHasMorph('accountable', [StudentAcademicEnrollment::class], fn ($q) => $q->whereHas('group.classroom', fn ($c) => $c->whereIn('school_site_id', $siteIds)))->orWhereHasMorph('accountable', [CourseEnrollment::class], fn ($q) => $q->where(fn ($enrollment) => $enrollment->whereHas('trainingPlanGroup.classroom', fn ($c) => $c->whereIn('school_site_id', $siteIds))->orWhereHas('form.classroom', fn ($c) => $c->whereIn('school_site_id', $siteIds))))),
             $model instanceof FinancialTransaction => $query->whereHas('account', fn ($q) => $this->site($q->withoutGlobalScope(self::DATA_SCOPE), $q->getModel(), $user)),
             $model instanceof TimetableSession => $query->whereHas('room', fn ($q) => $q->whereIn('school_site_id', $siteIds)),

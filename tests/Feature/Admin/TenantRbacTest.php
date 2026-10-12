@@ -163,8 +163,9 @@ test('sensitive routes use distinct permissions and unknown admin routes fail cl
     $authorization = app(AuthorizationService::class);
 
     expect($authorization->permissionForRoute('admin.salaries.generate', 'POST'))->toBe('salaries.approve')
-        ->and($authorization->permissionForRoute('admin.finance.payments.reverse', 'POST'))->toBe('payments.cancel')
-        ->and($authorization->permissionForRoute('admin.finance.payments.refund', 'POST'))->toBe('payments.refund')
+        ->and($authorization->permissionForRoute('admin.school-payments.transactions.cancel', 'POST'))->toBe('payments.cancel')
+        ->and($authorization->permissionForRoute('admin.formation-payments.transactions.cancel', 'POST'))->toBe('payments.cancel')
+        ->and($authorization->permissionForRoute('admin.formation-payments.movements.store', 'POST'))->toBe('formation_fees.manage')
         ->and($authorization->permissionForRoute('admin.reports.export', 'GET'))->toBe('reports.export')
         ->and($authorization->permissionForRoute('admin.users.roles.assign', 'PUT'))->toBe('roles.manage')
         ->and($authorization->permissionForRoute('admin.unmapped.secret', 'GET'))->toBeNull();

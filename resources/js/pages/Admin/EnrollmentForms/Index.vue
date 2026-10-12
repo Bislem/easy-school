@@ -35,14 +35,12 @@ interface EnrollmentForm {
     end_date: string;
     min_students: number;
     max_students: number;
-    groups_count: number;
-    students_per_group?: number | null;
     is_active: boolean;
     course_id: number;
-    teacher_id: number;
+    teacher_id?: number | null;
     classroom_id?: number | null;
     course: Option;
-    teacher: Option;
+    teacher?: Option | null;
     classroom?: Option | null;
     enrollments_count: number;
     confirmed_enrollments_count: number;
@@ -78,8 +76,6 @@ const form = useForm({
     end_date: '',
     min_students: 1,
     max_students: 20,
-    groups_count: 1,
-    students_per_group: 20,
     is_active: true,
     cover_temp_folders: [] as string[],
     cover_removed_files: [] as number[],
@@ -104,8 +100,6 @@ function openCreate() {
     coverRemovedFiles.value = [];
     form.min_students = 1;
     form.max_students = 20;
-    form.groups_count = 1;
-    form.students_per_group = 20;
     form.is_active = true;
     modalOpen.value = true;
 }
@@ -113,15 +107,13 @@ function openEdit(item: EnrollmentForm) {
     editing.value = item;
     form.clearErrors();
     form.course_id = String(item.course_id);
-    form.teacher_id = String(item.teacher_id);
+    form.teacher_id = item.teacher_id ? String(item.teacher_id) : '';
     form.classroom_id = item.classroom_id ? String(item.classroom_id) : '';
     form.title = item.title;
     form.start_date = item.start_date;
     form.end_date = item.end_date;
     form.min_students = item.min_students;
     form.max_students = item.max_students;
-    form.groups_count = item.groups_count;
-    form.students_per_group = item.students_per_group ?? 20;
     form.is_active = item.is_active;
     coverFiles.value = item.files
         .filter((file) => file.collection === 'cover')
@@ -272,17 +264,6 @@ const paginationLabel = (label: string) =>
                                     {{ item.max_students }}
                                 </p>
                             </div>
-                            <div class="rounded-lg bg-muted/50 p-3">
-                                <p class="text-muted-foreground">Groupes</p>
-                                <p class="mt-1 font-semibold">
-                                    {{ item.groups_count }} groupe(s) ·
-                                    {{
-                                        item.classroom?.capacity ??
-                                        item.students_per_group
-                                    }}
-                                    / groupe
-                                </p>
-                            </div>
                         </div>
                         <div
                             class="mt-4 space-y-2 text-sm text-muted-foreground"
@@ -292,7 +273,8 @@ const paginationLabel = (label: string) =>
                                 {{ item.start_date }} au {{ item.end_date }}
                             </p>
                             <p class="flex gap-2">
-                                <Users class="size-4" />{{ item.teacher.name
+                                <Users class="size-4" />{{
+                                    item.teacher?.name || 'Formateur à définir'
                                 }}<template v-if="item.classroom">
                                     · {{ item.classroom.name }} ({{
                                         item.classroom.capacity
@@ -422,25 +404,6 @@ const paginationLabel = (label: string) =>
                             class="mt-1"
                         />
                     </div>
-                    <div v-if="!form.classroom_id">
-                        <Label for="students_per_group"
-                            >Étudiants par groupe</Label
-                        ><Input
-                            id="students_per_group"
-                            v-model="form.students_per_group"
-                            type="number"
-                            min="1"
-                            class="mt-1"
-                            required
-                        /><InputError
-                            :message="form.errors.students_per_group"
-                            class="mt-1"
-                        />
-                        <p class="mt-1 text-xs text-muted-foreground">
-                            Utilisé comme capacité de chaque groupe
-                            lorsqu’aucune salle n’est sélectionnée.
-                        </p>
-                    </div>
                     <div class="grid gap-4 sm:grid-cols-2">
                         <div>
                             <Label for="course">Formation</Label
@@ -464,14 +427,13 @@ const paginationLabel = (label: string) =>
                             />
                         </div>
                         <div>
-                            <Label for="teacher">Enseignant</Label
+                            <Label for="teacher">Enseignant (facultatif)</Label
                             ><select
                                 id="teacher"
                                 v-model="form.teacher_id"
                                 class="mt-1 h-9 w-full rounded-md border bg-transparent px-3 text-sm"
-                                required
                             >
-                                <option value="" disabled>Sélectionner</option>
+                                <option value="">À définir</option>
                                 <option
                                     v-for="teacher in teachers"
                                     :key="teacher.id"
@@ -533,7 +495,7 @@ const paginationLabel = (label: string) =>
                             />
                         </div>
                     </div>
-                    <div class="grid gap-4 sm:grid-cols-3">
+                    <div class="grid gap-4 sm:grid-cols-2">
                         <div>
                             <Label for="min">Minimum</Label
                             ><Input
@@ -559,20 +521,6 @@ const paginationLabel = (label: string) =>
                                 required
                             /><InputError
                                 :message="form.errors.max_students"
-                                class="mt-1"
-                            />
-                        </div>
-                        <div>
-                            <Label for="groups">Groupes</Label
-                            ><Input
-                                id="groups"
-                                v-model="form.groups_count"
-                                type="number"
-                                min="1"
-                                class="mt-1"
-                                required
-                            /><InputError
-                                :message="form.errors.groups_count"
                                 class="mt-1"
                             />
                         </div>

@@ -24,7 +24,7 @@ final class TenantScope
         \App\Models\CourseLevel::class, \App\Models\Driver::class,
         \App\Models\EmployeeAttendance::class, \App\Models\EmployeeDocument::class,
         \App\Models\EmployeeHrRecord::class, \App\Models\EmployeeHrRecordEvent::class,
-        \App\Models\EmployeeType::class, \App\Models\EnrollmentFinancialAdjustment::class,
+        \App\Models\EmployeeType::class,
         \App\Models\EnrollmentForm::class, \App\Models\EnrollmentHistory::class,
         \App\Models\Expense::class, \App\Models\FcmToken::class,
         \App\Models\FuelTankRecord::class, \App\Models\LeaveBalanceAdjustment::class,
@@ -45,8 +45,7 @@ final class TenantScope
         \App\Models\SessionAttendance::class, \App\Models\SickLeave::class,
         \App\Models\SickLeaveEvent::class, \App\Models\Staff::class,
         \App\Models\Student::class, \App\Models\StudentHistory::class,
-        \App\Models\StudentInstallment::class, \App\Models\StudentObservation::class,
-        \App\Models\StudentPayment::class, \App\Models\TeacherAttendance::class,
+        \App\Models\StudentObservation::class, \App\Models\TeacherAttendance::class,
         \App\Models\SchoolFeeStructure::class, \App\Models\SchoolFeeComponent::class, \App\Models\SchoolFeeScheduleItem::class,
         \App\Models\FinancialAccount::class, \App\Models\FinancialInstallment::class, \App\Models\FinancialTransaction::class, \App\Models\FinancialAllocation::class,
         \App\Models\FormationPricingConfig::class, \App\Models\FormationPricingScheduleItem::class,
@@ -90,6 +89,7 @@ final class TenantScope
             $model->setAttribute('tenant_id', $tenantId);
         });
 
-        $modelClass::resolveRelationUsing('tenant', fn (Model $model): BelongsTo => $model->belongsTo(Tenant::class));
+        // Keys are explicit: inside a closure Eloquent cannot guess them from the relation name.
+        $modelClass::resolveRelationUsing('tenant', fn (Model $model): BelongsTo => $model->belongsTo(Tenant::class, 'tenant_id', 'id', 'tenant'));
     }
 }

@@ -10,12 +10,14 @@ use App\Models\Expense;
 use App\Models\Student;
 use App\Models\User;
 use App\Models\TrainingSession;
-use App\Models\StudentInstallment;
+use App\Models\FinancialAccount;
+use App\Models\FinancialInstallment;
 use App\Models\SessionAttendance;
 use App\Models\SalaryStatement;
 use App\Models\Staff;
 use App\Models\TrainingPlanGroup;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 use Illuminate\Http\RedirectResponse;
@@ -85,8 +87,8 @@ class DashboardController extends Controller
             ->values();
         $groupAttendance=TrainingPlanGroup::with('plan.course')->withCount('sessions')->get()->map(function($group){$records=SessionAttendance::whereHas('session',fn($q)=>$q->where('training_plan_group_id',$group->id))->get();$rate=$records->count()?round($records->whereIn('status',['present','late'])->count()/$records->count()*100,1):null;return ['id'=>$group->id,'name'=>$group->name,'formation'=>$group->plan?->course?->title ?? 'Formation supprimée','rate'=>$rate];})->filter(fn($g)=>$g['rate']!==null&&$g['rate']<75)->values();
         $completedMinutes=TrainingSession::where('status','completed')->get()->sum(fn($s)=>$s->starts_at && $s->ends_at ? $s->starts_at->diffInMinutes($s->ends_at) : 0);
-        $nearCompletionGroups=TrainingPlanGroup::with(['plan.course','sessions'])->get()->filter(function($group){$duration=(float)($group->plan?->course?->duration_hours ?? 0);$done=$group->sessions->where('status','completed')->sum(fn($s)=>$s->starts_at && $s->ends_at ? $s->starts_at->diffInMinutes($s->ends_at) : 0)/60;return $duration>0&&$done/$duration>=.8&&$done<$duration;})->count();
-        $salariesDue=(float)SalaryStatement::whereIn('status',['pending','partially_paid'])->sum('remaining_amount');$salariesPaid=(float)SalaryStatement::sum('amount_paid');$expenses=(float)Expense::sum('amount');$collected=(float)CourseEnrollment::whereNotNull('student_id')->sum('total_paid');
+        $nearCompletionGroups=TrainingPlanGroup::with(['plan.level','sessions'])->get()->filter(function($group){$duration=(float)($group->plan?->level?->duration_hours ?? 0);$done=$group->sessions->where('status','completed')->sum(fn($s)=>$s->starts_at && $s->ends_at ? $s->starts_at->diffInMinutes($s->ends_at) : 0)/60;return $duration>0&&$done/$duration>=.8&&$done<$duration;})->count();
+        $salariesDue=(float)SalaryStatement::whereIn('status',['pending','partially_paid'])->sum('remaining_amount');$salariesPaid=(float)SalaryStatement::sum('amount_paid');$expenses=(float)Expense::sum('amount');$collected=(float)FinancialAccount::sum('paid_total');
 
         $activities = collect()
             ->merge(Student::latest()->limit(3)->get()->map(fn ($student) => [
@@ -108,7 +110,7 @@ class DashboardController extends Controller
                     'students' => Student::where('is_active', true)->count(),
                     'monthly_enrollments' => CourseEnrollment::where('status', 'registered')->whereBetween('registered_at', [$today->copy()->startOfMonth(), $today->copy()->endOfMonth()])->count(),
                     'ongoing_courses' => $activeForms->count(),
-                    'active_groups' => $activeForms->sum('groups_count'),
+                    'active_groups' => TrainingPlanGroup::where('is_active', true)->whereHas('plan', fn ($plan) => $plan->whereIn('status', ['scheduled', 'in_progress']))->count(),
                     'monthly_expenses' => (float) Expense::whereBetween('expense_date', [$today->copy()->startOfMonth(), $today->copy()->endOfMonth()])->sum('amount'),
                     'teachers_today' => $todaySessions->pluck('teacher_id')->unique()->count(),
                     'rooms_occupied' => $occupiedRoomIds->count(),
@@ -127,11 +129,11 @@ class DashboardController extends Controller
                     'other_staff'=>Staff::whereHas('employeeType',fn($q)=>$q->where('is_teacher',false))->where('employment_status','active')->count(),
                 ],
                 'finance' => [
-                    'expected' => (float) CourseEnrollment::whereNotNull('student_id')->sum('final_price'),
-                    'collected' => (float) CourseEnrollment::whereNotNull('student_id')->sum('total_paid'),
-                    'remaining' => (float) CourseEnrollment::whereNotNull('student_id')->sum('remaining_balance'),
-                    'overdue' => (float) CourseEnrollment::where('payment_status', 'overdue')->sum('remaining_balance'),
-                    'upcoming' => (float) StudentInstallment::whereBetween('due_date', [$today, $today->copy()->addDays(30)])->whereIn('status', ['pending', 'partial'])->sum('amount'),
+                    'expected' => (float) FinancialAccount::sum(DB::raw('expected_total + adjustment_total')),
+                    'collected' => $collected,
+                    'remaining' => (float) FinancialAccount::sum('balance'),
+                    'overdue' => (float) FinancialAccount::where('status', 'overdue')->sum('balance'),
+                    'upcoming' => (float) FinancialInstallment::whereBetween('due_date', [$today, $today->copy()->addDays(30)])->whereIn('status', ['pending', 'partial'])->sum(DB::raw('amount - (SELECT COALESCE(SUM(financial_allocations.amount), 0) FROM financial_allocations WHERE financial_allocations.financial_installment_id = financial_installments.id)')),
                     'expenses'=>$expenses,'salaries_due'=>$salariesDue,'salaries_paid'=>$salariesPaid,'net_cash_flow'=>$collected-$expenses,
                 ],
                 'attendance' => ['rate' => $attendanceTotal?round($attendancePresent/$attendanceTotal*100,1):null, 'recent_absences' => $repeatedAbsences, 'low_groups' => $groupAttendance, 'missing_documents' => []],

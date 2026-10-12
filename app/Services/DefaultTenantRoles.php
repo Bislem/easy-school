@@ -22,7 +22,7 @@ final class DefaultTenantRoles
         return [
             self::TENANT_ADMINISTRATOR => ['name' => 'Tenant Administrator', 'permissions' => $all],
             'hr' => ['name' => 'RH', 'permissions' => self::matching(['employees.', 'staff_attendance.', 'salaries.', 'payslips.', 'hr_records.'])],
-            'finance' => ['name' => 'Finance', 'permissions' => self::matching(['payments.', 'school_fees.', 'expenses.', 'financial_reports.'])],
+            'finance' => ['name' => 'Finance', 'permissions' => self::matching(['payments.', 'school_fees.', 'formation_fees.', 'expenses.', 'financial_reports.'])],
             'general_supervision' => ['name' => 'Surveillance générale', 'permissions' => self::matching(['students.', 'parents.', 'groups.', 'timetables.', 'student_attendance.', 'absences.', 'discipline.', 'observations.'])],
             'teacher' => ['name' => 'Teacher', 'permissions' => self::matching(['assigned_groups.', 'timetables.view', 'absences.view', 'student_absences.manage', 'grades.', 'homework.', 'observations.'])],
             'reception_registration' => ['name' => 'Reception/Registration', 'permissions' => self::matching(['enrollments.', 'students.view', 'students.create', 'students.update', 'parents.', 'administrative_documents.'])],

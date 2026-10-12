@@ -16,7 +16,7 @@ class EnrollmentForm extends Model
 
     protected $fillable = [
         'course_id', 'teacher_id', 'classroom_id', 'title', 'start_date', 'end_date',
-        'min_students', 'max_students', 'groups_count', 'students_per_group', 'is_active',
+        'min_students', 'max_students', 'is_active',
     ];
 
     protected static function booted(): void
@@ -28,8 +28,7 @@ class EnrollmentForm extends Model
     {
         return [
             'start_date' => 'date:Y-m-d', 'end_date' => 'date:Y-m-d',
-            'min_students' => 'integer', 'max_students' => 'integer',
-            'groups_count' => 'integer', 'students_per_group' => 'integer', 'is_active' => 'boolean',
+            'min_students' => 'integer', 'max_students' => 'integer', 'is_active' => 'boolean',
         ];
     }
 
@@ -63,30 +62,18 @@ class EnrollmentForm extends Model
         return $this->hasMany(FormationPricingConfig::class);
     }
 
-    public function groupCapacity(): int
+    public function registeredCount(): int
     {
-        if ($this->classroom_id) {
-            $this->loadMissing('classroom');
-
-            return (int) $this->classroom->capacity;
-        }
-
-        return (int) ($this->students_per_group
-            ?: max(1, (int) ceil($this->max_students / max(1, $this->groups_count))));
+        return $this->enrollments()->where('status', 'registered')->count();
     }
 
-    public function nextAvailableGroup(): ?int
+    /** Public registration is open while the session is active, not ended, not full and its formation is active. */
+    public function acceptsApplications(): bool
     {
-        $counts = $this->enrollments()->where('status', 'registered')
-            ->selectRaw('group_number, COUNT(*) as total')
-            ->groupBy('group_number')
-            ->pluck('total', 'group_number');
-        $capacity = $this->groupCapacity();
+        $this->loadMissing('course');
 
-        return collect(range(1, $this->groups_count))
-            ->filter(fn (int $group) => (int) ($counts[$group] ?? 0) < $capacity)
-            ->sortBy(fn (int $group) => (int) ($counts[$group] ?? 0))
-            ->first();
+        return $this->is_active && $this->course?->is_active && ! $this->end_date?->lt(today())
+            && $this->registeredCount() < $this->max_students;
     }
 
     public function getCoverUrlAttribute(): ?string

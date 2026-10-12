@@ -12,7 +12,7 @@ final class FinancialReceiptService
     public function download(FinancialTransaction $transaction): Response
     {
         abort_unless($transaction->type === 'payment', 404);
-        $transaction->load(['account.student', 'account.academicYear', 'account.accountable', 'recorder', 'allocations.installment']);
+        $transaction->load(['account.student', 'account.academicYear', 'account.accountable', 'recorder', 'allocations.installment', 'reversal']);
         $view = $transaction->account->domain === 'school' ? 'admin.school-payments.receipt' : 'admin.formation-payments.receipt';
 
         return Pdf::loadView($view, ['transaction' => $transaction, 'school' => CompanySetting::current(), 'currency' => config('app.currency_symbol')])->download($transaction->reference.'.pdf');

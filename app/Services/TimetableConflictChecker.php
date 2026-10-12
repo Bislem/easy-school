@@ -83,6 +83,16 @@ class TimetableConflictChecker
             }
         }
 
+        foreach (app(SharedResourceBookings::class)->trainingConflicts($data, $year) as $training) {
+            $when = $training->starts_at->format('d/m/Y H:i');
+            if ((int) $training->teacher_id === (int) $data['teacher_id']) {
+                $conflicts[] = ['type' => 'teacher_conflict', 'field' => 'teacher_id', 'message' => "The teacher has a formation session on {$when}."];
+            }
+            if ((int) $training->classroom_id === (int) $data['classroom_id']) {
+                $conflicts[] = ['type' => 'room_conflict', 'field' => 'classroom_id', 'message' => "The room is used by a formation session on {$when}."];
+            }
+        }
+
         $groupSize = (int) $group->students_count;
         if ($room->capacity < $groupSize) {
             $warnings[] = ['type' => 'room_capacity', 'message' => "Room {$room->name} has capacity {$room->capacity}, below group size {$groupSize}."];

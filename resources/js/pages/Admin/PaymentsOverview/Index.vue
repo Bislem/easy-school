@@ -484,7 +484,7 @@ onBeforeUnmount(() => {
                                     <td>{{ transaction.context }}</td>
                                     <td
                                         :class="
-                                            transaction.type === 'refund'
+                                            transaction.amount < 0
                                                 ? 'text-red-600'
                                                 : 'text-emerald-700'
                                         "

@@ -65,7 +65,7 @@ const studentOptions = computed(() =>
 const enrollmentOptions = computed(() =>
     (selectedStudent.value?.enrollments ?? []).map((e: any) => ({
         ...e,
-        label: `${e.form?.course?.title ?? 'Inscription sans formation liée'} · Groupe ${e.group_number || '—'}`,
+        label: `${e.form?.course?.title ?? 'Inscription sans formation liée'} · ${e.training_plan_group?.name ?? 'Sans groupe'}`,
     })),
 );
 const selectedCourse = computed(() =>

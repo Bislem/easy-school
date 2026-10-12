@@ -512,7 +512,16 @@ const generate = () =>
                                 />
                             </div>
                         </div>
-                        <Button class="w-full">Enregistrer</Button>
+                        <p
+                            v-for="(error, key) in pricing.errors"
+                            :key="key"
+                            class="text-sm text-red-600"
+                        >
+                            {{ error }}
+                        </p>
+                        <Button class="w-full" :disabled="pricing.processing"
+                            >Enregistrer</Button
+                        >
                     </form>
                     <form
                         v-else
@@ -576,7 +585,16 @@ const generate = () =>
                             {{ preview.existing }} existante(s). Les comptes
                             avec historique seront ignorés.
                         </div>
-                        <Button :disabled="!preview" class="w-full"
+                        <p
+                            v-for="(error, key) in generation.errors"
+                            :key="key"
+                            class="text-sm text-red-600"
+                        >
+                            {{ error }}
+                        </p>
+                        <Button
+                            :disabled="!preview || generation.processing"
+                            class="w-full"
                             >Confirmer la génération</Button
                         >
                     </form>
